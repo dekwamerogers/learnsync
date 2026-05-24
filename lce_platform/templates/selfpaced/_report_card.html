@@ -1,0 +1,18 @@
+<div class="rpt-card" style="display:flex;flex-direction:column;gap:8px;">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div class="rpt-card-icon" style="background:{{ color }}1a;">
+      <i class="ti {{ icon }}" style="font-size:16px;color:{{ color }};"></i>
+    </div>
+    <span style="font-size:11px;color:#6b7280;font-weight:500;">{{ label }}</span>
+  </div>
+  <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+    <span style="font-size:24px;font-weight:700;color:#111827;line-height:1;">{{ value }}</span>
+    {% if rate is not None %}
+    <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;
+                 background:{{ color }}1a;color:{{ color }};">{{ rate }}%</span>
+    {% endif %}
+  </div>
+  {% if desc %}
+  <p style="font-size:11px;color:#9ca3af;margin:0;line-height:1.45;">{{ desc }}</p>
+  {% endif %}
+</div>

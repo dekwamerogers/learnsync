@@ -1,0 +1,524 @@
+{% extends "selfpaced/base.html" %}
+{% block title %}Manager Report — LearnSync{% endblock %}
+{% block nav_manager_report %}sp-nav-active{% endblock %}
+{% block page_title %}Manager Report{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Plain tooltip using <abbr> */
+  abbr[title] {
+    text-decoration: underline dotted #9ca3af;
+    cursor: help;
+  }
+  .rpt-card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:16px 18px; }
+  .rpt-card-icon {
+    width:32px; height:32px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .rpt-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+  .rpt-tbl th {
+    padding:8px 10px; background:#f9fafb; color:#6b7280; font-weight:600;
+    border-bottom:1px solid #e5e7eb; white-space:nowrap;
+  }
+  .rpt-tbl th:first-child { text-align:left; padding-left:14px; }
+  .rpt-tbl td { padding:8px 10px; text-align:center; border-bottom:1px solid #f3f4f6; }
+  .rpt-tbl td:first-child { text-align:left; padding-left:14px; font-weight:500; color:#111827; }
+  .rpt-tbl tbody tr:last-child td { border-bottom:none; }
+  .pill {
+    display:inline-block; padding:2px 9px; border-radius:999px;
+    font-size:11px; font-weight:600;
+  }
+  .pill-green  { background:#f0fdf4; color:#16a34a; }
+  .pill-blue   { background:#eff6ff; color:#1d4ed8; }
+  .pill-orange { background:#fff7ed; color:#c2410c; }
+  .glossary-row { display:flex; gap:14px; padding:10px 0; border-bottom:1px solid #f3f4f6; }
+  .glossary-row:last-child { border-bottom:none; }
+  .glossary-term { flex:0 0 160px; font-size:12px; font-weight:600; color:#374151; }
+  .glossary-def  { flex:1; font-size:12px; color:#6b7280; line-height:1.55; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding:0 0 48px;">
+
+  <!-- ── Header ─────────────────────────────────────────────────────────── -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+    <div>
+      <p style="font-size:13px;color:#6b7280;margin:0;">
+        System-wide overview · {{ today|date:"j F Y" }}
+      </p>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <a href="?format=excel"
+         style="display:inline-flex;align-items:center;gap:7px;padding:9px 18px;
+                background:#0452F0;color:#fff;border-radius:8px;text-decoration:none;
+                font-size:13px;font-weight:600;font-family:inherit;">
+        <i class="ti ti-file-spreadsheet" style="font-size:15px;"></i>
+        Download Excel
+      </a>
+      <a href="?format=pdf"
+         style="display:inline-flex;align-items:center;gap:7px;padding:9px 18px;
+                background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:8px;
+                text-decoration:none;font-size:13px;font-weight:600;font-family:inherit;">
+        <i class="ti ti-file-type-pdf" style="font-size:15px;color:#ef4444;"></i>
+        Download PDF
+      </a>
+    </div>
+  </div>
+
+  <!-- ── Unpaid-excluded notice ─────────────────────────────────────────── -->
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;
+              background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;margin-bottom:22px;">
+    <i class="ti ti-info-circle" style="font-size:16px;color:#d97706;flex-shrink:0;"></i>
+    <p style="font-size:12px;color:#92400e;margin:0;line-height:1.5;">
+      <strong>Unpaid learners excluded.</strong>
+      All metrics on this page count only learners whose payment status is Compliant, Due Soon,
+      Grace Period, or Overdue — the {{ unpaid_count }} learner{{ unpaid_count|pluralize }}
+      with <em>Unpaid</em> status have been removed from every figure.
+      Full payment distribution is shown in the Payment Status panel below.
+    </p>
+  </div>
+
+  <!-- ── Summary cards ──────────────────────────────────────────────────── -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;margin-bottom:28px;">
+
+    {% include "selfpaced/_report_card.html" with label="Active Programmes" value=active_programmes icon="ti-school" color="#0452F0" desc="Programmes currently running. Prerequisite / onboarding tracks are excluded." %}
+    {% include "selfpaced/_report_card.html" with label="Paid Enrolled" value=total_enrolled icon="ti-users" color="#0d9488" desc="Learners with a confirmed or pending payment enrolled in at least one programme." %}
+    {% include "selfpaced/_report_card.html" with label="Activated" value=total_activated rate=activation_rate icon="ti-player-play" color="#7c3aed" desc="Enrolled learners who have passed the first module of their programme." %}
+    {% include "selfpaced/_report_card.html" with label="Retained" value=total_retained rate=retention_rate icon="ti-repeat" color="#0891b2" desc="Learners who passed the first module and remain engaged — health is Active, At Risk, or Graduated." %}
+    {% include "selfpaced/_report_card.html" with label="Graduated" value=total_graduated rate=grad_rate icon="ti-award" color="#16a34a" desc="Completed all required courses and met graduation criteria." %}
+    {% include "selfpaced/_report_card.html" with label="Badges Earned" value=total_badges icon="ti-rosette" color="#f59e0b" desc="Course-completion credentials awarded. One badge per passed course — a learner can earn multiple." %}
+    {% include "selfpaced/_report_card.html" with label="Active" value=health_totals.active|default:0 icon="ti-circle-check" color="#0d9488" desc="On track: submitting work, passing assignments, within all inactivity thresholds." %}
+    {% include "selfpaced/_report_card.html" with label="At Risk" value=health_totals.at_risk|default:0 icon="ti-alert-triangle" color="#dc2626" desc="At least one warning flag raised. Needs attention — see the At-Risk Flags panel." %}
+    {% include "selfpaced/_report_card.html" with label="Dormant" value=health_totals.dormant|default:0 icon="ti-moon" color="#6b7280" desc="No meaningful activity for an extended period. Candidates for re-engagement outreach." %}
+
+  </div>
+
+  <!-- ── Programme breakdown table ─────────────────────────────────────── -->
+  <div class="rpt-card" style="margin-bottom:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div>
+        <span style="font-size:13px;font-weight:600;color:#111827;">Programme Breakdown</span>
+        <span style="font-size:11px;color:#9ca3af;margin-left:8px;">paid learners only · hover column headers for definitions</span>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="rpt-tbl">
+        <thead>
+          <tr>
+            <th style="min-width:180px;">Programme</th>
+            <th><abbr title="Paid learners enrolled in this programme.">Enrolled</abbr></th>
+            <th><abbr title="Learners who have passed the first module of their programme.">Activated</abbr></th>
+            <th><abbr title="Activation Rate = Activated ÷ Enrolled. What share of enrolled learners have passed the first module?">Act %</abbr></th>
+            <th><abbr title="Learners who passed the first module and remain engaged — health is Active, At Risk, or Graduated.">Retained</abbr></th>
+            <th><abbr title="Retention Rate = Retained ÷ Activated. Of those who passed the first module, how many are still going?">Ret %</abbr></th>
+            <th style="color:#0d9488;"><abbr title="Currently submitting work, passing assignments, and within inactivity thresholds.">Active</abbr></th>
+            <th style="color:#dc2626;"><abbr title="At least one warning flag raised. See the At-Risk Flags panel for details.">At Risk</abbr></th>
+            <th><abbr title="Enrolled but no meaningful activity for an extended period.">Dormant</abbr></th>
+            <th style="color:#16a34a;"><abbr title="Completed all required courses and met graduation criteria.">Graduated</abbr></th>
+            <th><abbr title="Graduation Rate = Graduated ÷ Enrolled.">Grad %</abbr></th>
+            <th style="color:#f59e0b;"><abbr title="Course-completion credentials earned by learners in this programme. One per passed course.">Badges</abbr></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in prog_rows %}
+          <tr>
+            <td>
+              {{ p.programme__name }}<br>
+              <span style="font-size:11px;color:#9ca3af;font-weight:400;">{{ p.programme__code }}</span>
+            </td>
+            <td>{{ p.total }}</td>
+            <td>{{ p.activated }}</td>
+            <td><span class="pill pill-blue">{{ p.activation_rate }}%</span></td>
+            <td>{{ p.retained }}</td>
+            <td><span class="pill pill-blue">{{ p.retention_rate }}%</span></td>
+            <td style="color:#0d9488;font-weight:600;">{{ p.active }}</td>
+            <td style="color:#dc2626;font-weight:600;">{{ p.at_risk }}</td>
+            <td style="color:#6b7280;">{{ p.dormant }}</td>
+            <td style="color:#16a34a;font-weight:600;">{{ p.graduated }}</td>
+            <td><span class="pill pill-green">{{ p.grad_rate }}%</span></td>
+            <td style="color:#f59e0b;font-weight:600;">{{ p.badges }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="12" style="padding:20px;text-align:center;color:#9ca3af;">No active programmes.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Two-column: flags + payment ────────────────────────────────────── -->
+  <div style="display:grid;grid-template-columns:1fr 280px;gap:20px;margin-bottom:20px;align-items:start;">
+
+    <!-- At-risk flags -->
+    <div class="rpt-card">
+      <div style="margin-bottom:12px;">
+        <span style="font-size:13px;font-weight:600;color:#111827;">At-Risk Flags</span>
+        <span style="font-size:11px;color:#9ca3af;margin-left:8px;">paid learners · each flag is a distinct reason a learner is flagged at risk</span>
+      </div>
+      <table class="rpt-tbl">
+        <thead>
+          <tr>
+            <th>Flag</th>
+            <th style="width:80px;">Learners</th>
+            <th style="text-align:left;padding-left:12px;">What it means</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in flag_rows %}
+          <tr>
+            <td style="white-space:nowrap;">{{ f.flag }}</td>
+            <td>
+              <span style="font-weight:700;color:{% if f.count > 0 %}#dc2626{% else %}#9ca3af{% endif %};">
+                {{ f.count }}
+              </span>
+            </td>
+            <td style="text-align:left;color:#6b7280;padding-left:12px;font-weight:400;line-height:1.45;">
+              {{ f.desc }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Payment status -->
+    <div class="rpt-card">
+      <div style="margin-bottom:12px;">
+        <span style="font-size:13px;font-weight:600;color:#111827;">Payment Status</span>
+        <span style="font-size:11px;color:#9ca3af;display:block;margin-top:2px;">all learners including unpaid</span>
+      </div>
+      {% for p in payment_rows %}
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  padding:7px 0;border-bottom:1px solid #f3f4f6;">
+        <span style="font-size:12px;color:{% if p.payment_status == 'unknown' %}#9ca3af{% else %}#374151{% endif %};">
+          {{ p.label }}
+          {% if p.payment_status == 'unknown' %}
+          <span style="font-size:10px;color:#9ca3af;display:block;">excluded from metrics</span>
+          {% endif %}
+        </span>
+        <span style="font-size:12px;font-weight:600;color:#374151;">
+          {{ p.count }}
+          <span style="font-weight:400;color:#9ca3af;">({{ p.pct }}%)</span>
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+
+  </div>
+
+  <!-- ── Recent interventions ───────────────────────────────────────────── -->
+  {% if recent_interventions %}
+  <div class="rpt-card" style="margin-bottom:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div>
+        <span style="font-size:13px;font-weight:600;color:#111827;">Recent Interventions</span>
+        <span style="font-size:11px;color:#9ca3af;margin-left:8px;">
+          {{ thirty_ago|date:"j M" }} – {{ today|date:"j M Y" }} · {{ recent_interventions|length }} logged
+        </span>
+        <p style="font-size:11px;color:#9ca3af;margin:4px 0 0;">
+          An intervention is any direct outreach to a learner — call, email, message — logged by a team member in response to a flag or concern.
+        </p>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="rpt-tbl">
+        <thead>
+          <tr>
+            <th style="text-align:left;">Date</th>
+            <th style="text-align:left;">Learner</th>
+            <th style="text-align:left;">Programme</th>
+            <th style="text-align:left;"><abbr title="How the team member reached out: call, email, SMS, eHub message, or meeting.">Type</abbr></th>
+            <th style="text-align:left;"><abbr title="What happened as a result: Re-engaged (learner came back), No Response, Promised Action, or Withdrew.">Outcome</abbr></th>
+            <th style="text-align:left;">Logged by</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for iv in recent_interventions|slice:":20" %}
+          <tr>
+            <td style="text-align:left;color:#6b7280;white-space:nowrap;">{{ iv.intervention_date|date:"j M" }}</td>
+            <td style="text-align:left;">
+              <a href="{% url 'sp_learner_profile' iv.learner.email %}"
+                 style="color:#0452F0;text-decoration:none;">
+                {{ iv.learner.first_name }} {{ iv.learner.last_name }}
+              </a>
+            </td>
+            <td style="text-align:left;color:#374151;">
+              {% if iv.enrolment %}{{ iv.enrolment.programme.code }}{% else %}—{% endif %}
+            </td>
+            <td style="text-align:left;color:#374151;">{{ iv.get_type_display }}</td>
+            <td style="text-align:left;">
+              <span class="pill
+                {% if iv.outcome == 're_engaged' %}pill-green
+                {% elif iv.outcome == 'no_response' %}{% else %}pill-orange{% endif %}"
+                style="{% if iv.outcome == 'no_response' %}background:#fef2f2;color:#dc2626;{% endif %}">
+                {{ iv.get_outcome_display }}
+              </span>
+            </td>
+            <td style="text-align:left;color:#6b7280;">
+              {% if iv.logged_by %}{{ iv.logged_by.get_full_name }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if recent_interventions|length > 20 %}
+    <p style="font-size:11px;color:#9ca3af;margin:8px 0 0;padding-top:8px;border-top:1px solid #f3f4f6;">
+      Showing 20 of {{ recent_interventions|length }}. Download Excel for the full list.
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- ── Metric Glossary ────────────────────────────────────────────────── -->
+  <div class="rpt-card" style="margin-bottom:20px;">
+    <div style="margin-bottom:14px;">
+      <span style="font-size:13px;font-weight:600;color:#111827;">Metric Glossary</span>
+      <p style="font-size:11px;color:#9ca3af;margin:4px 0 0;">
+        Plain-English definitions for every number on this page.
+      </p>
+    </div>
+    {% for term, defn in metric_definitions.items %}
+    <div class="glossary-row">
+      <div class="glossary-term">{{ term }}</div>
+      <div class="glossary-def">{{ defn }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- ── Weekly Breakdown ─────────────────────────────────────────────────── -->
+  <div class="rpt-card" style="margin-bottom:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div>
+        <span style="font-size:13px;font-weight:600;color:#111827;">Weekly Activity</span>
+        <span style="font-size:11px;color:#9ca3af;margin-left:8px;">last 13 weeks · enrolled and activated counts are paid learners only · interventions include all learners</span>
+      </div>
+    </div>
+    <!-- Column semantics note -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-bottom:16px;font-size:11px;color:#6b7280;line-height:1.5;">
+      <div><span style="color:#111827;font-weight:600;">Enrolled / Activated / Graduated / Interventions</span><br>
+        Counts of <em>events that occurred</em> in that calendar week — by enrolment date, first-module completion date, graduation date, and intervention date respectively. A week can show enrolments but zero activations if learners were still working through the material that week; activations appear in whatever week the first-module completion was recorded.</div>
+      <div><span style="color:#0d9488;font-weight:600;">Active</span> &amp; <span style="color:#dc2626;font-weight:600;">At Risk</span><br>
+        <em>Current</em> health status of learners who enrolled in that week's cohort, as of today. These are not historical snapshots — they reflect each cohort's standing right now. A zero simply means no one from that intake is currently in that status.</div>
+    </div>
+    <canvas id="weeklyChart" style="max-height:280px;"></canvas>
+    <div style="overflow-x:auto;margin-top:20px;">
+      <table class="rpt-tbl">
+        <thead>
+          <tr>
+            <th style="text-align:left;min-width:160px;">Week</th>
+            <th><abbr title="New paid enrolments recorded in this week.">Enrolled</abbr></th>
+            <th><abbr title="First-module completions recorded in this week — new activations.">Activated</abbr></th>
+            <th style="color:#0d9488;"><abbr title="Of learners enrolled in this week, how many are currently Active (on track, within thresholds).">Active</abbr></th>
+            <th style="color:#dc2626;"><abbr title="Of learners enrolled in this week, how many are currently At-Risk (at least one warning flag raised).">At Risk</abbr></th>
+            <th><abbr title="Programme graduations recorded in this week.">Graduated</abbr></th>
+            <th><abbr title="Interventions logged this week (all learners, not just paid).">Interventions</abbr></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in weekly_rows %}
+          <tr>
+            <td style="text-align:left;color:#6b7280;font-weight:400;">{{ r.label }}</td>
+            <td>{{ r.enrolled }}</td>
+            <td>{{ r.activated }}</td>
+            <td style="color:#0d9488;font-weight:600;">{{ r.active }}</td>
+            <td style="color:#dc2626;font-weight:600;">{{ r.at_risk }}</td>
+            <td>{{ r.graduated }}</td>
+            <td>{{ r.interventions }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Per-programme weekly breakdown -->
+    {% if weekly_by_prog %}
+    <div style="margin-top:24px;border-top:1px solid #e5e7eb;padding-top:18px;">
+      <p style="font-size:12px;font-weight:600;color:#374151;margin:0 0 10px;">By Programme</p>
+      <p style="font-size:11px;color:#9ca3af;margin:0 0 14px;">
+        Enrolled counts use the effective date (later of enrolment date and programme start) — learners added before their programme launched appear in the programme's launch week.
+      </p>
+      {% for p in weekly_by_prog %}
+      <details style="margin-bottom:6px;border:1px solid #e5e7eb;border-radius:6px;">
+        <summary style="cursor:pointer;padding:9px 14px;font-size:12px;font-weight:600;color:#0452F0;
+                        list-style:none;display:flex;align-items:center;gap:8px;user-select:none;">
+          <span style="font-size:11px;color:#9ca3af;font-weight:400;">[+]</span>
+          {{ p.code }} — {{ p.name }}
+        </summary>
+        <div style="overflow-x:auto;padding:0 2px 2px;">
+          <table class="rpt-tbl" style="font-size:11px;">
+            <thead>
+              <tr>
+                <th style="text-align:left;min-width:140px;">Week</th>
+                <th>Enrolled</th>
+                <th>Activated</th>
+                <th style="color:#0d9488;">Active</th>
+                <th style="color:#dc2626;">At Risk</th>
+                <th>Graduated</th>
+                <th>Interventions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for w in p.weeks %}
+              <tr>
+                <td style="text-align:left;color:#6b7280;font-weight:400;">{{ w.label }}</td>
+                <td>{{ w.enrolled }}</td>
+                <td>{{ w.activated }}</td>
+                <td style="color:#0d9488;font-weight:600;">{{ w.active }}</td>
+                <td style="color:#dc2626;font-weight:600;">{{ w.at_risk }}</td>
+                <td>{{ w.graduated }}</td>
+                <td>{{ w.interventions }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- ── What's in the downloads ───────────────────────────────────────── -->
+  <div style="padding:14px 18px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;">
+    <p style="font-size:12px;font-weight:600;color:#374151;margin:0 0 10px;">What's in the downloads</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <p style="font-size:12px;font-weight:600;color:#0452F0;margin:0 0 5px;">
+          <i class="ti ti-file-spreadsheet" style="font-size:13px;vertical-align:middle;"></i>
+          Excel — 9 sheets
+        </p>
+        <ul style="font-size:11px;color:#6b7280;margin:0;padding-left:16px;line-height:1.9;">
+          <li><strong>Summary</strong> — key metrics with inline definitions</li>
+          <li><strong>By Programme</strong> — full row per programme including activation, retention, badges</li>
+          <li><strong>Learner Detail</strong> — one row per enrolled (paid) learner with activation &amp; graduation dates</li>
+          <li><strong>Payment Status</strong> — distribution across all learners</li>
+          <li><strong>At-Risk Flags</strong> — flag counts and descriptions</li>
+          <li><strong>Recent Interventions</strong> — last 30 days</li>
+          <li><strong>Metric Definitions</strong> — full glossary sheet</li>
+          <li><strong>Weekly Breakdown</strong> — overall weekly totals (last 13 weeks)</li>
+          <li><strong>Weekly by Programme</strong> — same 13-week breakdown split per programme</li>
+        </ul>
+      </div>
+      <div>
+        <p style="font-size:12px;font-weight:600;color:#ef4444;margin:0 0 5px;">
+          <i class="ti ti-file-type-pdf" style="font-size:13px;vertical-align:middle;"></i>
+          PDF — landscape A4
+        </p>
+        <ul style="font-size:11px;color:#6b7280;margin:0;padding-left:16px;line-height:1.9;">
+          <li>Performance summary with inline definitions</li>
+          <li>Health status overview</li>
+          <li>Full programme breakdown (activation, retention, badges)</li>
+          <li>At-risk flag breakdown with descriptions</li>
+          <li>Payment status distribution</li>
+          <li>Weekly activity table (last 13 weeks)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  var labels        = [{% for r in weekly_rows %}"{{ r.label }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+  var enrolled      = [{% for r in weekly_rows %}{{ r.enrolled }}{% if not forloop.last %},{% endif %}{% endfor %}];
+  var activated     = [{% for r in weekly_rows %}{{ r.activated }}{% if not forloop.last %},{% endif %}{% endfor %}];
+  var active        = [{% for r in weekly_rows %}{{ r.active }}{% if not forloop.last %},{% endif %}{% endfor %}];
+  var atRisk        = [{% for r in weekly_rows %}{{ r.at_risk }}{% if not forloop.last %},{% endif %}{% endfor %}];
+  var graduated     = [{% for r in weekly_rows %}{{ r.graduated }}{% if not forloop.last %},{% endif %}{% endfor %}];
+  var interventions = [{% for r in weekly_rows %}{{ r.interventions }}{% if not forloop.last %},{% endif %}{% endfor %}];
+
+  new Chart(document.getElementById('weeklyChart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Enrolled',
+          data: enrolled,
+          borderColor: '#0d9488',
+          backgroundColor: 'rgba(13,148,136,0.08)',
+          tension: 0.3,
+          fill: false,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        },
+        {
+          label: 'Activated',
+          data: activated,
+          borderColor: '#7c3aed',
+          backgroundColor: 'rgba(124,58,237,0.08)',
+          tension: 0.3,
+          fill: false,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        },
+        {
+          label: 'Active',
+          data: active,
+          borderColor: '#0d9488',
+          backgroundColor: 'rgba(13,148,136,0.08)',
+          tension: 0.3,
+          fill: false,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        },
+        {
+          label: 'At Risk',
+          data: atRisk,
+          borderColor: '#dc2626',
+          backgroundColor: 'rgba(220,38,38,0.08)',
+          tension: 0.3,
+          fill: false,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        },
+        {
+          label: 'Graduated',
+          data: graduated,
+          borderColor: '#16a34a',
+          backgroundColor: 'rgba(22,163,74,0.08)',
+          tension: 0.3,
+          fill: false,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        },
+        {
+          label: 'Interventions',
+          data: interventions,
+          borderColor: '#f59e0b',
+          borderDash: [5, 3],
+          backgroundColor: 'rgba(245,158,11,0.08)',
+          tension: 0.3,
+          fill: false,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } },
+      },
+      scales: {
+        x: {
+          ticks: { font: { size: 10 }, maxRotation: 45 },
+          grid: { display: false },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { font: { size: 10 }, precision: 0 },
+          grid: { color: '#f3f4f6' },
+        },
+      },
+    },
+  });
+})();
+</script>
+{% endblock %}

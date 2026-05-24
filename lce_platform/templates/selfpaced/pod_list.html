@@ -1,0 +1,139 @@
+{% extends "selfpaced/base.html" %}
+
+{% block title %}Pods — LearnSync{% endblock %}
+{% block page_title %}Pods{% endblock %}
+{% block nav_pods %}active{% endblock %}
+
+{% block content %}
+
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+
+  {# Programme filter #}
+  <form method="get" style="display:flex;align-items:center;gap:6px;">
+    {% if month_filter %}<input type="hidden" name="month" value="{{ month_filter }}">{% endif %}
+    <select name="programme" onchange="this.form.submit()"
+            style="font-size:12px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-family:'Poppins',sans-serif;background:#fff;color:#374151;">
+      <option value="">All programmes</option>
+      {% for prog in programmes_with_pods %}
+      <option value="{{ prog.code }}" {% if prog.code == prog_filter %}selected{% endif %}>{{ prog.code }} — {{ prog.name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+
+  {# Month filter #}
+  <form method="get" style="display:flex;align-items:center;gap:6px;">
+    {% if prog_filter %}<input type="hidden" name="programme" value="{{ prog_filter }}">{% endif %}
+    <select name="month" onchange="this.form.submit()"
+            style="font-size:12px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-family:'Poppins',sans-serif;background:#fff;color:#374151;">
+      <option value="">All months</option>
+      {% for m in all_months %}
+      <option value="{{ m|date:'Y-m' }}" {% if m|date:'Y-m' == month_filter %}selected{% endif %}>{{ m|date:"M Y" }}</option>
+      {% endfor %}
+    </select>
+  </form>
+
+  {% if prog_filter or month_filter %}
+  <a href="{% url 'sp_pod_list' %}" style="font-size:12px;color:#6b7280;text-decoration:none;">
+    <i class="ti ti-x" style="font-size:11px;"></i> Clear
+  </a>
+  {% endif %}
+
+  <div style="margin-left:auto;">
+    <form method="post" action="{% url 'sp_pod_recompute_all' %}">
+      {% csrf_token %}
+      <button type="submit" class="sp-btn sp-btn-secondary" style="font-size:12px;">
+        <i class="ti ti-refresh" style="font-size:13px;"></i> Recompute All Paces
+      </button>
+    </form>
+  </div>
+
+</div>
+
+<div class="sp-card">
+  {% if pods %}
+  <table class="sp-table">
+    <thead>
+      <tr>
+        <th>Pod</th>
+        <th>Programme</th>
+        <th>Target Month</th>
+        <th>Status</th>
+        <th>Assigned</th>
+        <th title="Completed WALX onboarding">Onboarded</th>
+        <th>On Track</th>
+        <th>Ahead</th>
+        <th>Behind</th>
+        <th>Sig. Behind</th>
+        <th>Completed</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for pod in pods %}
+      <tr>
+        <td style="font-weight:500;color:#111827;">{{ pod.name }}</td>
+        <td>
+          <span style="font-size:12px;background:#f3f4f6;border-radius:4px;padding:1px 6px;">
+            {{ pod.programme.code }}
+          </span>
+        </td>
+        <td style="font-size:12px;color:#6b7280;white-space:nowrap;">{{ pod.target_month|date:"M Y" }}</td>
+        <td>
+          {% if pod.status == 'active' %}
+            <span class="sp-badge-health sp-health-active">Active</span>
+          {% elif pod.status == 'completed' %}
+            <span class="sp-badge-health sp-health-graduated">Completed</span>
+          {% else %}
+            <span class="sp-badge-health sp-health-not_yet_started">Archived</span>
+          {% endif %}
+        </td>
+        <td style="font-weight:600;color:#111827;">{{ pod.total_assigned }}</td>
+        <td>
+          {% if pod.onboarded_count %}
+            <span style="color:#0d9488;font-weight:600;">{{ pod.onboarded_count }}</span>
+          {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+        </td>
+        <td>
+          {% if pod.on_track_count %}<span style="color:#16a34a;font-weight:600;">{{ pod.on_track_count }}</span>
+          {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+        </td>
+        <td>
+          {% if pod.ahead_count %}<span style="color:#2563eb;font-weight:600;">{{ pod.ahead_count }}</span>
+          {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+        </td>
+        <td>
+          {% if pod.behind_count %}<span style="color:#d97706;font-weight:600;">{{ pod.behind_count }}</span>
+          {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+        </td>
+        <td>
+          {% if pod.sig_behind_count %}<span style="color:#dc2626;font-weight:600;">{{ pod.sig_behind_count }}</span>
+          {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+        </td>
+        <td>
+          {% if pod.completed_count %}<span style="color:#6b7280;font-weight:600;">{{ pod.completed_count }}</span>
+          {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+        </td>
+        <td>
+          <a href="{% url 'sp_pod_detail' pod.pk %}"
+             style="font-size:12px;color:#0452F0;text-decoration:none;font-weight:500;white-space:nowrap;">
+            View →
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:48px;text-align:center;color:#9ca3af;">
+    <i class="ti ti-circle-dashed" style="font-size:32px;display:block;margin-bottom:8px;"></i>
+    <div style="font-size:13px;">
+      {% if prog_filter or month_filter %}No pods match the selected filters.{% else %}No pods created yet.{% endif %}
+    </div>
+    {% if not prog_filter and not month_filter %}
+    <div style="font-size:12px;margin-top:4px;">Pods are created via the Admin panel and assigned manually or automatically.</div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

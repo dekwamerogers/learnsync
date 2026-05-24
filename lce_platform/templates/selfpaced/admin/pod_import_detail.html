@@ -1,0 +1,16 @@
+{% extends "selfpaced/base.html" %}
+{% block title %}Pod Import #{{ job.pk }} — LearnSync{% endblock %}
+{% block page_title %}Pod Import #{{ job.pk }}{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;">
+
+  <div style="margin-bottom:16px;">
+    <a href="{% url 'sp_pod_import_log' %}" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+  </div>
+
+  {% include "selfpaced/admin/_pod_import_status.html" %}
+
+</div>
+{% endblock %}

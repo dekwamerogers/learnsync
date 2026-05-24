@@ -1,0 +1,114 @@
+{% extends "selfpaced/base.html" %}
+
+{% block title %}Programme Settings — LearnSync{% endblock %}
+{% block page_title %}Programme Settings{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+
+<div style="margin-bottom:16px;">
+  <a href="{% url 'sp_admin_home' %}" onclick="spBack('{% url 'sp_admin_home' %}'); return false;" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+</div>
+
+<div class="sp-card" style="max-width:1000px;">
+  <div class="sp-card-header">Programmes <span style="font-size:11px;font-weight:400;color:#9ca3af;">{{ programmes|length }} total</span></div>
+  <table class="sp-table">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Name</th>
+        <th style="text-align:center;">Courses</th>
+        <th>Enrolment Health</th>
+        <th>Dates</th>
+        <th style="text-align:center;">Active</th>
+        <th style="text-align:center;">Credentials</th>
+        <th style="text-align:center;">Thresholds</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in programmes %}
+      <tr>
+        <td>
+          <span style="font-size:12px;font-weight:700;background:#f3f4f6;border-radius:4px;padding:2px 8px;color:#374151;">{{ p.code }}</span>
+        </td>
+        <td>
+          <a href="{% url 'sp_admin_programme_edit' p.pk %}"
+             style="font-weight:500;color:#111827;font-size:13px;text-decoration:none;"
+             onmouseover="this.style.color='#0452F0'" onmouseout="this.style.color='#111827'">
+            {{ p.name }}
+          </a>
+        </td>
+        <td style="text-align:center;color:#6b7280;font-size:13px;">{{ p.course_count }}</td>
+        <td>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+            {% if p.active_count %}
+            <a href="{% url 'sp_learner_list' %}?programme={{ p.pk }}&health=active" style="text-decoration:none;">
+              <span style="font-size:11px;background:#dcfce7;color:#16a34a;border-radius:3px;padding:1px 6px;font-weight:600;">{{ p.active_count }} active</span>
+            </a>
+            {% endif %}
+            {% if p.at_risk_count %}
+            <a href="{% url 'sp_learner_list' %}?programme={{ p.pk }}&health=at_risk" style="text-decoration:none;">
+              <span style="font-size:11px;background:#fef3c7;color:#d97706;border-radius:3px;padding:1px 6px;font-weight:600;">{{ p.at_risk_count }} at risk</span>
+            </a>
+            {% endif %}
+            {% if p.dormant_count %}
+            <a href="{% url 'sp_learner_list' %}?programme={{ p.pk }}&health=dormant" style="text-decoration:none;">
+              <span style="font-size:11px;background:#ede9fe;color:#7c3aed;border-radius:3px;padding:1px 6px;font-weight:600;">{{ p.dormant_count }} dormant</span>
+            </a>
+            {% endif %}
+            {% if p.graduated_count %}
+            <a href="{% url 'sp_learner_list' %}?programme={{ p.pk }}&health=graduated" style="text-decoration:none;">
+              <span style="font-size:11px;background:#dbeafe;color:#2563eb;border-radius:3px;padding:1px 6px;font-weight:600;">{{ p.graduated_count }} grad</span>
+            </a>
+            {% endif %}
+            {% if p.not_started_count %}
+            <a href="{% url 'sp_learner_list' %}?programme={{ p.pk }}&health=not_yet_started" style="text-decoration:none;">
+              <span style="font-size:11px;background:#f3f4f6;color:#6b7280;border-radius:3px;padding:1px 6px;font-weight:600;">{{ p.not_started_count }} not started</span>
+            </a>
+            {% endif %}
+            {% if not p.enrolment_count %}<span style="font-size:11px;color:#d1d5db;">—</span>{% endif %}
+          </div>
+        </td>
+        <td style="font-size:11px;white-space:nowrap;">
+          {% with ds=p.date_status %}
+          {% if ds == 'upcoming' %}
+            <span style="background:#fef3c7;color:#d97706;border-radius:3px;padding:1px 6px;font-weight:600;">Upcoming</span><br>
+          {% elif ds == 'ended' %}
+            <span style="background:#f3f4f6;color:#9ca3af;border-radius:3px;padding:1px 6px;font-weight:600;">Ended</span><br>
+          {% elif ds == 'current' %}
+            <span style="background:#dcfce7;color:#16a34a;border-radius:3px;padding:1px 6px;font-weight:600;">Running</span><br>
+          {% endif %}
+          {% if p.start_date %}<span style="color:#6b7280;">Start: {{ p.start_date|date:"d M Y" }}</span><br>{% endif %}
+          {% if p.end_date %}<span style="color:#6b7280;">End: {{ p.end_date|date:"d M Y" }}</span>{% endif %}
+          {% if not p.start_date and not p.end_date %}<span style="color:#d1d5db;">—</span>{% endif %}
+          {% endwith %}
+        </td>
+        <td style="text-align:center;">
+          {% if p.is_active %}<i class="ti ti-check" style="color:#16a34a;font-size:14px;"></i>
+          {% else %}<i class="ti ti-minus" style="color:#d1d5db;font-size:14px;"></i>{% endif %}
+        </td>
+        <td style="text-align:center;">
+          {% if p.awards_credentials %}<i class="ti ti-check" style="color:#16a34a;font-size:14px;"></i>
+          {% else %}<i class="ti ti-minus" style="color:#d1d5db;font-size:14px;"></i>{% endif %}
+        </td>
+        <td style="text-align:center;font-size:11px;color:#9ca3af;">
+          {% with t=p.threshold %}{% if t %}custom{% else %}<span style="color:#d1d5db;">defaults</span>{% endif %}{% endwith %}
+        </td>
+        <td>
+          <a href="{% url 'sp_admin_programme_edit' p.pk %}"
+             style="font-size:12px;color:#0452F0;text-decoration:none;font-weight:500;white-space:nowrap;">Edit →</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="9" style="padding:48px;text-align:center;color:#9ca3af;font-size:13px;">
+          No programmes found. Upload a CSV to discover programmes automatically.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

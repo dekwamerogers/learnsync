@@ -1,0 +1,478 @@
+{% extends "selfpaced/base.html" %}
+
+{% block title %}Home — LearnSync{% endblock %}
+{% block page_title %}Daily Briefing{% endblock %}
+{% block nav_home %}active{% endblock %}
+
+{% block freshness_stale %}{% if data_stale %}class="stale"{% endif %}{% endblock %}
+{% block freshness_text %}
+  {% if last_job %}
+    <span>Data as of {{ last_job.uploaded_at|date:"d M Y H:i" }} · {{ last_job.file_name }}</span>
+    {% if data_stale %}<span style="font-weight:600;">— upload overdue</span>{% endif %}
+  {% else %}
+    <span>No data uploaded yet</span>
+  {% endif %}
+{% endblock %}
+
+{% block home_badge %}
+  {% if follow_up_count %}
+    <span class="sp-badge sp-badge-yellow">{{ follow_up_count }}</span>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<style>
+.sp-action-row  { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+.sp-health-row  { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:12px; }
+.sp-kpi-row     { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+.sp-charts-2col { display:grid; grid-template-columns:280px 1fr; gap:12px; margin-bottom:16px; }
+@media(max-width:1280px){
+  .sp-health-row  { grid-template-columns:repeat(3,1fr); }
+  .sp-kpi-row     { grid-template-columns:repeat(2,1fr); }
+}
+@media(max-width:900px){
+  .sp-action-row  { grid-template-columns:1fr; }
+  .sp-health-row  { grid-template-columns:repeat(2,1fr); }
+  .sp-kpi-row     { grid-template-columns:repeat(2,1fr); }
+  .sp-charts-2col { grid-template-columns:1fr; }
+}
+@media(max-width:540px){
+  .sp-health-row  { grid-template-columns:1fr 1fr; }
+  .sp-kpi-row     { grid-template-columns:1fr; }
+}
+</style>
+
+<!-- ── 0. Empty state — shown only when no data has ever been uploaded ── -->
+{% if not last_job %}
+<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:20px 24px;margin-bottom:16px;display:flex;align-items:flex-start;gap:16px;">
+  <div style="width:40px;height:40px;border-radius:8px;background:#0452F0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+    <i class="ti ti-database-import" style="font-size:20px;color:#fff;"></i>
+  </div>
+  <div style="flex:1;">
+    <div style="font-size:14px;font-weight:700;color:#1e3a8a;margin-bottom:4px;">No data uploaded yet</div>
+    <div style="font-size:13px;color:#3b82f6;line-height:1.5;">
+      LearnSync is ready — upload your first staff portal CSV to populate the dashboard.
+      Once data is ingested, all metrics, charts, and health flags will appear here.
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="spOpenUpload()"
+              style="background:#0452F0;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <i class="ti ti-upload" style="font-size:13px;"></i> Upload CSV
+      </button>
+      <a href="{% url 'sp_admin_home' %}"
+         style="background:#fff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+        <i class="ti ti-settings" style="font-size:13px;"></i> Go to Admin
+      </a>
+    </div>
+  </div>
+</div>
+{% elif total_learners == 0 %}
+<div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
+  <i class="ti ti-info-circle" style="font-size:20px;color:#ca8a04;flex-shrink:0;"></i>
+  <div style="font-size:13px;color:#713f12;">
+    A CSV was uploaded but no paid learners were detected yet. Metrics will appear once the ingestion engine finds recognised learners.
+    Check the <a href="{% url 'sp_ingestion_log' %}" style="color:#ca8a04;font-weight:600;">ingestion log</a> for details.
+  </div>
+</div>
+{% endif %}
+
+<!-- ── 1. Action row — most urgent, always on top ─────────── -->
+<div class="sp-action-row">
+
+  <a href="{% url 'sp_learner_list' %}?follow_up=due" style="text-decoration:none;">
+    <div class="sp-card" style="padding:16px;display:flex;align-items:center;gap:16px;{% if follow_up_count %}border-color:#fde68a;background:#fffdf5;{% endif %}">
+      <div style="width:44px;height:44px;border-radius:10px;background:{% if follow_up_count %}#fef3c7{% else %}#f3f4f6{% endif %};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="ti ti-clock" style="font-size:22px;color:{% if follow_up_count %}#d97706{% else %}#9ca3af{% endif %};"></i>
+      </div>
+      <div>
+        <div style="font-size:30px;font-weight:700;color:{% if follow_up_count %}#d97706{% else %}#9ca3af{% endif %};line-height:1;">{{ follow_up_count }}</div>
+        <div style="font-size:13px;font-weight:600;color:#374151;margin-top:3px;">Follow-ups Due</div>
+        <div style="font-size:11px;color:#9ca3af;">Interventions requiring action today</div>
+      </div>
+    </div>
+  </a>
+
+  <a href="{% url 'sp_learner_list' %}?since=7" style="text-decoration:none;">
+    <div class="sp-card" style="padding:16px;display:flex;align-items:center;gap:16px;">
+      <div style="width:44px;height:44px;border-radius:10px;background:#eff6ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="ti ti-user-plus" style="font-size:22px;color:#0452F0;"></i>
+      </div>
+      <div>
+        <div style="font-size:30px;font-weight:700;color:#0452F0;line-height:1;">{{ new_this_week_count }}</div>
+        <div style="font-size:13px;font-weight:600;color:#374151;margin-top:3px;">New This Week</div>
+        <div style="font-size:11px;color:#9ca3af;">Learners enrolled in the last 7 days</div>
+      </div>
+    </div>
+  </a>
+
+</div>
+
+<!-- ── 2. Health strip — who needs attention (worst → best) ── -->
+<div class="sp-health-row">
+
+  <a href="{% url 'sp_learner_list' %}?health=dormant" style="text-decoration:none;">
+    <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #7c3aed;">
+      <div style="font-size:26px;font-weight:700;color:#7c3aed;line-height:1;">{{ health_counts.dormant }}</div>
+      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Dormant</div>
+      {% if deltas %}<div style="margin-top:4px;">{% include "selfpaced/_delta.html" with val=deltas.dormant positive_is_good=False %}</div>{% endif %}
+    </div>
+  </a>
+
+  <a href="{% url 'sp_learner_list' %}?health=at_risk" style="text-decoration:none;">
+    <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #d97706;">
+      <div style="font-size:26px;font-weight:700;color:#d97706;line-height:1;">{{ health_counts.at_risk }}</div>
+      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">At Risk</div>
+      {% if deltas %}<div style="margin-top:4px;">{% include "selfpaced/_delta.html" with val=deltas.at_risk positive_is_good=False %}</div>{% endif %}
+    </div>
+  </a>
+
+  <a href="{% url 'sp_learner_list' %}?health=active" style="text-decoration:none;">
+    <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #16a34a;">
+      <div style="font-size:26px;font-weight:700;color:#16a34a;line-height:1;">{{ health_counts.active }}</div>
+      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Active</div>
+      {% if deltas %}<div style="margin-top:4px;">{% include "selfpaced/_delta.html" with val=deltas.active positive_is_good=True %}</div>{% endif %}
+    </div>
+  </a>
+
+  <a href="{% url 'sp_learner_list' %}?graduated=certificate" style="text-decoration:none;">
+    <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #2563eb;">
+      <div style="font-size:26px;font-weight:700;color:#2563eb;line-height:1;">{{ certified_learner_count }}</div>
+      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Graduated</div>
+      {% if deltas %}<div style="margin-top:4px;">{% include "selfpaced/_delta.html" with val=deltas.graduated positive_is_good=True %}</div>{% endif %}
+    </div>
+  </a>
+
+  <a href="{% url 'sp_learner_list' %}?health=not_yet_started" style="text-decoration:none;">
+    <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #d1d5db;">
+      <div style="font-size:26px;font-weight:700;color:#9ca3af;line-height:1;">{{ health_counts.not_yet_started }}</div>
+      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Not Started</div>
+    </div>
+  </a>
+
+</div>
+
+<!-- ── 3. Portfolio KPIs ────────────────────────────────────── -->
+<div class="sp-kpi-row">
+
+  <!-- Unique Learners + Enrolments (merged) -->
+  <div class="sp-card" style="padding:16px;">
+    <div style="display:flex;gap:0;height:100%;">
+
+      <!-- Left: Unique Learners -->
+      <div style="flex:1;padding-right:14px;border-right:1px solid #f3f4f6;">
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Unique Learners</div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px;">
+          <div style="font-size:28px;font-weight:700;color:#111827;line-height:1;">{{ total_learners }}</div>
+          {% if deltas %}{% include "selfpaced/_delta.html" with val=deltas.total_learners positive_is_good=True %}{% endif %}
+        </div>
+        <div style="font-size:10px;color:#9ca3af;margin-top:6px;">Across all active programmes</div>
+      </div>
+
+      <!-- Right: Enrolments -->
+      <div style="flex:1;padding-left:14px;">
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Enrolments</div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px;">
+          <div style="font-size:28px;font-weight:700;color:#111827;line-height:1;">{{ enrolment_counts.total }}</div>
+          {% if deltas %}{% include "selfpaced/_delta.html" with val=deltas.total_enrolments positive_is_good=True %}{% endif %}
+        </div>
+        {% if upcoming_enrolment_count %}
+        <div style="font-size:10px;color:#9ca3af;margin-top:2px;">+ {{ upcoming_enrolment_count }} upcoming</div>
+        {% endif %}
+        <div style="display:flex;flex-direction:column;gap:2px;margin-top:8px;padding-top:6px;border-top:1px solid #f3f4f6;">
+          <div style="display:flex;justify-content:space-between;font-size:10px;">
+            <span style="color:#16a34a;font-weight:600;">Active</span><span style="color:#374151;">{{ enrolment_counts.active }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;">
+            <span style="color:#d97706;font-weight:600;">At Risk</span><span style="color:#374151;">{{ enrolment_counts.at_risk }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;">
+            <span style="color:#7c3aed;font-weight:600;">Dormant</span><span style="color:#374151;">{{ enrolment_counts.dormant }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;">
+            <span style="color:#2563eb;font-weight:600;">Graduated</span><span style="color:#374151;">{{ enrolment_counts.graduated }}</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Learner Journey Funnel -->
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Learner Journey</div>
+    <div style="display:flex;flex-direction:column;">
+
+      {# ── Step 1: Onboarded ── #}
+      <div style="display:flex;align-items:center;gap:10px;padding:5px 0;">
+        <div style="width:7px;height:7px;border-radius:50%;background:#0d9488;flex-shrink:0;margin-left:1px;"></div>
+        <div style="flex:1;font-size:11px;color:#6b7280;">Onboarded</div>
+        <div style="font-size:14px;font-weight:700;color:#0d9488;">{{ onboarded_count }}</div>
+        <div style="font-size:10px;color:#9ca3af;min-width:34px;text-align:right;">{% if onboarded_rate is not None %}{{ onboarded_rate }}%{% else %}—{% endif %}</div>
+      </div>
+      <div style="width:1px;height:6px;background:#e5e7eb;margin-left:4px;"></div>
+
+      {# ── Step 2: Onboarding ── #}
+      <div style="display:flex;align-items:center;gap:10px;padding:5px 0;">
+        <div style="width:7px;height:7px;border-radius:50%;background:#1d4ed8;flex-shrink:0;margin-left:1px;"></div>
+        <div style="flex:1;font-size:11px;color:#6b7280;">Onboarding</div>
+        <div style="font-size:14px;font-weight:700;color:#1d4ed8;">{{ currently_onboarding_count }}</div>
+        <div style="font-size:10px;color:#9ca3af;min-width:34px;text-align:right;">{% if onboarding_rate is not None %}{{ onboarding_rate }}%{% else %}—{% endif %}</div>
+      </div>
+      <div style="width:1px;height:6px;background:#e5e7eb;margin-left:4px;"></div>
+
+      {# ── Step 3: Activated ── #}
+      <div style="display:flex;align-items:center;gap:10px;padding:5px 0;">
+        <div style="width:7px;height:7px;border-radius:50%;background:#0452F0;flex-shrink:0;margin-left:1px;"></div>
+        <div style="flex:1;font-size:11px;color:#6b7280;">Activated</div>
+        <div style="font-size:14px;font-weight:700;color:#0452F0;">{{ module_activated_count }}</div>
+        <div style="font-size:10px;color:#9ca3af;min-width:34px;text-align:right;">{% if module_activation_rate is not None %}{{ module_activation_rate }}%{% else %}—{% endif %}</div>
+      </div>
+      <div style="width:1px;height:6px;background:#e5e7eb;margin-left:4px;"></div>
+
+      {# ── Step 4: Retained ── #}
+      <div style="display:flex;align-items:center;gap:10px;padding:5px 0;">
+        <div style="width:7px;height:7px;border-radius:50%;background:#7c3aed;flex-shrink:0;margin-left:1px;"></div>
+        <div style="flex:1;font-size:11px;color:#6b7280;">Retained</div>
+        <div style="font-size:14px;font-weight:700;color:#7c3aed;">{{ module_retained_count }}</div>
+        <div style="font-size:10px;color:#9ca3af;min-width:34px;text-align:right;">{% if retention_rate is not None %}{{ retention_rate }}%{% else %}—{% endif %}</div>
+      </div>
+      <div style="font-size:9px;color:#d1d5db;margin-top:6px;padding-top:6px;border-top:1px solid #f9fafb;">
+        Rates: onboarded/onboarding of total · activated of total · retained of activated
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Graduation Rate -->
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Graduation Rate</div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-top:4px;">
+      <div style="font-size:32px;font-weight:700;color:#2563eb;line-height:1;">{% if grad_rate is not None %}{{ grad_rate }}%{% else %}—{% endif %}</div>
+      {% if deltas and grad_rate is not None %}{% include "selfpaced/_delta.html" with val=deltas.grad_rate positive_is_good=True suffix="pp" %}{% endif %}
+    </div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:8px;">Of activated learners who have graduated</div>
+  </div>
+
+  <!-- Certificates & Badges -->
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">
+      <i class="ti ti-certificate" style="font-size:11px;"></i> Certificates
+    </div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-top:4px;">
+      <div style="font-size:32px;font-weight:700;color:#2563eb;line-height:1;">{{ certificates_count }}</div>
+      {% if deltas %}{% include "selfpaced/_delta.html" with val=deltas.certs positive_is_good=True %}{% endif %}
+    </div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:8px;">Programme graduations</div>
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid #f3f4f6;display:flex;align-items:baseline;gap:8px;">
+      <span style="font-size:18px;font-weight:700;color:#7c3aed;">{{ badges_count }}</span>
+      {% if deltas %}{% include "selfpaced/_delta.html" with val=deltas.badges positive_is_good=True %}{% endif %}
+      <span style="font-size:10px;color:#9ca3af;">course badges</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── 4. Charts ────────────────────────────────────────────── -->
+<div class="sp-charts-2col">
+
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px;">Health Breakdown</div>
+    <div style="position:relative;height:180px;">
+      <canvas id="healthDonut"></canvas>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;justify-content:center;">
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block;"></span>Active</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#d97706;display:inline-block;"></span>At Risk</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#7c3aed;display:inline-block;"></span>Dormant</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#2563eb;display:inline-block;"></span>Graduated</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#d1d5db;display:inline-block;"></span>Not Started</span>
+    </div>
+  </div>
+
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px;">Learners by Programme</div>
+    <div style="position:relative;height:204px;">
+      <canvas id="programmeBar"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── 5. Flag breakdown ────────────────────────────────────── -->
+<div class="sp-card" style="padding:16px;margin-bottom:16px;">
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
+    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">At-Risk &amp; Dormant — Flag Breakdown</div>
+    <a href="{% url 'sp_learner_list' %}?health=at_risk&health=dormant" style="font-size:11px;color:#0452F0;text-decoration:none;">View learners →</a>
+  </div>
+  <div style="font-size:10px;color:#9ca3af;margin-bottom:12px;">Click a bar to see the learners carrying that flag</div>
+  <div style="position:relative;height:160px;">
+    <canvas id="flagBar"></canvas>
+  </div>
+</div>
+
+<!-- ── Enrolments by Week ─────────────────────────────────── -->
+<div class="sp-card" style="padding:16px;margin-top:24px;">
+  <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:12px;">
+    <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;">Enrolments by Week</div>
+    <div style="font-size:10px;color:#9ca3af;">Enrolment date → activation date → first activity, whichever is earliest available</div>
+  </div>
+  {% if enrol_timeline_has_data %}
+  <div style="position:relative;height:260px;">
+    <canvas id="homeEnrolTimeline"></canvas>
+  </div>
+  {% else %}
+  <div style="height:100px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;">
+    No date data available yet.
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>
+(function() {
+  var DL_WHITE = {
+    display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
+    color: '#fff', font: { size: 10, weight: '600', family: 'Poppins,sans-serif' },
+    anchor: 'center', align: 'center', clamp: true,
+  };
+  var DL_END = {
+    display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
+    color: '#374151', font: { size: 10, weight: '600', family: 'Poppins,sans-serif' },
+    anchor: 'end', align: 'end', offset: 4,
+  };
+
+  // ── Donut: health breakdown ──────────────────────────────
+  new Chart(document.getElementById('healthDonut'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Active','At Risk','Dormant','Graduated','Not Started'],
+      datasets: [{
+        data: [{{ health_counts.active }},{{ health_counts.at_risk }},{{ health_counts.dormant }},{{ health_counts.graduated }},{{ health_counts.not_yet_started }}],
+        backgroundColor: ['#16a34a','#d97706','#7c3aed','#2563eb','#d1d5db'],
+        borderWidth: 0, hoverOffset: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        datalabels: DL_WHITE,
+        tooltip: { callbacks: { label: function(ctx) { return ' ' + ctx.label + ': ' + ctx.parsed; } } },
+      },
+      animation: { duration: 400 },
+    }
+  });
+
+  // ── Horizontal bar: at-risk flag breakdown ──────────────
+  new Chart(document.getElementById('flagBar'), {
+    type: 'bar',
+    data: {
+      labels: {{ chart_flag_labels|safe }},
+      datasets: [{ data: {{ chart_flag_counts|safe }}, backgroundColor: '#f97316', borderRadius: 4, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      layout: { padding: { right: 32 } },
+      plugins: {
+        legend: { display: false },
+        datalabels: DL_END,
+        tooltip: { callbacks: { label: function(ctx) { return ' ' + ctx.parsed.x + ' learner' + (ctx.parsed.x===1?'':'s'); } } },
+      },
+      scales: {
+        x: { grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 11 } }, beginAtZero: true },
+        y: { grid: { display: false }, ticks: { font: { size: 11 } } },
+      },
+      animation: { duration: 400 },
+      onClick: function(evt, elements) {
+        if (!elements.length) return;
+        var flags = ['inactive','never_activated','stuck_on_assignment','low_pass_rate','stalled_between_courses','stalled_progression','payment_issue'];
+        window.location.href = '{% url "sp_learner_list" %}?flag=' + flags[elements[0].index];
+      },
+    }
+  });
+
+  // ── Grouped bar: per-programme ───────────────────────────
+  new Chart(document.getElementById('programmeBar'), {
+    type: 'bar',
+    data: {
+      labels: {{ chart_programme_labels|safe }},
+      datasets: [
+        { label: 'Graduated',    data: {{ chart_graduated|safe }},        backgroundColor: '#2563eb', borderRadius: 3, borderSkipped: false },
+        { label: 'Active',       data: {{ chart_active|safe }},           backgroundColor: '#16a34a', borderRadius: 3, borderSkipped: false },
+        { label: 'At Risk',      data: {{ chart_at_risk|safe }},          backgroundColor: '#d97706', borderRadius: 3, borderSkipped: false },
+        { label: 'Dormant',      data: {{ chart_dormant|safe }},          backgroundColor: '#7c3aed', borderRadius: 3, borderSkipped: false },
+        { label: 'Not Started',  data: {{ chart_not_yet_started|safe }},  backgroundColor: '#9ca3af', borderRadius: 3, borderSkipped: false },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 18 } },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 10 } } },
+        datalabels: {
+          display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
+          color: '#374151', font: { size: 9, weight: '600', family: 'Poppins,sans-serif' },
+          anchor: 'end', align: 'end', offset: 2,
+        },
+        tooltip: {
+          mode: 'index', intersect: false,
+          callbacks: {
+            footer: function(items) {
+              const total = items.reduce((s, i) => s + i.parsed.y, 0);
+              return 'Total: ' + total;
+            }
+          }
+        },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 11 } }, beginAtZero: true },
+      },
+      animation: { duration: 400 },
+    }
+  });
+
+  // ── Enrolments by week ────────────────────────────────────
+  var timelineCanvas = document.getElementById('homeEnrolTimeline');
+  if (timelineCanvas) {
+    new Chart(timelineCanvas, {
+      type: 'bar',
+      data: {
+        labels: {{ enrol_timeline_labels|safe }},
+        datasets: {{ enrol_timeline_datasets|safe }},
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+          y: { stacked: true, beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 10 } } },
+        },
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10 } } },
+          datalabels: {
+            display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
+            color: '#fff', font: { size: 9, weight: '600' },
+            anchor: 'center', align: 'center', clamp: true,
+          },
+          tooltip: {
+            mode: 'index', intersect: false,
+            callbacks: {
+              footer: function(items) {
+                const total = items.reduce((s, i) => s + i.parsed.y, 0);
+                return 'Total: ' + total;
+              }
+            }
+          },
+        },
+        animation: { duration: 400 },
+      },
+    });
+  }
+
+
+})();
+</script>
+{% endblock %}

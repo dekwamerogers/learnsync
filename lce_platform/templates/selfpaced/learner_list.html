@@ -1,0 +1,819 @@
+{% extends "selfpaced/base.html" %}
+{% load sp_filters %}
+
+{% block title %}Learners — LearnSync{% endblock %}
+{% block page_title %}Learners{% endblock %}
+{% block nav_learners %}active{% endblock %}
+
+{% block content %}
+
+<style>
+/* ── Multi-select dropdown infrastructure ── */
+.ms-wrap { position:relative; }
+.ms-menu {
+  display:none; position:absolute; top:calc(100% + 4px); left:0; min-width:200px;
+  background:#fff; border:1px solid #e5e7eb; border-radius:8px;
+  box-shadow:0 8px 24px rgba(0,0,0,.12); z-index:200; padding:4px 0; max-height:240px; overflow-y:auto;
+}
+.ms-menu.open { display:block; }
+.ms-menu.ms-float { position:fixed; min-width:260px; max-height:300px; }
+.ms-item {
+  display:flex; align-items:center; gap:8px; padding:7px 12px; cursor:pointer;
+  font-size:12px; color:#374151; user-select:none;
+}
+.ms-item:hover { background:#f9fafb; }
+.ms-item input[type="checkbox"],
+.ms-item input[type="radio"] { width:14px; height:14px; accent-color:#0452F0; flex-shrink:0; cursor:pointer; }
+.ms-search { padding:6px 8px 4px; border-bottom:1px solid #f3f4f6; position:sticky; top:0; background:#fff; z-index:1; }
+.ms-search input { width:100%; padding:5px 8px 5px 26px; border:1px solid #e5e7eb; border-radius:5px; font-size:12px; font-family:inherit; outline:none; box-sizing:border-box; }
+.ms-search-icon { position:absolute; left:15px; top:50%; transform:translateY(-50%); color:#9ca3af; font-size:12px; pointer-events:none; }
+.ms-no-results { padding:10px 12px; font-size:12px; color:#9ca3af; display:none; }
+.ms-panel-title { padding:8px 12px 4px; font-size:10px; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:.05em; }
+
+/* ── Icon filter buttons ── */
+.fi-btn {
+  width:34px; height:34px; border:1px solid #e5e7eb; border-radius:6px;
+  background:#fff; color:#9ca3af; cursor:pointer; font-size:16px;
+  display:flex; align-items:center; justify-content:center; position:relative;
+  flex-shrink:0; transition:border-color .15s, background .15s, color .15s;
+}
+.fi-btn:hover { border-color:#d1d5db; color:#374151; }
+.fi-btn.fi-active { border-color:#0452F0; background:#f0f5ff; color:#0452F0; }
+.fi-badge {
+  position:absolute; top:-5px; right:-5px;
+  background:#0452F0; color:#fff; font-size:9px; font-weight:700; line-height:1;
+  min-width:15px; height:15px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center; padding:0 3px;
+  font-family:inherit; pointer-events:none;
+}
+.fi-sep { width:1px; height:22px; background:#e5e7eb; flex-shrink:0; margin:0 2px; }
+</style>
+
+<!-- Filter bar -->
+<form method="get" action="" id="filter-form">
+<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:14px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;">
+
+  <!-- Search -->
+  <div style="position:relative;flex:1;min-width:140px;max-width:200px;">
+    <i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:13px;pointer-events:none;"></i>
+    <input type="text" name="q" value="{{ filter.form.q.value|default:'' }}"
+           placeholder="Name or email…"
+           style="width:100%;padding:6px 10px 6px 28px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;outline:none;background:#f9fafb;box-sizing:border-box;"
+           autocomplete="off">
+  </div>
+
+  <div class="fi-sep"></div>
+
+  <!-- Programme -->
+  <div class="ms-wrap" title="Programme">
+    <button type="button" class="fi-btn {% if filter.form.programme.value %}fi-active{% endif %}" onclick="msDrop(this)">
+      <i class="ti ti-list"></i>
+      {% if filter.form.programme.value %}<span class="fi-badge">{{ filter.form.programme.value|length }}</span>{% endif %}
+    </button>
+    <div class="ms-menu">
+      <div class="ms-panel-title">Programme</div>
+      {% for val, label in filter.form.programme.field.choices %}{% if val %}
+      <label class="ms-item">
+        <input type="checkbox" name="programme" value="{{ val }}" {% if val|stringformat:"s" in filter.form.programme.value %}checked{% endif %}>{{ label }}
+      </label>{% endif %}{% endfor %}
+    </div>
+  </div>
+
+  <!-- Health -->
+  <div class="ms-wrap" title="Health status">
+    <button type="button" class="fi-btn {% if filter.form.health.value %}fi-active{% endif %}" onclick="msDrop(this)">
+      <i class="ti ti-heartbeat"></i>
+      {% if filter.form.health.value %}<span class="fi-badge">{{ filter.form.health.value|length }}</span>{% endif %}
+    </button>
+    <div class="ms-menu">
+      <div class="ms-panel-title">Health status</div>
+      {% for val, label in filter.form.health.field.choices %}{% if val %}
+      <label class="ms-item">
+        <input type="checkbox" name="health" value="{{ val }}" {% if val in filter.form.health.value %}checked{% endif %}>{{ label }}
+      </label>{% endif %}{% endfor %}
+    </div>
+  </div>
+
+  <!-- Payment -->
+  <div class="ms-wrap" title="Payment status">
+    <button type="button" class="fi-btn {% if filter.form.payment.value %}fi-active{% endif %}" onclick="msDrop(this)">
+      <i class="ti ti-credit-card"></i>
+      {% if filter.form.payment.value %}<span class="fi-badge">{{ filter.form.payment.value|length }}</span>{% endif %}
+    </button>
+    <div class="ms-menu">
+      <div class="ms-panel-title">Payment status</div>
+      {% for val, label in filter.form.payment.field.choices %}{% if val %}
+      <label class="ms-item">
+        <input type="checkbox" name="payment" value="{{ val }}" {% if val in filter.form.payment.value %}checked{% endif %}>{{ label }}
+      </label>{% endif %}{% endfor %}
+    </div>
+  </div>
+
+  <!-- Country -->
+  <div class="ms-wrap" title="Country">
+    <button type="button" class="fi-btn {% if filter.form.country.value %}fi-active{% endif %}" onclick="msDrop(this)">
+      <i class="ti ti-map-pin"></i>
+      {% if filter.form.country.value %}<span class="fi-badge">{{ filter.form.country.value|length }}</span>{% endif %}
+    </button>
+    <div class="ms-menu ms-float">
+      <div class="ms-panel-title">Country</div>
+      <div class="ms-search" style="position:relative;">
+        <i class="ti ti-search ms-search-icon"></i>
+        <input type="text" placeholder="Search countries…" oninput="msSearch(this)" autocomplete="off">
+      </div>
+      {% for val, label in filter.form.country.field.choices %}{% if val %}
+      <label class="ms-item">
+        <input type="checkbox" name="country" value="{{ val }}" {% if val in filter.form.country.value %}checked{% endif %}>{{ label }}
+      </label>{% endif %}{% endfor %}
+      <div class="ms-no-results">No results</div>
+    </div>
+  </div>
+
+  <!-- Course -->
+  <div class="ms-wrap" title="Course / Module">
+    <button type="button" class="fi-btn {% if filter.form.course.value %}fi-active{% endif %}" onclick="msDrop(this)">
+      <i class="ti ti-book"></i>
+      {% if filter.form.course.value %}<span class="fi-badge">{{ filter.form.course.value|length }}</span>{% endif %}
+    </button>
+    <div class="ms-menu ms-float">
+      <div class="ms-panel-title">Course / Module</div>
+      <div class="ms-search" style="position:relative;">
+        <i class="ti ti-search ms-search-icon"></i>
+        <input type="text" placeholder="Search courses…" oninput="msSearch(this)" autocomplete="off">
+      </div>
+      {% for c in filter.form.course.field.queryset %}
+      <label class="ms-item">
+        <input type="checkbox" name="course" value="{{ c.pk }}" {% if c.pk|stringformat:"s" in filter.form.course.value %}checked{% endif %}>
+        <span><span style="font-size:10px;font-weight:600;color:#374151;margin-right:5px;">{{ c.code|default:c.programme.code }}</span>{{ c.full_name }}</span>
+      </label>{% endfor %}
+      <div class="ms-no-results">No results</div>
+    </div>
+  </div>
+
+  <!-- Assignment -->
+  <div class="ms-wrap" title="Assignment">
+    <button type="button" class="fi-btn {% if filter.form.assignment.value %}fi-active{% endif %}" onclick="msDrop(this)">
+      <i class="ti ti-clipboard-list"></i>
+      {% if filter.form.assignment.value %}<span class="fi-badge">{{ filter.form.assignment.value|length }}</span>{% endif %}
+    </button>
+    <div class="ms-menu ms-float">
+      <div class="ms-panel-title">Assignment</div>
+      <div class="ms-search" style="position:relative;">
+        <i class="ti ti-search ms-search-icon"></i>
+        <input type="text" placeholder="Search assignments…" oninput="msSearch(this)" autocomplete="off">
+      </div>
+      {% for a in filter.form.assignment.field.queryset %}
+      <label class="ms-item">
+        <input type="checkbox" name="assignment" value="{{ a.pk }}" {% if a.pk|stringformat:"s" in filter.form.assignment.value %}checked{% endif %}>
+        <span><span style="font-size:10px;font-weight:600;color:#9ca3af;margin-right:3px;">{{ a.course.programme.code }}</span>{{ a.name }}<span style="font-size:10px;color:#d1d5db;"> — {{ a.course.full_name }}</span></span>
+      </label>{% endfor %}
+      <div class="ms-no-results">No results</div>
+    </div>
+  </div>
+
+  <!-- Graduation -->
+  <div class="ms-wrap" title="Graduation status">
+    <button type="button" class="fi-btn {% if filter.form.graduated.value %}fi-active{% endif %}" onclick="msDrop(this)">
+      <i class="ti ti-certificate"></i>
+      {% if filter.form.graduated.value %}<span class="fi-badge">1</span>{% endif %}
+    </button>
+    <div class="ms-menu">
+      <div class="ms-panel-title">Graduation status</div>
+      <label class="ms-item">
+        <input type="radio" name="graduated" value="" {% if not filter.form.graduated.value %}checked{% endif %}>Any graduation
+      </label>
+      {% for val, label in filter.form.graduated.field.choices %}{% if val %}
+      <label class="ms-item">
+        <input type="radio" name="graduated" value="{{ val }}" {% if filter.form.graduated.value == val %}checked{% endif %}>{{ label }}
+      </label>{% endif %}{% endfor %}
+    </div>
+  </div>
+
+  <!-- At-risk flag -->
+  <div class="ms-wrap" title="At-risk flag">
+    <button type="button" class="fi-btn {% if filter.form.flag.value %}fi-active{% endif %}" onclick="msDrop(this)">
+      <i class="ti ti-flag"></i>
+      {% if filter.form.flag.value %}<span class="fi-badge">{{ filter.form.flag.value|length }}</span>{% endif %}
+    </button>
+    <div class="ms-menu">
+      <div class="ms-panel-title">At-risk flag</div>
+      {% for val, label in filter.form.flag.field.choices %}{% if val %}
+      <label class="ms-item">
+        <input type="checkbox" name="flag" value="{{ val }}" {% if val in filter.form.flag.value %}checked{% endif %}>{{ label }}
+      </label>{% endif %}{% endfor %}
+    </div>
+  </div>
+
+  <div class="fi-sep"></div>
+
+  <!-- Enrolled since -->
+  <div class="ms-wrap" title="Enrolled since">
+    <button type="button" class="fi-btn {% if filter.form.since.value %}fi-active{% endif %}" onclick="msDrop(this)">
+      <i class="ti ti-calendar"></i>
+      {% if filter.form.since.value %}<span class="fi-badge">1</span>{% endif %}
+    </button>
+    <div class="ms-menu">
+      <div class="ms-panel-title">Enrolled since</div>
+      <label class="ms-item"><input type="radio" name="since" value="" {% if not filter.form.since.value %}checked{% endif %}>All time</label>
+      {% for val, label in filter.form.since.field.choices %}{% if val %}
+      <label class="ms-item"><input type="radio" name="since" value="{{ val }}" {% if filter.form.since.value == val %}checked{% endif %}>{{ label }}</label>
+      {% endif %}{% endfor %}
+    </div>
+  </div>
+
+  <!-- Enrolment date range -->
+  <div class="ms-wrap" title="Enrolment date range">
+    <button type="button" class="fi-btn {% if enrol_from or enrol_to %}fi-active{% endif %}" onclick="msDrop(this)">
+      <i class="ti ti-calendar-event"></i>
+      {% if enrol_from or enrol_to %}<span class="fi-badge">1</span>{% endif %}
+    </button>
+    <div class="ms-menu" style="min-width:290px;padding:12px;">
+      <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Enrolment date range</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+        <input type="date" name="enrol_from" value="{{ enrol_from }}"
+               style="flex:1;padding:5px 8px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;outline:none;">
+        <span style="color:#9ca3af;font-size:11px;">–</span>
+        <input type="date" name="enrol_to" value="{{ enrol_to }}"
+               style="flex:1;padding:5px 8px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;outline:none;">
+      </div>
+      <select name="cohort_basis"
+              style="width:100%;padding:5px 8px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;outline:none;color:#374151;background:#fff;">
+        <option value="effective" {% if cohort_basis == 'effective' %}selected{% endif %}>Effective start</option>
+        <option value="enrolment" {% if cohort_basis == 'enrolment' %}selected{% endif %}>Enrolment date</option>
+        <option value="fsol"      {% if cohort_basis == 'fsol'      %}selected{% endif %}>First activity</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Multi-programme toggle -->
+  <div title="Multi-programme learners only">
+    <input type="checkbox" name="juggler" value="1" id="f-juggler"
+           {% if filter.form.juggler.value == '1' %}checked{% endif %}
+           style="display:none;" onchange="this.form.submit()">
+    <label for="f-juggler" class="fi-btn {% if filter.form.juggler.value == '1' %}fi-active{% endif %}" style="cursor:pointer;">
+      <i class="ti ti-directions"></i>
+      {% if filter.form.juggler.value == '1' %}<span class="fi-badge">1</span>{% endif %}
+    </label>
+  </div>
+
+  <div class="fi-sep"></div>
+
+  <button type="submit" class="sp-btn sp-btn-primary" style="height:34px;font-size:12px;padding:0 14px;">Apply</button>
+  <a href="{% url 'sp_learner_list' %}" class="sp-btn sp-btn-secondary" style="height:34px;font-size:12px;padding:0 12px;">Clear</a>
+  <a href="?{{ request.GET|qparams_except:'export' }}export=csv"
+     class="fi-btn" title="Export CSV" style="text-decoration:none;">
+    <i class="ti ti-download"></i>
+  </a>
+
+</div>
+</form>
+
+<script>
+(function() {
+  window.msDrop = function(trigger) {
+    var menu = trigger.nextElementSibling;
+    var isOpen = menu.classList.contains('open');
+    document.querySelectorAll('.ms-menu.open').forEach(function(m) { m.classList.remove('open'); });
+    if (!isOpen) {
+      if (menu.classList.contains('ms-float')) {
+        var rect = trigger.getBoundingClientRect();
+        var menuW = 260;
+        var left = rect.left;
+        if (left + menuW > window.innerWidth - 8) { left = window.innerWidth - menuW - 8; }
+        menu.style.top = (rect.bottom + 4) + 'px';
+        menu.style.left = left + 'px';
+        menu.style.minWidth = menuW + 'px';
+      }
+      menu.classList.add('open');
+      var s = menu.querySelector('.ms-search input');
+      if (s) { setTimeout(function() { s.focus(); }, 40); }
+    }
+  };
+
+  window.msSearch = function(input) {
+    var q = input.value.toLowerCase();
+    var menu = input.closest('.ms-menu');
+    var anyVisible = false;
+    menu.querySelectorAll('.ms-item').forEach(function(item) {
+      var show = item.textContent.toLowerCase().includes(q);
+      item.style.display = show ? 'flex' : 'none';
+      if (show) anyVisible = true;
+    });
+    var nr = menu.querySelector('.ms-no-results');
+    if (nr) nr.style.display = anyVisible ? 'none' : 'block';
+  };
+
+  // Close on outside click or scroll
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.ms-wrap') && !e.target.closest('.ms-menu')) {
+      document.querySelectorAll('.ms-menu.open').forEach(function(m) { m.classList.remove('open'); });
+    }
+  });
+  window.addEventListener('scroll', function(e) {
+    if (e.target && e.target.closest && e.target.closest('.ms-menu')) return;
+    document.querySelectorAll('.ms-menu.ms-float.open').forEach(function(m) { m.classList.remove('open'); });
+  }, true);
+
+  // Restore scroll position when navigating back
+  var SK = 'learner_list_scroll';
+  var saved = sessionStorage.getItem(SK);
+  if (saved && performance.navigation && performance.navigation.type === 2) {
+    window.scrollTo(0, parseInt(saved, 10));
+  }
+  // Save scroll before navigating to a profile
+  document.addEventListener('click', function(e) {
+    var link = e.target.closest('a[href*="/learners/"]');
+    if (link) sessionStorage.setItem(SK, window.scrollY);
+  });
+})();
+</script>
+
+<!-- Active filter chips -->
+{% with hv=filter.form.health.value pv=filter.form.programme.value fv=filter.form.flag.value qv=filter.form.q.value|default:'' sv=filter.form.since.value gv=filter.form.graduated.value fuv=request.GET.follow_up %}
+{% if hv or pv or fv or qv or sv or gv or fuv or enrol_from or enrol_to %}
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center;">
+  <span style="font-size:11px;color:#9ca3af;font-weight:600;">Filtered:</span>
+
+  {% for val in hv %}
+  <a href="?{{ request.GET|qparams_except:'health,page' }}{% for other in hv %}{% if other != val %}&health={{ other }}{% endif %}{% endfor %}"
+     style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#ede9fe;color:#7c3aed;text-decoration:none;border:1px solid #c4b5fd;">
+    {% if val == 'dormant' %}Dormant{% elif val == 'at_risk' %}At Risk{% elif val == 'active' %}Active{% elif val == 'graduated' %}Graduated{% elif val == 'not_yet_started' %}Not Started{% elif val == 'onboarded' %}Onboarded{% else %}{{ val }}{% endif %}
+    <i class="ti ti-x" style="font-size:9px;"></i>
+  </a>
+  {% endfor %}
+
+  {% for prog in filter.form.programme.field.queryset %}
+  {% if prog.pk|stringformat:"s" in pv %}
+  <a href="?{{ request.GET|qparams_except:'programme,page' }}{% for other in pv %}{% if other != prog.pk|stringformat:"s" %}&programme={{ other }}{% endif %}{% endfor %}"
+     style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#eff6ff;color:#0452F0;text-decoration:none;border:1px solid #bfdbfe;">
+    {{ prog.code }}
+    <i class="ti ti-x" style="font-size:9px;"></i>
+  </a>
+  {% endif %}
+  {% endfor %}
+
+  {% for val in fv %}
+  <a href="?{{ request.GET|qparams_except:'flag,page' }}{% for other in fv %}{% if other != val %}&flag={{ other }}{% endif %}{% endfor %}"
+     style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#fff7ed;color:#ea580c;text-decoration:none;border:1px solid #fed7aa;">
+    {% if val == 'inactive' %}Inactive{% elif val == 'never_activated' %}Never Activated{% elif val == 'stuck_on_assignment' %}Stuck{% elif val == 'low_pass_rate' %}Low Pass Rate{% elif val == 'stalled_between_courses' %}Stalled{% elif val == 'stalled_progression' %}No Onward Progress{% elif val == 'payment_issue' %}Payment Issue{% else %}{{ val }}{% endif %}
+    <i class="ti ti-x" style="font-size:9px;"></i>
+  </a>
+  {% endfor %}
+
+  {% if qv %}
+  <a href="?{{ request.GET|qparams_except:'q,page' }}"
+     style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#f3f4f6;color:#374151;text-decoration:none;border:1px solid #e5e7eb;">
+    "{{ qv }}"
+    <i class="ti ti-x" style="font-size:9px;"></i>
+  </a>
+  {% endif %}
+
+  {% if sv %}
+  <a href="?{{ request.GET|qparams_except:'since,page' }}"
+     style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#f0fdf4;color:#16a34a;text-decoration:none;border:1px solid #bbf7d0;">
+    {% if sv == '7' %}Last 7 days{% elif sv == '30' %}Last 30 days{% elif sv == '90' %}Last 90 days{% elif sv == '365' %}Last 12 months{% else %}{{ sv }} days{% endif %}
+    <i class="ti ti-x" style="font-size:9px;"></i>
+  </a>
+  {% endif %}
+
+  {% if gv %}
+  <a href="?{{ request.GET|qparams_except:'graduated,page' }}"
+     style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#dbeafe;color:#2563eb;text-decoration:none;border:1px solid #93c5fd;">
+    {% if gv == 'certificate' %}Has certificate{% elif gv == 'badge' %}Has badge{% else %}{{ gv }}{% endif %}
+    <i class="ti ti-x" style="font-size:9px;"></i>
+  </a>
+  {% endif %}
+
+  {% if fuv %}
+  <a href="?{{ request.GET|qparams_except:'follow_up,page' }}"
+     style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#fef3c7;color:#b45309;text-decoration:none;border:1px solid #fde68a;">
+    Follow-up due
+    <i class="ti ti-x" style="font-size:9px;"></i>
+  </a>
+  {% endif %}
+
+  {% if enrol_from or enrol_to %}
+  <a href="?{{ request.GET|qparams_except:'enrol_from,enrol_to,page' }}"
+     style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#f3f4f6;color:#374151;text-decoration:none;border:1px solid #e5e7eb;">
+    {% if enrol_from %}From {{ enrol_from }}{% endif %}{% if enrol_from and enrol_to %} – {% endif %}{% if enrol_to %}To {{ enrol_to }}{% endif %}
+    <i class="ti ti-x" style="font-size:9px;"></i>
+  </a>
+  {% endif %}
+
+  <a href="{% url 'sp_learner_list' %}"
+     style="font-size:11px;color:#9ca3af;text-decoration:none;margin-left:2px;">Clear all</a>
+</div>
+{% endif %}
+{% endwith %}
+
+<!-- Results count -->
+<div style="font-size:12px;color:#6b7280;margin-bottom:8px;">
+  <strong style="color:#111827;">{{ total }}</strong> learner{{ total|pluralize }}
+  {% if total != total_all %}<span style="color:#9ca3af;"> (filtered from {{ total_all }})</span>{% endif %}
+</div>
+
+<!-- Table -->
+<div class="sp-card">
+  {% if page_obj.object_list %}
+  <table class="sp-table" id="learner-table">
+    <thead>
+      <tr>
+        <th style="width:32px;padding:8px 12px;">
+          <input type="checkbox" id="check-all" onchange="toggleAllChecks(this)"
+                 style="cursor:pointer;width:14px;height:14px;">
+        </th>
+        <th>Learner</th>
+        <th>Country</th>
+        <th>Phone</th>
+        <th>Health</th>
+        <th>Programmes</th>
+        <th>Payment</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for learner in page_obj.object_list %}
+      <tr>
+
+        <!-- Checkbox -->
+        <td style="padding:10px 12px;">
+          <input type="checkbox" class="learner-check" data-email="{{ learner.email }}"
+                 onchange="updateBulkBar()"
+                 style="cursor:pointer;width:14px;height:14px;">
+        </td>
+
+        <!-- Learner: name + email (name is clickable) -->
+        <td style="white-space:nowrap;padding-right:6px;">
+          <a href="{% url 'sp_learner_profile' learner.email %}"
+             style="font-weight:500;color:#111827;text-decoration:none;display:block;"
+             onmouseover="this.style.color='#0452F0'" onmouseout="this.style.color='#111827'">
+            {{ learner.full_name|default:"—"|title }}
+          </a>
+          <div style="font-size:11px;color:#9ca3af;margin-top:1px;">{{ learner.email }}</div>
+        </td>
+
+        <!-- Country -->
+        <td style="font-size:12px;color:#6b7280;white-space:nowrap;padding-left:6px;width:100px;">
+          {{ learner.country|default:"—" }}
+        </td>
+
+        <!-- Phone -->
+        <td style="font-size:12px;color:#6b7280;white-space:nowrap;">
+          {% if learner.phone_number %}{{ learner.phone_number }}{% else %}<span style="color:#e5e7eb;">—</span>{% endif %}
+        </td>
+
+        <!-- Overall health + flag reasons -->
+        <td style="min-width:120px;">
+          {% with s=learner.overall_health_status %}
+            {% if s == 'graduated' %}<span class="sp-badge-health sp-health-graduated">Graduated</span>
+            {% elif s == 'dormant' %}<span class="sp-badge-health sp-health-dormant">Dormant</span>
+            {% elif s == 'at_risk' %}<span class="sp-badge-health sp-health-at_risk">At Risk</span>
+            {% elif s == 'active' %}<span class="sp-badge-health sp-health-active">Active</span>
+            {% else %}<span class="sp-badge-health sp-health-not_yet_started">Not Started</span>
+            {% endif %}
+            {% if s == 'at_risk' or s == 'dormant' %}
+            <div style="margin-top:5px;display:flex;flex-direction:column;gap:2px;">
+              {% for enrolment in learner.enrolments.all %}
+              {% if enrolment.active_flags and enrolment.health_status != 'graduated' and enrolment.health_status != 'not_yet_started' %}
+              <div style="display:flex;align-items:baseline;gap:5px;white-space:nowrap;">
+                <span style="font-size:10px;font-weight:700;color:#6b7280;flex-shrink:0;">{{ enrolment.programme.code }}</span>
+                <span style="font-size:11px;color:#b45309;">
+                  {% with f=enrolment.active_flags|first %}
+                  {% if f == 'inactive' %}Inactive · {{ enrolment.last_activity|timeago }}
+                  {% elif f == 'never_activated' %}Never activated
+                  {% elif f == 'stuck_on_assignment' %}Stuck on assignment
+                  {% elif f == 'low_pass_rate' %}{% with d=enrolment.flag_detail.low_pass_rate %}Low pass rate{% if d %} · {{ d.rate }}%{% endif %}{% endwith %}
+                  {% elif f == 'stalled_between_courses' %}Stalled between courses
+                  {% elif f == 'stalled_progression' %}No onward progress
+                  {% else %}{{ f }}{% endif %}
+                  {% endwith %}
+                  {% if enrolment.active_flags|length > 1 %}<span style="color:#9ca3af;"> +{{ enrolment.active_flags|length|add:"-1" }}</span>{% endif %}
+                </span>
+              </div>
+              {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+          {% endwith %}
+        </td>
+
+        <!-- Programmes — side-by-side health-coloured badges -->
+        <td>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+            {% for enrolment in learner.enrolments.all %}
+            {% with s=enrolment.health_status %}
+            <span style="border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap;{% if s == 'graduated' %}background:#dbeafe;color:#2563eb;{% elif s == 'active' %}background:#dcfce7;color:#16a34a;{% elif s == 'at_risk' %}background:#fef3c7;color:#d97706;{% elif s == 'dormant' %}background:#ede9fe;color:#7c3aed;{% else %}background:#f3f4f6;color:#6b7280;{% endif %}">
+              {% if enrolment.current_course and enrolment.current_course.code %}{{ enrolment.current_course.code }}{% else %}{{ enrolment.programme.code }}{% endif %}
+            </span>
+            {% endwith %}
+            {% empty %}
+            <span style="color:#9ca3af;font-size:12px;">—</span>
+            {% endfor %}
+          </div>
+        </td>
+
+        <!-- Payment -->
+        <td style="white-space:nowrap;">
+          {% with p=learner.payment_status %}
+            {% if p == 'compliant' %}<span style="font-size:12px;color:#16a34a;">Compliant</span>
+            {% elif p == 'due_soon' %}<span style="font-size:12px;color:#d97706;">Due Soon</span>
+            {% elif p == 'grace_period' %}<span style="font-size:12px;color:#d97706;">Grace Period</span>
+            {% elif p == 'overdue' %}<span style="font-size:12px;color:#dc2626;font-weight:600;">Overdue</span>
+            {% elif p == 'unknown' %}<span style="font-size:12px;color:#9ca3af;">Unpaid</span>
+            {% else %}<span style="font-size:12px;color:#9ca3af;">—</span>
+            {% endif %}
+          {% endwith %}
+        </td>
+
+        <td>
+          <a href="{% url 'sp_learner_profile' learner.email %}"
+             style="font-size:12px;color:#0452F0;text-decoration:none;font-weight:500;white-space:nowrap;">
+            View →
+          </a>
+        </td>
+
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Pagination footer -->
+  <div style="padding:12px 16px;border-top:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+    <span style="font-size:12px;color:#6b7280;">
+      {% with start=page_obj.start_index end=page_obj.end_index %}
+        Showing {{ start }}–{{ end }} of
+        <strong>{{ total }}</strong> learner{{ total|pluralize }}
+        {% if total != total_all %}
+          <span style="color:#9ca3af;">of {{ total_all }} total</span>
+        {% endif %}
+      {% endwith %}
+    </span>
+    {% if page_obj.has_other_pages %}
+    <div style="display:flex;gap:3px;align-items:center;">
+      {% if page_obj.has_previous %}
+        <a href="?{{ request.GET|qparams_except:'page' }}page={{ page_obj.previous_page_number }}"
+           style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid #e5e7eb;border-radius:5px;font-size:14px;color:#374151;text-decoration:none;background:#fff;">‹</a>
+      {% else %}
+        <span style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid #f3f4f6;border-radius:5px;font-size:14px;color:#d1d5db;background:#fafafa;">‹</span>
+      {% endif %}
+      {% for p in page_range %}
+        {% if p == None %}
+          <span style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;font-size:12px;color:#9ca3af;">…</span>
+        {% elif p == page_obj.number %}
+          <span style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:5px;font-size:12px;font-weight:600;background:#0452F0;color:#fff;">{{ p }}</span>
+        {% else %}
+          <a href="?{{ request.GET|qparams_except:'page' }}page={{ p }}"
+             style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid #e5e7eb;border-radius:5px;font-size:12px;color:#374151;text-decoration:none;background:#fff;">{{ p }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}
+        <a href="?{{ request.GET|qparams_except:'page' }}page={{ page_obj.next_page_number }}"
+           style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid #e5e7eb;border-radius:5px;font-size:14px;color:#374151;text-decoration:none;background:#fff;">›</a>
+      {% else %}
+        <span style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid #f3f4f6;border-radius:5px;font-size:14px;color:#d1d5db;background:#fafafa;">›</span>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% else %}
+  <div style="padding:48px;text-align:center;color:#9ca3af;">
+    <i class="ti ti-users-off" style="font-size:32px;display:block;margin-bottom:8px;"></i>
+    <div style="font-size:13px;">No learners found.</div>
+    {% if request.GET.q or request.GET.programme or request.GET.health or request.GET.payment or request.GET.country or request.GET.course or request.GET.assignment or request.GET.graduated %}
+      <a href="{% url 'sp_learner_list' %}" style="font-size:12px;color:#0452F0;text-decoration:none;margin-top:8px;display:inline-block;">Clear filters</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Bulk intervention bar (toggled by JS) -->
+<div id="bulk-bar" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;border-radius:10px;padding:12px 20px;box-shadow:0 8px 24px rgba(0,0,0,.25);align-items:center;gap:12px;z-index:500;min-width:320px;flex-wrap:wrap;">
+  <span style="font-size:13px;font-weight:500;"><span id="bulk-count">0</span> learner<span id="bulk-plural">s</span> selected</span>
+
+  <!-- "Select all across pages" prompt — shown only when all page items are checked and there are more pages -->
+  <button id="select-all-btn" type="button" onclick="selectAllFiltered()"
+          style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap;">
+    Select all {{ total }} learners →
+  </button>
+  <span id="all-selected-msg" style="display:none;font-size:12px;color:#9ca3af;">
+    All {{ total }} selected &nbsp;·&nbsp;
+    <button type="button" onclick="clearAllFiltered()"
+            style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:12px;text-decoration:underline;padding:0;">
+      Clear
+    </button>
+  </span>
+
+  <button onclick="openBulkModal()" type="button"
+          style="background:#0452F0;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+    <i class="ti ti-message" style="font-size:12px;"></i> Log Intervention
+  </button>
+  <button onclick="clearChecks()" type="button"
+          style="background:transparent;color:#9ca3af;border:1px solid #374151;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;">
+    Clear
+  </button>
+</div>
+
+<!-- Bulk intervention modal -->
+<div id="bulk-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:10px;padding:28px;max-width:480px;width:90%;box-shadow:0 20px 40px rgba(0,0,0,.15);">
+    <div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:4px;">Log Bulk Intervention</div>
+    <div style="font-size:12px;color:#9ca3af;margin-bottom:16px;">This will create one intervention record per selected learner.</div>
+
+    <form id="bulk-intervention-form" method="post" action="{% url 'sp_bulk_log_intervention' %}" onsubmit="return submitBulkForm(event)">
+      {% csrf_token %}
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;">Date</label>
+          <input type="date" name="intervention_date" id="bulk-date"
+                 style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;outline:none;">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;">Type</label>
+          <select name="type" required style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;outline:none;">
+            <option value="">— select —</option>
+            <option value="call">Call</option>
+            <option value="email">Email</option>
+            <option value="sms">SMS</option>
+            <option value="ehub_message">eHub Message</option>
+            <option value="meeting">Meeting</option>
+            <option value="automated">Automated</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <label style="display:block;font-size:11px;font-weight:600;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;">Reason / Notes</label>
+        <textarea name="reason" rows="2" placeholder="Brief reason for this intervention…"
+                  style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;outline:none;resize:vertical;"></textarea>
+      </div>
+
+      <div style="margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" name="follow_up_required" value="1" id="bulk-followup" onchange="document.getElementById('bulk-followup-date').style.display=this.checked?'inline-block':'none'">
+        <label for="bulk-followup" style="font-size:13px;color:#374151;cursor:pointer;">Requires follow-up</label>
+        <input type="date" name="follow_up_date" id="bulk-followup-date"
+               style="display:none;padding:5px 8px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;outline:none;margin-left:8px;">
+      </div>
+
+      <div id="bulk-feedback" style="display:none;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px;"></div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" onclick="closeBulkModal()"
+                style="border:1px solid #e5e7eb;background:#fff;color:#374151;border-radius:6px;padding:7px 16px;font-size:13px;cursor:pointer;">
+          Cancel
+        </button>
+        <button type="submit" id="bulk-submit"
+                style="background:#0452F0;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;">
+          Log for <span id="bulk-submit-count">0</span> learners
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  var today = new Date().toISOString().split('T')[0];
+  document.getElementById('bulk-date').value = today;
+
+  var allFilterMode = false;
+  var totalFiltered = {{ total }};
+  var pageCount = document.querySelectorAll('.learner-check').length;
+  // Current filter params — passed to the server so it can re-apply the same filter
+  var filterQS = {{ request.GET.urlencode|safe|default:'""' }};
+
+  window.updateBulkBar = function() {
+    var checked = document.querySelectorAll('.learner-check:checked');
+    var bar = document.getElementById('bulk-bar');
+    var countEl = document.getElementById('bulk-count');
+    var pluralEl = document.getElementById('bulk-plural');
+    var submitCount = document.getElementById('bulk-submit-count');
+    var selectBtn = document.getElementById('select-all-btn');
+    var allMsg = document.getElementById('all-selected-msg');
+
+    var displayCount = allFilterMode ? totalFiltered : checked.length;
+
+    if (displayCount > 0 || allFilterMode) {
+      bar.style.display = 'flex';
+      countEl.textContent = displayCount;
+      pluralEl.textContent = displayCount === 1 ? '' : 's';
+      if (submitCount) submitCount.textContent = displayCount;
+    } else {
+      bar.style.display = 'none';
+    }
+
+    // Show "Select all N" prompt only when all page items are checked,
+    // there are more results than fit on this page, and we haven't already entered all-filter mode.
+    var allPageChecked = checked.length === pageCount && pageCount > 0;
+    selectBtn.style.display = (!allFilterMode && allPageChecked && totalFiltered > pageCount) ? 'inline-block' : 'none';
+    allMsg.style.display = allFilterMode ? 'inline' : 'none';
+  };
+
+  window.toggleAllChecks = function(cb) {
+    allFilterMode = false;
+    document.querySelectorAll('.learner-check').forEach(function(c) { c.checked = cb.checked; });
+    updateBulkBar();
+  };
+
+  window.clearChecks = function() {
+    allFilterMode = false;
+    document.querySelectorAll('.learner-check').forEach(function(c) { c.checked = false; });
+    document.getElementById('check-all').checked = false;
+    updateBulkBar();
+  };
+
+  window.selectAllFiltered = function() {
+    allFilterMode = true;
+    updateBulkBar();
+  };
+
+  window.clearAllFiltered = function() {
+    clearChecks();
+  };
+
+  // Unchecking any individual row exits all-filter mode
+  document.querySelectorAll('.learner-check').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+      if (!this.checked) allFilterMode = false;
+      updateBulkBar();
+    });
+  });
+
+  window.openBulkModal = function() {
+    var displayCount = allFilterMode ? totalFiltered : document.querySelectorAll('.learner-check:checked').length;
+    var submitCount = document.getElementById('bulk-submit-count');
+    if (submitCount) submitCount.textContent = displayCount;
+    document.getElementById('bulk-feedback').style.display = 'none';
+    document.getElementById('bulk-modal').style.display = 'flex';
+  };
+
+  window.closeBulkModal = function() {
+    document.getElementById('bulk-modal').style.display = 'none';
+  };
+
+  window.submitBulkForm = function(e) {
+    e.preventDefault();
+    var form = document.getElementById('bulk-intervention-form');
+
+    // Remove any previously injected hidden inputs
+    form.querySelectorAll('input[name="learner_emails"], input[name="select_all"]').forEach(function(el) { el.remove(); });
+
+    if (allFilterMode) {
+      // Tell the server to re-apply the current filter and log for all results.
+      // Pass filter params in the query string so the view can read request.GET.
+      form.action = "{% url 'sp_bulk_log_intervention' %}" + (filterQS ? '?' + filterQS : '');
+      var sa = document.createElement('input');
+      sa.type = 'hidden'; sa.name = 'select_all'; sa.value = '1';
+      form.appendChild(sa);
+    } else {
+      var checked = document.querySelectorAll('.learner-check:checked');
+      if (checked.length === 0) return false;
+      form.action = "{% url 'sp_bulk_log_intervention' %}";
+      checked.forEach(function(cb) {
+        var input = document.createElement('input');
+        input.type = 'hidden'; input.name = 'learner_emails'; input.value = cb.dataset.email;
+        form.appendChild(input);
+      });
+    }
+
+    var btn = document.getElementById('bulk-submit');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    fetch(form.action, { method: 'POST', body: new FormData(form) })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var fb = document.getElementById('bulk-feedback');
+      if (data.ok) {
+        fb.style.display = 'block';
+        fb.style.background = '#f0fdf4';
+        fb.style.color = '#16a34a';
+        fb.textContent = 'Logged for ' + data.created + ' learner' + (data.created === 1 ? '' : 's') + '.';
+        setTimeout(function() { closeBulkModal(); clearChecks(); }, 1200);
+      } else {
+        fb.style.display = 'block';
+        fb.style.background = '#fef2f2';
+        fb.style.color = '#dc2626';
+        fb.textContent = data.error || 'Something went wrong.';
+        btn.disabled = false;
+        btn.textContent = 'Retry';
+      }
+    })
+    .catch(function() {
+      var fb = document.getElementById('bulk-feedback');
+      fb.style.display = 'block';
+      fb.style.background = '#fef2f2';
+      fb.style.color = '#dc2626';
+      fb.textContent = 'Network error — please try again.';
+      btn.disabled = false;
+      btn.textContent = 'Retry';
+    });
+
+    return false;
+  };
+})();
+</script>
+
+{% endblock %}

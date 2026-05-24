@@ -1,0 +1,234 @@
+{% extends "selfpaced/base.html" %}
+{% load sp_filters %}
+
+{% block title %}{{ pod.name }} — LearnSync{% endblock %}
+{% block page_title %}{{ pod.name }}{% endblock %}
+{% block nav_pods %}active{% endblock %}
+
+{% block content %}
+
+<!-- Back link -->
+<div style="margin-bottom:16px;">
+  <a href="{% url 'sp_pod_list' %}" onclick="spBack('{% url 'sp_pod_list' %}'); return false;" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+</div>
+
+<!-- Header card -->
+<div class="sp-card" style="margin-bottom:20px;">
+  <div class="sp-card-body">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+
+      <div>
+        <div style="font-size:18px;font-weight:700;color:#111827;">{{ pod.name }}</div>
+        <div style="font-size:13px;color:#9ca3af;margin-top:2px;">
+          {{ pod.programme.code }} &nbsp;·&nbsp; Target: {{ pod.target_month|date:"F Y" }}
+          {% if pod.status == 'active' %}
+            &nbsp;·&nbsp; <span style="color:#16a34a;font-weight:600;">Active</span>
+          {% elif pod.status == 'completed' %}
+            &nbsp;·&nbsp; <span style="color:#2563eb;font-weight:600;">Completed</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;">
+        <a href="?export=csv" class="sp-btn sp-btn-secondary" style="font-size:12px;">
+          <i class="ti ti-download" style="font-size:13px;"></i>
+          Export CSV
+        </a>
+        <form method="post" action="{% url 'sp_pod_recompute' pod.pk %}" style="display:inline;">
+          {% csrf_token %}
+          <button type="submit" class="sp-btn sp-btn-secondary" style="font-size:12px;">
+            <i class="ti ti-refresh" style="font-size:13px;"></i>
+            Recompute Pace
+          </button>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- Pace summary strip -->
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid #f3f4f6;text-align:center;">
+      <div>
+        <div style="font-size:20px;font-weight:700;color:#16a34a;">{{ pace_counts.on_track }}</div>
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-top:2px;">On Track</div>
+      </div>
+      <div>
+        <div style="font-size:20px;font-weight:700;color:#2563eb;">{{ pace_counts.ahead }}</div>
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-top:2px;">Ahead</div>
+      </div>
+      <div>
+        <div style="font-size:20px;font-weight:700;color:#d97706;">{{ pace_counts.behind }}</div>
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-top:2px;">Behind</div>
+      </div>
+      <div>
+        <div style="font-size:20px;font-weight:700;color:#dc2626;">{{ pace_counts.sig_behind }}</div>
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-top:2px;">Sig. Behind</div>
+      </div>
+      <div>
+        <div style="font-size:20px;font-weight:700;color:#6b7280;">{{ pace_counts.completed }}</div>
+        <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-top:2px;">Completed</div>
+      </div>
+    </div>
+
+    <!-- Pace bar -->
+    {% if pace_counts.total %}
+    <div style="margin-top:12px;height:6px;border-radius:6px;overflow:hidden;display:flex;background:#f3f4f6;">
+      {% if pace_counts.sig_behind %}<div style="width:{% widthratio pace_counts.sig_behind pace_counts.total 100 %}%;background:#dc2626;"></div>{% endif %}
+      {% if pace_counts.behind %}<div style="width:{% widthratio pace_counts.behind pace_counts.total 100 %}%;background:#d97706;"></div>{% endif %}
+      {% if pace_counts.on_track %}<div style="width:{% widthratio pace_counts.on_track pace_counts.total 100 %}%;background:#16a34a;"></div>{% endif %}
+      {% if pace_counts.ahead %}<div style="width:{% widthratio pace_counts.ahead pace_counts.total 100 %}%;background:#2563eb;"></div>{% endif %}
+      {% if pace_counts.completed %}<div style="flex:1;background:#e5e7eb;"></div>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if assignments.0.last_computed_at %}
+    <div style="font-size:11px;color:#9ca3af;margin-top:8px;">
+      Pace last computed {{ assignments.0.last_computed_at|date:"d M Y H:i" }}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- Learners table -->
+<div class="sp-card" style="overflow-x:auto;">
+  <div class="sp-card-header" style="display:flex;align-items:center;justify-content:space-between;">
+    <span>Learners <span style="font-size:11px;font-weight:400;color:#9ca3af;">{{ pace_counts.total }} assigned</span></span>
+    <button type="button" onclick="document.getElementById('assign-form').style.display=document.getElementById('assign-form').style.display==='none'?'flex':'none'"
+            class="sp-btn sp-btn-primary" style="font-size:12px;height:30px;padding:0 12px;">
+      <i class="ti ti-user-plus" style="font-size:13px;"></i> Assign Learner
+    </button>
+  </div>
+
+  <!-- Inline assign form -->
+  <div id="assign-form" style="display:none;padding:12px 16px;border-bottom:1px solid #f3f4f6;background:#f9fafb;align-items:flex-end;gap:10px;flex-wrap:wrap;">
+    <form method="post" action="{% url 'sp_pod_assign' pod.pk %}" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;width:100%;">
+      {% csrf_token %}
+      <div style="flex:1;min-width:220px;">
+        <label style="display:block;font-size:11px;font-weight:600;color:#374151;margin-bottom:5px;">Learner email</label>
+        <input type="email" name="email" required placeholder="learner@example.com"
+               style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;box-sizing:border-box;">
+      </div>
+      <button type="submit" class="sp-btn sp-btn-primary" style="font-size:12px;height:34px;padding:0 16px;">
+        Assign
+      </button>
+      <button type="button" onclick="document.getElementById('assign-form').style.display='none'"
+              class="sp-btn" style="font-size:12px;height:34px;padding:0 12px;border:1px solid #e5e7eb;">
+        Cancel
+      </button>
+    </form>
+    {% if messages %}
+    {% for msg in messages %}
+    <div style="font-size:12px;color:{% if msg.tags == 'error' %}#dc2626{% elif msg.tags == 'success' %}#16a34a{% else %}#6b7280{% endif %};width:100%;">{{ msg }}</div>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  {% if assignments %}
+  <table class="sp-table">
+    <thead>
+      <tr>
+        <th>Learner</th>
+        <th title="Completed WALX onboarding">Onboarded</th>
+        <th>Pace Status</th>
+        <th>Completed</th>
+        <th>Current Course</th>
+        <th>Current Pace</th>
+        <th>Required Pace</th>
+        <th>Courses Behind</th>
+        <th>Projected Completion</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for pa in assignments %}
+      <tr>
+        <td>
+          <a href="{% url 'sp_learner_profile' pa.learner.email %}"
+             style="font-weight:500;color:#111827;text-decoration:none;font-size:13px;">
+            {{ pa.learner.full_name|default:pa.learner.email }}
+          </a>
+          <div style="font-size:11px;color:#9ca3af;">{{ pa.learner.email }}</div>
+        </td>
+        <td style="text-align:center;">
+          {% if pa.is_onboarded %}
+            <i class="ti ti-check" style="color:#0d9488;font-size:15px;" title="Completed WALX"></i>
+          {% else %}
+            <span style="color:#d1d5db;font-size:11px;">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if pa.pace_status == 'on_track' %}
+            <span class="sp-badge-health sp-health-active">On Track</span>
+          {% elif pa.pace_status == 'ahead' %}
+            <span class="sp-badge-health sp-health-graduated">Ahead</span>
+          {% elif pa.pace_status == 'behind' %}
+            <span class="sp-badge-health sp-health-at_risk">Behind</span>
+          {% elif pa.pace_status == 'significantly_behind' %}
+            <span class="sp-badge-health sp-health-dormant" style="background:#fef2f2;color:#dc2626;">Behind</span>
+          {% elif pa.pace_status == 'completed' %}
+            <span class="sp-badge-health sp-health-not_yet_started">Completed</span>
+          {% else %}
+            <span style="font-size:12px;color:#9ca3af;">—</span>
+          {% endif %}
+        </td>
+        <td style="font-size:12px;color:#374151;font-weight:600;">
+          {{ pa.courses_completed_count }}
+        </td>
+        <td style="font-size:12px;color:#374151;">
+          {% if not pa.is_onboarded and pa.in_walx %}
+            <span style="background:#f3f4f6;border-radius:3px;padding:2px 7px;font-weight:700;color:#0d9488;">WALX</span>
+          {% elif pa.current_course_row %}
+            <span style="background:#f3f4f6;border-radius:3px;padding:2px 7px;font-weight:700;">
+              {{ pod.programme.code }}-{{ pa.current_course_row.course__sequence_number }}
+            </span>
+          {% else %}
+            <span style="color:#9ca3af;">—</span>
+          {% endif %}
+        </td>
+        <td style="font-size:12px;color:#374151;">
+          {{ pa.current_pace|humanpace }}
+        </td>
+        <td style="font-size:12px;color:#374151;">
+          {% if pa.required_pace is not None %}
+            {{ pa.required_pace|humanpace }}
+          {% else %}<span style="color:#dc2626;">Past target</span>{% endif %}
+        </td>
+        <td style="font-size:12px;">
+          {% if pa.courses_behind and pa.courses_behind > 0 %}
+            <span style="color:#d97706;font-weight:600;">{{ pa.courses_behind|floatformat:0 }}</span>
+          {% else %}
+            <span style="color:#9ca3af;">—</span>
+          {% endif %}
+        </td>
+        <td style="font-size:12px;color:#6b7280;white-space:nowrap;">
+          {% if pa.projected_completion_date %}
+            {% if pa.projected_completion_date > pod.target_month %}
+              <span style="color:#dc2626;">{{ pa.projected_completion_date|date:"d M Y" }}</span>
+            {% else %}
+              {{ pa.projected_completion_date|date:"d M Y" }}
+            {% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td style="white-space:nowrap;">
+          <form method="post" action="{% url 'sp_pod_remove' pa.pk %}"
+                onsubmit="return confirm('Remove {{ pa.learner.full_name|default:pa.learner.email }} from this pod?')">
+            {% csrf_token %}
+            <button type="submit" title="Remove from pod"
+                    style="background:none;border:none;cursor:pointer;padding:4px 6px;color:#9ca3af;border-radius:4px;"
+                    onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#9ca3af'">
+              <i class="ti ti-x" style="font-size:14px;"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:48px;text-align:center;color:#9ca3af;font-size:13px;">
+    No learners assigned yet. Use the <strong>Assign Learner</strong> button above.
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

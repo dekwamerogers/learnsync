@@ -1,0 +1,22 @@
+{% comment %}
+Reusable delta indicator.
+  val              — integer or float delta (current minus previous)
+  positive_is_good — True: ▲ green / ▼ red  |  False (e.g. dormant): ▲ red / ▼ green
+  suffix           — optional string appended after the number (e.g. "pp" for percentage points)
+Shows nothing when val == 0 or val is None.
+{% endcomment %}
+{% if val is not None and val != 0 %}
+{% if val > 0 %}
+  {% if positive_is_good %}
+    <span style="font-size:11px;font-weight:600;color:#16a34a;white-space:nowrap;" title="vs previous upload">▲ {{ val }}{% if suffix %}&thinsp;{{ suffix }}{% endif %}</span>
+  {% else %}
+    <span style="font-size:11px;font-weight:600;color:#dc2626;white-space:nowrap;" title="vs previous upload">▲ {{ val }}{% if suffix %}&thinsp;{{ suffix }}{% endif %}</span>
+  {% endif %}
+{% else %}
+  {% if positive_is_good %}
+    <span style="font-size:11px;font-weight:600;color:#dc2626;white-space:nowrap;" title="vs previous upload">▼ {{ val|slice:"1:" }}{% if suffix %}&thinsp;{{ suffix }}{% endif %}</span>
+  {% else %}
+    <span style="font-size:11px;font-weight:600;color:#16a34a;white-space:nowrap;" title="vs previous upload">▼ {{ val|slice:"1:" }}{% if suffix %}&thinsp;{{ suffix }}{% endif %}</span>
+  {% endif %}
+{% endif %}
+{% endif %}

@@ -1,0 +1,331 @@
+{% extends "selfpaced/base.html" %}
+{% load sp_filters %}
+
+{% block title %}{{ programme.code }} — LearnSync{% endblock %}
+{% block page_title %}{{ programme.code }}{% endblock %}
+{% block nav_programmes %}active{% endblock %}
+
+{% block content %}
+
+<!-- Back link -->
+<div style="margin-bottom:16px;">
+  <a href="{% url 'sp_programme_list' %}" onclick="spBack('{% url 'sp_programme_list' %}'); return false;" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+</div>
+
+<!-- Header card -->
+<div class="sp-card" style="max-width:900px;margin-bottom:20px;">
+  <div class="sp-card-body">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:20px;font-weight:700;color:#111827;">{{ programme.name }}</div>
+        <div style="font-size:13px;color:#9ca3af;margin-top:2px;">Code: {{ programme.code }}</div>
+        <div style="margin-top:10px;">
+          <form hx-post="{% url 'sp_recompute_health' %}"
+                hx-target="#prog-recompute-widget"
+                hx-swap="outerHTML"
+                hx-confirm="Recompute health flags for {{ programme.code }} enrolments?">
+            {% csrf_token %}
+            <input type="hidden" name="programme_code" value="{{ programme.code }}">
+            <button type="submit" class="sp-btn" style="font-size:11px;">
+              <i class="ti ti-heartbeat" style="font-size:12px;"></i>
+              Recompute Health
+            </button>
+          </form>
+          <div id="prog-recompute-widget"></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:16px;text-align:center;min-width:480px;">
+        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&health=dormant" style="text-decoration:none;">
+          <div style="font-size:22px;font-weight:700;color:#7c3aed;">{{ health_counts.dormant }}</div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">Dormant</div>
+        </a>
+        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&health=at_risk" style="text-decoration:none;">
+          <div style="font-size:22px;font-weight:700;color:#d97706;">{{ health_counts.at_risk }}</div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">At Risk</div>
+        </a>
+        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&health=active" style="text-decoration:none;">
+          <div style="font-size:22px;font-weight:700;color:#16a34a;">{{ health_counts.active }}</div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">Active</div>
+        </a>
+        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&graduated=certificate" style="text-decoration:none;">
+          <div style="font-size:22px;font-weight:700;color:#2563eb;">{{ health_counts.graduated }}</div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">Graduated</div>
+        </a>
+        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&health=not_yet_started" style="text-decoration:none;">
+          <div style="font-size:22px;font-weight:700;color:#9ca3af;">{{ health_counts.not_yet_started }}</div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">Not Started</div>
+        </a>
+        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}" style="text-decoration:none;">
+          <div style="font-size:22px;font-weight:700;color:#111827;">{{ total }}</div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">Total</div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Health bar -->
+    {% if total %}
+    <div style="margin-top:16px;height:6px;border-radius:6px;overflow:hidden;display:flex;background:#f3f4f6;">
+      {% if health_counts.dormant %}<div style="width:{% widthratio health_counts.dormant total 100 %}%;background:#7c3aed;"></div>{% endif %}
+      {% if health_counts.at_risk %}<div style="width:{% widthratio health_counts.at_risk total 100 %}%;background:#d97706;"></div>{% endif %}
+      {% if health_counts.active %}<div style="width:{% widthratio health_counts.active total 100 %}%;background:#16a34a;"></div>{% endif %}
+      {% if health_counts.graduated %}<div style="width:{% widthratio health_counts.graduated total 100 %}%;background:#2563eb;"></div>{% endif %}
+      {% if health_counts.not_yet_started %}<div style="flex:1;background:#e5e7eb;"></div>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Tab nav -->
+<div style="display:flex;gap:2px;margin-bottom:16px;border-bottom:1px solid #e5e7eb;max-width:900px;">
+  <a href="?tab=overview"
+     style="padding:8px 16px;font-size:13px;font-weight:500;text-decoration:none;border-bottom:2px solid {% if tab == 'overview' %}#0452F0{% else %}transparent{% endif %};color:{% if tab == 'overview' %}#0452F0{% else %}#6b7280{% endif %};">
+    Overview
+  </a>
+  <a href="?tab=learners"
+     style="padding:8px 16px;font-size:13px;font-weight:500;text-decoration:none;border-bottom:2px solid {% if tab == 'learners' %}#0452F0{% else %}transparent{% endif %};color:{% if tab == 'learners' %}#0452F0{% else %}#6b7280{% endif %};">
+    Learners
+    <span style="font-size:11px;background:#f3f4f6;border-radius:10px;padding:1px 6px;margin-left:4px;color:#6b7280;">{{ total }}</span>
+  </a>
+  <a href="?tab=courses"
+     style="padding:8px 16px;font-size:13px;font-weight:500;text-decoration:none;border-bottom:2px solid {% if tab == 'courses' %}#0452F0{% else %}transparent{% endif %};color:{% if tab == 'courses' %}#0452F0{% else %}#6b7280{% endif %};">
+    Courses
+    <span style="font-size:11px;background:#f3f4f6;border-radius:10px;padding:1px 6px;margin-left:4px;color:#6b7280;">{{ courses|length }}</span>
+  </a>
+</div>
+
+
+<!-- ── Overview tab ────────────────────────────────────────── -->
+{% if tab == 'overview' %}
+<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-width:900px;">
+
+  <!-- Health breakdown -->
+  <div class="sp-card">
+    <div class="sp-card-header">Health Breakdown</div>
+    <div class="sp-card-body" style="display:flex;flex-direction:column;gap:10px;">
+      {% if total %}
+        {% for item in health_display %}
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:{{ item.color }};flex-shrink:0;"></div>
+          <span style="font-size:13px;color:#374151;flex:1;">{{ item.label }}</span>
+          <span style="font-size:13px;font-weight:600;color:#111827;">{{ item.count }}</span>
+          <span style="font-size:11px;color:#9ca3af;width:36px;text-align:right;">{% widthratio item.count total 100 %}%</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="color:#9ca3af;font-size:13px;margin:0;">No enrolments yet.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- At-risk flag breakdown -->
+  {% if flag_breakdown %}
+  <div class="sp-card">
+    <div class="sp-card-header">
+      <span>At-Risk &amp; Dormant Flags</span>
+      <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&health=at_risk&health=dormant"
+         style="font-size:11px;color:#0452F0;text-decoration:none;">View all →</a>
+    </div>
+    <div class="sp-card-body" style="display:flex;flex-direction:column;gap:8px;">
+      {% for item in flag_breakdown %}
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:13px;color:#374151;flex:1;">{{ item.label }}</span>
+        <span style="font-size:13px;font-weight:600;color:{{ item.color }};">{{ item.count }}</span>
+        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&flag={{ item.code }}"
+           style="font-size:11px;color:#0452F0;text-decoration:none;white-space:nowrap;">filter →</a>
+      </div>
+      {% endfor %}
+      <div style="font-size:11px;color:#9ca3af;margin-top:4px;padding-top:6px;border-top:1px solid #f3f4f6;">
+        Enrolments with each flag. A learner with multiple flags is counted per flag.
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Course summary -->
+  <div class="sp-card">
+    <div class="sp-card-header">Courses ({{ courses|length }})</div>
+    {% if courses %}
+    <div style="display:flex;flex-direction:column;">
+      {% for course in courses %}
+      <div style="padding:10px 16px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:11px;color:#9ca3af;width:20px;text-align:right;flex-shrink:0;">{{ course.sequence_number }}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:500;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            {{ course.full_name }}
+          </div>
+          {% if course.code %}
+            <div style="font-size:11px;color:#9ca3af;">{{ course.code }}</div>
+          {% endif %}
+        </div>
+        {% if course.completed_count %}
+          <span style="font-size:11px;color:#16a34a;flex-shrink:0;font-weight:600;">{{ course.completed_count }} done</span>
+        {% endif %}
+        {% if course.expected_duration_days %}
+          <span style="font-size:11px;color:#9ca3af;flex-shrink:0;">{{ course.expected_duration_days }}d</span>
+        {% endif %}
+        {% if course.enrolled_count %}
+        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&course={{ course.full_name|urlencode_val }}"
+           style="font-size:11px;color:#0452F0;text-decoration:none;flex-shrink:0;">→</a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px;">No courses yet.</div>
+    {% endif %}
+  </div>
+
+</div>
+{% endif %}
+
+
+<!-- ── Learners tab ────────────────────────────────────────── -->
+{% if tab == 'learners' %}
+<div class="sp-card" style="max-width:900px;">
+  {% if enrolments %}
+  <table class="sp-table">
+    <thead>
+      <tr>
+        <th>Learner</th>
+        <th>Health</th>
+        <th>Current Course</th>
+        <th>Flags</th>
+        <th>Updated</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for enrolment in enrolments %}
+      <tr>
+        <td>
+          <div style="font-weight:500;color:#111827;font-size:13px;">
+            {{ enrolment.learner.full_name|default:"—" }}
+          </div>
+          <div style="font-size:11px;color:#9ca3af;">{{ enrolment.learner.email }}</div>
+        </td>
+        <td>
+          {% with s=enrolment.health_status %}
+            {% if s == 'graduated' %}<span class="sp-badge-health sp-health-graduated">Graduated</span>
+            {% elif s == 'dormant' %}<span class="sp-badge-health sp-health-dormant">Dormant</span>
+            {% elif s == 'at_risk' %}<span class="sp-badge-health sp-health-at_risk">At Risk</span>
+            {% elif s == 'active' %}<span class="sp-badge-health sp-health-active">Active</span>
+            {% else %}<span class="sp-badge-health sp-health-not_yet_started">Not Started</span>
+            {% endif %}
+          {% endwith %}
+        </td>
+        <td style="font-size:12px;color:#374151;">
+          {% if enrolment.current_course %}
+            {{ enrolment.current_course.code|default:enrolment.current_course.full_name }}
+          {% else %}—{% endif %}
+        </td>
+        <td style="font-size:11px;">
+          {% for flag in enrolment.active_flags|slice:":2" %}
+            {% if flag == 'never_activated' %}<span class="sp-flag-chip">Never Activated</span>
+            {% elif flag == 'inactive' %}<span class="sp-flag-chip">Inactive</span>
+            {% elif flag == 'stuck_on_assignment' %}<span class="sp-flag-chip">Stuck</span>
+            {% elif flag == 'low_pass_rate' %}<span class="sp-flag-chip">Low Pass Rate</span>
+            {% elif flag == 'stalled_between_courses' %}<span class="sp-flag-chip">Stalled</span>
+            {% elif flag == 'stalled_progression' %}<span class="sp-flag-chip">Stalled Prog.</span>
+            {% elif flag == 'payment_issue' %}<span class="sp-flag-chip" style="background:#fef2f2;color:#dc2626;">Payment</span>
+            {% else %}<span class="sp-flag-chip">{{ flag }}</span>
+            {% endif %}
+          {% endfor %}
+          {% if enrolment.active_flags|length > 2 %}
+            <span style="font-size:10px;color:#9ca3af;">+{{ enrolment.active_flags|length|add:"-2" }}</span>
+          {% endif %}
+        </td>
+        <td style="font-size:12px;color:#9ca3af;white-space:nowrap;">
+          {{ enrolment.learner.last_updated_date|date:"d M Y" }}
+        </td>
+        <td>
+          <a href="{% url 'sp_learner_profile' enrolment.learner.email %}"
+             style="font-size:12px;color:#0452F0;text-decoration:none;font-weight:500;">
+            View →
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if enrolments.has_other_pages %}
+  <div style="padding:12px 16px;display:flex;gap:8px;align-items:center;border-top:1px solid #f3f4f6;">
+    {% if enrolments.has_previous %}
+      <a href="?tab=learners&page={{ enrolments.previous_page_number }}"
+         style="font-size:12px;color:#0452F0;text-decoration:none;">← Prev</a>
+    {% endif %}
+    <span style="font-size:12px;color:#9ca3af;flex:1;text-align:center;">
+      Page {{ enrolments.number }} of {{ enrolments.paginator.num_pages }}
+    </span>
+    {% if enrolments.has_next %}
+      <a href="?tab=learners&page={{ enrolments.next_page_number }}"
+         style="font-size:12px;color:#0452F0;text-decoration:none;">Next →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div style="padding:48px;text-align:center;color:#9ca3af;font-size:13px;">No enrolments yet.</div>
+  {% endif %}
+</div>
+{% endif %}
+
+
+<!-- ── Courses tab ─────────────────────────────────────────── -->
+{% if tab == 'courses' %}
+<div class="sp-card" style="max-width:900px;">
+  {% if courses %}
+  <table class="sp-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Course</th>
+        <th>Code</th>
+        <th style="text-align:center;">Enrolled</th>
+        <th style="text-align:center;">In Progress</th>
+        <th style="text-align:center;">Completed</th>
+        <th style="text-align:right;">Duration</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for course in courses %}
+      <tr>
+        <td style="color:#9ca3af;font-weight:600;">{{ course.sequence_number }}</td>
+        <td style="font-weight:500;color:#111827;">{{ course.full_name }}</td>
+        <td style="font-size:12px;color:#6b7280;">{{ course.code|default:"—" }}</td>
+        <td style="text-align:center;">
+          {% if course.enrolled_count %}
+            <span style="font-size:13px;font-weight:600;color:#111827;">{{ course.enrolled_count }}</span>
+          {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+        </td>
+        <td style="text-align:center;">
+          {% if course.in_progress_count %}
+            <span style="font-size:13px;font-weight:600;color:#d97706;">{{ course.in_progress_count }}</span>
+          {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+        </td>
+        <td style="text-align:center;">
+          {% if course.completed_count %}
+            <span style="font-size:13px;font-weight:600;color:#16a34a;">{{ course.completed_count }}</span>
+          {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+        </td>
+        <td style="text-align:right;font-size:12px;color:#6b7280;">
+          {% if course.expected_duration_days %}{{ course.expected_duration_days }}d{% else %}—{% endif %}
+        </td>
+        <td>
+          {% if course.enrolled_count %}
+          <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&course={{ course.full_name|urlencode_val }}"
+             style="font-size:12px;color:#0452F0;text-decoration:none;font-weight:500;white-space:nowrap;">
+            View learners →
+          </a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:48px;text-align:center;color:#9ca3af;font-size:13px;">No courses yet.</div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

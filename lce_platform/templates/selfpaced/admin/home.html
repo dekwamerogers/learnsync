@@ -1,0 +1,137 @@
+{% extends "selfpaced/base.html" %}
+
+{% block title %}Admin — LearnSync{% endblock %}
+{% block page_title %}Admin{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+
+<!-- Stats row — system health only (learner KPIs live on the main dashboard) -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:640px;margin-bottom:24px;">
+
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Recent Uploads</div>
+    <div style="font-size:28px;font-weight:700;color:#111827;margin-top:4px;">{{ recent_jobs|length }}</div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:4px;">Last 10 ingestion jobs</div>
+  </div>
+
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Flagged Rows</div>
+    <div style="font-size:28px;font-weight:700;color:{% if flagged_count %}#d97706{% else %}#111827{% endif %};margin-top:4px;">{{ flagged_count }}</div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:4px;">Pending resolution</div>
+  </div>
+
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Programmes</div>
+    <div style="font-size:28px;font-weight:700;color:#111827;margin-top:4px;">{{ programme_count }}</div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:4px;">Active programmes</div>
+  </div>
+
+</div>
+
+<!-- Nav cards (left) + Recent uploads (right) -->
+<div style="display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start;">
+
+  <!-- Left: nav cards -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+
+    <a href="{% url 'sp_ingestion_log' %}" class="sp-card" style="text-decoration:none;padding:18px;display:block;">
+      <i class="ti ti-file-text" style="font-size:22px;color:#0452F0;"></i>
+      <div style="font-size:13px;font-weight:600;color:#111827;margin-top:8px;">Ingestion Log</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px;">Upload history &amp; status</div>
+    </a>
+
+    <a href="{% url 'sp_admin_programme_list' %}" class="sp-card" style="text-decoration:none;padding:18px;display:block;">
+      <i class="ti ti-list" style="font-size:22px;color:#0452F0;"></i>
+      <div style="font-size:13px;font-weight:600;color:#111827;margin-top:8px;">Programme Settings</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px;">Names, credentials, thresholds</div>
+    </a>
+
+    <a href="{% url 'sp_programme_structure_upload' %}" class="sp-card" style="text-decoration:none;padding:18px;display:block;">
+      <i class="ti ti-git-branch" style="font-size:22px;color:#0452F0;"></i>
+      <div style="font-size:13px;font-weight:600;color:#111827;margin-top:8px;">Programme Structure</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px;">Upload course sequence CSV</div>
+    </a>
+
+    <a href="#" class="sp-card" style="text-decoration:none;padding:18px;display:block;opacity:.55;">
+      <i class="ti ti-alert-triangle" style="font-size:22px;color:#d97706;"></i>
+      <div style="font-size:13px;font-weight:600;color:#111827;margin-top:8px;">Flagged Rows</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px;">Rows pending resolution</div>
+    </a>
+
+    <a href="{% url 'sp_pattern_registry' %}" class="sp-card" style="text-decoration:none;padding:18px;display:block;">
+      <i class="ti ti-database" style="font-size:22px;color:#374151;"></i>
+      <div style="font-size:13px;font-weight:600;color:#111827;margin-top:8px;">Identifier Registry</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px;">eHub class name patterns</div>
+    </a>
+
+    <a href="{% url 'sp_enrolment_log' %}" class="sp-card" style="text-decoration:none;padding:18px;display:block;">
+      <i class="ti ti-user-check" style="font-size:22px;color:#0452F0;"></i>
+      <div style="font-size:13px;font-weight:600;color:#111827;margin-top:8px;">Enrolment CSV</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px;">Map learners to programmes &amp; dates</div>
+    </a>
+
+    <a href="{% url 'sp_pod_import_log' %}" class="sp-card" style="text-decoration:none;padding:18px;display:block;">
+      <i class="ti ti-layout-grid" style="font-size:22px;color:#0d9488;"></i>
+      <div style="font-size:13px;font-weight:600;color:#111827;margin-top:8px;">Pod Import</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px;">Import Google Form pod selections</div>
+    </a>
+
+    <a href="{% url 'sp_country_settings' %}" class="sp-card" style="text-decoration:none;padding:18px;display:block;">
+      <i class="ti ti-world" style="font-size:22px;color:#374151;"></i>
+      <div style="font-size:13px;font-weight:600;color:#111827;margin-top:8px;">Country Settings</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px;">Select monitored African countries</div>
+    </a>
+
+    <a href="#" class="sp-card" style="text-decoration:none;padding:18px;display:block;">
+      <i class="ti ti-users" style="font-size:22px;color:#374151;"></i>
+      <div style="font-size:13px;font-weight:600;color:#111827;margin-top:8px;">Users</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px;">Staff account management</div>
+    </a>
+
+    <div id="recompute-widget"
+         hx-get="{% url 'sp_recompute_status' %}"
+         hx-trigger="load"
+         hx-swap="outerHTML">
+      <div class="sp-card" style="padding:18px;opacity:.5;">
+        <i class="ti ti-heartbeat" style="font-size:22px;color:#374151;"></i>
+        <div style="font-size:13px;font-weight:600;color:#111827;margin-top:8px;">Recompute Health</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:2px;">Recalculate flags without re-uploading</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right: recent uploads -->
+  {% if recent_jobs %}
+  <div class="sp-card">
+    <div class="sp-card-header">Recent Uploads</div>
+    <table class="sp-table">
+      <thead>
+        <tr>
+          <th>File</th><th>Status</th><th>Date</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in recent_jobs %}
+        <tr>
+          <td style="font-size:12px;color:#374151;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ job.file_name }}</td>
+          <td>
+            {% if job.status == 'complete' %}<span class="sp-badge-health sp-health-active">complete</span>
+            {% elif job.status == 'failed' %}<span class="sp-badge-health sp-health-dormant">failed</span>
+            {% elif job.status == 'processing' %}<span class="sp-badge-health sp-health-at_risk">processing</span>
+            {% else %}<span class="sp-badge-health sp-health-not_yet_started">{{ job.status }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size:11px;color:#6b7280;white-space:nowrap;">{{ job.uploaded_at|date:"d M H:i" }}</td>
+          <td><a href="{% url 'sp_job_detail' job.pk %}" style="font-size:12px;color:#0452F0;text-decoration:none;">→</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+</div>
+
+{% endblock %}

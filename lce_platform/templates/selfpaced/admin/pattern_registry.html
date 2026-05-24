@@ -1,0 +1,164 @@
+{% extends "selfpaced/base.html" %}
+
+{% block title %}Pattern Registry — LearnSync{% endblock %}
+{% block page_title %}Pattern Registry{% endblock %}
+{% block nav_pattern_registry %}active{% endblock %}
+
+{% block content %}
+
+<div style="display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap;">
+
+  <!-- Registry table -->
+  <div style="flex:1;min-width:0;">
+    <div class="sp-card">
+      <div class="sp-card-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Registered Patterns</span>
+        <span style="font-size:11px;font-weight:400;color:#9ca3af;">{{ entries|length }} total</span>
+      </div>
+
+      {% if entries %}
+      <table class="sp-table">
+        <thead>
+          <tr>
+            <th>Pattern</th>
+            <th>Type</th>
+            <th>Programme</th>
+            <th>Course</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in entries %}
+          <tr>
+            <td style="font-size:12px;font-weight:600;color:#111827;font-family:monospace;">
+              {{ entry.raw_pattern }}
+            </td>
+            <td style="font-size:11px;color:#6b7280;">{{ entry.get_pattern_type_display }}</td>
+            <td>
+              <a href="{% url 'sp_programme_detail' entry.programme.pk %}"
+                 style="font-size:12px;font-weight:600;color:#0452F0;text-decoration:none;">
+                {{ entry.programme.code }}
+              </a>
+            </td>
+            <td style="font-size:12px;color:#6b7280;">
+              {% if entry.course %}
+                Seq {{ entry.course.sequence_number }}: {{ entry.course.full_name }}
+              {% else %}
+                <span style="color:#d1d5db;">Auto-detect</span>
+              {% endif %}
+            </td>
+            <td style="white-space:nowrap;">
+              <form method="post" style="display:inline;"
+                    onsubmit="return confirm('Remove this pattern mapping?');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="entry_pk" value="{{ entry.pk }}">
+                <button type="submit"
+                        style="background:none;border:none;color:#dc2626;font-size:12px;cursor:pointer;padding:0;">
+                  <i class="ti ti-trash" style="font-size:13px;"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div style="padding:40px;text-align:center;color:#9ca3af;">
+        <i class="ti ti-list-search" style="font-size:32px;display:block;margin-bottom:8px;"></i>
+        <div style="font-size:13px;">No patterns registered yet.</div>
+        <div style="font-size:12px;margin-top:4px;">Patterns are created automatically during ingestion or via the form below.</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Add new pattern form -->
+  <div style="flex:0 0 320px;">
+    <div class="sp-card">
+      <div class="sp-card-header">Add Pattern</div>
+      <div class="sp-card-body">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="add">
+
+          <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">
+              Pattern <span style="color:#dc2626;">*</span>
+            </label>
+            <input type="text" name="pattern" required
+                   placeholder="e.g. AICE-3_cohort2025"
+                   style="width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box;">
+            <div style="font-size:11px;color:#9ca3af;margin-top:3px;">Must match exactly what appears in the CSV eHub class name column.</div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">
+              Type
+            </label>
+            <select name="pattern_type"
+                    style="width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff;">
+              <option value="ehub_class_name">eHub class name</option>
+              <option value="course_name_prefix">Course name prefix</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">
+              Programme <span style="color:#dc2626;">*</span>
+            </label>
+            <select name="programme" id="reg-prog-select" required
+                    onchange="filterRegCourses(this.value)"
+                    style="width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff;">
+              <option value="">— Select programme —</option>
+              {% for prog in programmes %}
+              <option value="{{ prog.pk }}">{{ prog.code }} — {{ prog.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <label style="display:block;font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">
+              Course <span style="font-size:11px;color:#9ca3af;font-weight:400;">(optional)</span>
+            </label>
+            <select name="course" id="reg-course-select"
+                    style="width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff;">
+              <option value="">— Auto-detect —</option>
+              {% for prog in programmes %}
+              {% for course in prog.courses.all %}
+              <option value="{{ course.pk }}" data-programme="{{ prog.pk }}" style="display:none;">
+                Seq {{ course.sequence_number }}: {{ course.full_name }}
+              </option>
+              {% endfor %}
+              {% endfor %}
+            </select>
+          </div>
+
+          <button type="submit" class="sp-btn sp-btn-primary" style="width:100%;">
+            <i class="ti ti-plus" style="font-size:13px;"></i>
+            Add to registry
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;padding:12px 14px;background:#f9fafb;border-radius:8px;font-size:11px;color:#6b7280;line-height:1.6;">
+      <strong style="color:#374151;">How patterns work</strong><br>
+      Each eHub class name in the CSV is looked up here first. If found, the row maps directly to the registered programme and course without regex parsing.<br><br>
+      Patterns auto-register during ingestion when a new class name is parsed successfully — you only need to add them manually for unusual formats.
+    </div>
+  </div>
+
+</div>
+
+<script>
+function filterRegCourses(progPk) {
+  var sel = document.getElementById('reg-course-select');
+  sel.value = '';
+  for (var i = 1; i < sel.options.length; i++) {
+    var show = progPk && sel.options[i].dataset.programme === progPk;
+    sel.options[i].style.display = show ? '' : 'none';
+  }
+}
+</script>
+{% endblock %}

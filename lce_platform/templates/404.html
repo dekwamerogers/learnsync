@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page Not Found — LearnSync</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      padding: 56px 48px;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      margin-bottom: 40px;
+    }
+    .brand-mark {
+      width: 32px; height: 32px;
+      background: #0452F0;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 800; font-size: 14px;
+    }
+    .brand-name {
+      font-size: 18px; font-weight: 700; color: #0f172a;
+    }
+    .code {
+      font-size: 88px;
+      font-weight: 700;
+      color: #0452F0;
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 12px;
+    }
+    p {
+      font-size: 14px;
+      color: #64748b;
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+    .path {
+      display: inline-block;
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-family: monospace;
+      font-size: 13px;
+      color: #475569;
+      word-break: break-all;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #0452F0;
+      color: #fff;
+      text-decoration: none;
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #0341c0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <a href="/" class="brand">
+      <div class="brand-mark">A</div>
+      <span class="brand-name">LearnSync</span>
+    </a>
+
+    <div class="code">404</div>
+    <h1>Page not found</h1>
+
+    <p>
+      The page you're looking for doesn't exist or may have been moved.
+      {% if request_path %}
+        <br><br>
+        Requested: <span class="path">{{ request_path }}</span>
+      {% endif %}
+    </p>
+
+    <a href="/" class="btn">← Go to dashboard</a>
+  </div>
+</body>
+</html>

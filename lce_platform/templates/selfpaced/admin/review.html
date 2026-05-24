@@ -1,0 +1,417 @@
+{% extends "selfpaced/base.html" %}
+{% load sp_filters %}
+
+{% block title %}Review Upload #{{ job.pk }} — LearnSync{% endblock %}
+{% block page_title %}Review Upload{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:860px;">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <div style="font-size:13px;color:#6b7280;">Job #{{ job.pk }}</div>
+      <div style="font-size:18px;font-weight:700;color:#111827;margin-top:2px;">{{ job.file_name }}</div>
+      <div style="font-size:12px;color:#9ca3af;margin-top:2px;">
+        Uploaded {{ job.uploaded_at|date:"d M Y H:i" }} by {{ job.uploaded_by.get_full_name|default:"—" }}
+      </div>
+    </div>
+    <span class="sp-badge-health" style="background:#ede9fe;color:#7c3aed;font-size:11px;padding:4px 10px;border-radius:9999px;font-weight:600;">
+      Pending Review
+    </span>
+  </div>
+
+  <!-- Summary row -->
+  <div class="sp-card" style="margin-bottom:20px;">
+    <div class="sp-card-header">What this upload will do</div>
+    <div class="sp-card-body">
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:16px;">
+        <div>
+          <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Rows</div>
+          <div style="font-size:20px;font-weight:700;color:#111827;margin-top:4px;">{{ review.rows_processed|default:"—" }}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">New Learners</div>
+          <div style="font-size:20px;font-weight:700;color:#059669;margin-top:4px;">{{ review.new_learners|default:"0" }}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Updated</div>
+          <div style="font-size:20px;font-weight:700;color:#111827;margin-top:4px;">{{ review.updated_learners|default:"0" }}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">New Progs</div>
+          <div style="font-size:20px;font-weight:700;color:{% if review.new_programmes %}#0369a1{% else %}#9ca3af{% endif %};margin-top:4px;">{{ review.new_programmes|length }}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">New Courses</div>
+          <div style="font-size:20px;font-weight:700;color:{% if review.new_courses %}#0452F0{% else %}#9ca3af{% endif %};margin-top:4px;">{{ review.new_courses|length }}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Flagged</div>
+          <div style="font-size:20px;font-weight:700;color:{% if review.flagged_count %}#d97706{% else %}#9ca3af{% endif %};margin-top:4px;">{{ review.flagged_count|default:"0" }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cross-enrolment signals -->
+  {% if review.cross_enrolled_programmes %}
+  <div class="sp-card" style="margin-bottom:20px;">
+    <div class="sp-card-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Cross-enrolment signals</span>
+      <span style="font-size:11px;font-weight:400;color:#9ca3af;">
+        Programmes listed in the "Other programs enrolled" column — not in this file
+      </span>
+    </div>
+    <div class="sp-card-body">
+      <div style="font-size:12px;color:#6b7280;margin-bottom:12px;">
+        These programmes appear alongside learners in this upload. Their data is not included here — upload each separately to track full progress.
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        {% for p in review.cross_enrolled_programmes %}
+        <div style="display:inline-flex;align-items:center;gap:6px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:20px;padding:5px 12px;">
+          <span style="font-size:12px;font-weight:600;color:#0369a1;">{{ p.name }}</span>
+          <span style="font-size:11px;color:#7dd3fc;font-weight:500;">×{{ p.learner_count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- New programmes — optional mapping panel -->
+  {% if review.new_programmes %}
+  <div class="sp-card" style="margin-bottom:20px;border-color:#bae6fd;">
+    <div class="sp-card-header" style="background:#f0f9ff;color:#0369a1;border-bottom-color:#bae6fd;">
+      <i class="ti ti-info-circle" style="margin-right:6px;"></i>
+      {{ review.new_programmes|length }} new programme{{ review.new_programmes|length|pluralize }} will be auto-created
+      <span style="font-size:11px;font-weight:400;color:#0ea5e9;margin-left:8px;">
+        Ingestion will proceed — optionally map each to an existing programme instead
+      </span>
+    </div>
+    <div class="sp-card-body" style="padding:0;">
+      {% for p in review.new_programmes %}
+      <div style="padding:14px 16px;{% if not forloop.last %}border-bottom:1px solid #e0f2fe;{% endif %}background:{% if forloop.counter|divisibleby:2 %}#fff{% else %}#f0f9ff{% endif %};">
+
+        <!-- Code + row count -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <span style="background:#e0f2fe;border:1px solid #bae6fd;border-radius:6px;padding:4px 12px;font-size:13px;font-weight:700;color:#0369a1;letter-spacing:.03em;">{{ p.code }}</span>
+          <span style="font-size:12px;color:#6b7280;">{{ p.row_count }} row{{ p.row_count|pluralize }} in this file</span>
+        </div>
+
+        <!-- Two actions side by side -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;">
+
+          <!-- Option A: create as new programme -->
+          <form method="post" action="{% url 'sp_resolve_preview_programme' job.pk %}"
+                style="display:flex;align-items:center;gap:0;">
+            {% csrf_token %}
+            <input type="hidden" name="code" value="{{ p.code }}">
+            <input type="hidden" name="action" value="create_new">
+            <button type="submit" class="sp-btn"
+                    style="font-size:12px;padding:5px 12px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:6px 0 0 6px;white-space:nowrap;">
+              <i class="ti ti-plus" style="font-size:11px;margin-right:4px;"></i>
+              Create "{{ p.code }}" as new programme
+            </button>
+          </form>
+
+          <!-- Divider -->
+          <span style="font-size:11px;color:#9ca3af;align-self:center;flex-shrink:0;">or map to existing</span>
+
+          <!-- Option B: map to existing programme -->
+          <form method="post" action="{% url 'sp_resolve_preview_programme' job.pk %}"
+                style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="code" value="{{ p.code }}">
+            <input type="hidden" name="action" value="map_to_existing">
+            <select name="programme" required
+                    onchange="this.form.querySelector('button[type=submit]').disabled = !this.value"
+                    style="padding:5px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;background:#fff;min-width:160px;">
+              <option value="">— Select programme —</option>
+              {% for prog in programmes_for_mapping %}
+              <option value="{{ prog.pk }}">{{ prog.code }}{% if prog.name != prog.code %} — {{ prog.name }}{% endif %}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="sp-btn sp-btn-primary"
+                    disabled
+                    style="font-size:12px;padding:5px 12px;">
+              Map &amp; refresh
+            </button>
+          </form>
+
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Programmes & courses in this file — always visible -->
+  {% if review.programme_breakdown %}
+  <div class="sp-card" style="margin-bottom:20px;">
+    <div class="sp-card-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Programmes &amp; courses in this file</span>
+      <span style="font-size:11px;font-weight:400;color:#9ca3af;">
+        {{ review.programme_breakdown|length }} programme{{ review.programme_breakdown|length|pluralize }}
+        · {{ review.new_courses|length }} new course{{ review.new_courses|length|pluralize }}
+      </span>
+    </div>
+    <div class="sp-card-body" style="padding:0;">
+      {% for prog in review.programme_breakdown %}
+      <div style="{% if not forloop.last %}border-bottom:1px solid #f3f4f6;{% endif %}">
+
+        <!-- Programme header row -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#f9fafb;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:12px;font-weight:700;color:#111827;background:#e5e7eb;border-radius:4px;padding:2px 8px;letter-spacing:.03em;">{{ prog.code }}</span>
+            <span style="font-size:12px;color:#6b7280;">{{ prog.name }}</span>
+            {% if prog.new_course_count %}
+            <span style="font-size:11px;font-weight:600;color:#059669;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:1px 6px;">
+              +{{ prog.new_course_count }} new
+            </span>
+            {% endif %}
+          </div>
+          <span style="font-size:11px;color:#9ca3af;">{{ prog.row_count }} row{{ prog.row_count|pluralize }}</span>
+        </div>
+
+        <!-- Course list -->
+        {% if prog.courses %}
+        <table style="width:100%;font-size:12px;border-collapse:collapse;">
+          {% for course in prog.courses %}
+          <tr style="border-bottom:1px solid #f9fafb;">
+            <td style="padding:6px 10px 6px 16px;width:72px;">
+              <span style="font-size:11px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:3px;padding:1px 6px;font-family:monospace;white-space:nowrap;">{{ course.tag }}</span>
+            </td>
+            <td style="padding:6px 8px;color:#374151;">
+              {{ course.name }}
+              {% if course.mapped_from_name %}
+              <span style="font-size:10px;color:#9ca3af;margin-left:6px;">(was: {{ course.mapped_from_name }})</span>
+              {% endif %}
+            </td>
+            <td style="padding:6px 8px;text-align:right;white-space:nowrap;">
+              {% if course.is_new %}
+              <span style="font-size:10px;font-weight:700;color:#059669;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:2px 6px;letter-spacing:.04em;margin-right:6px;">NEW</span>
+              <!-- Edit new course name -->
+              <button type="button"
+                      style="font-size:11px;color:#6b7280;background:none;border:1px solid #e5e7eb;border-radius:4px;padding:2px 8px;cursor:pointer;font-family:inherit;"
+                      onclick="toggleCourseEdit('ce-{{ prog.code }}-{{ course.seq }}')">Edit</button>
+              {% else %}
+              {% if course.course_pk and prog.prog_pk %}
+              <a href="{% url 'sp_admin_course_edit' prog.prog_pk course.course_pk %}"
+                 style="font-size:11px;color:#6b7280;text-decoration:none;border:1px solid #e5e7eb;border-radius:4px;padding:2px 8px;white-space:nowrap;">Edit →</a>
+              {% else %}
+              <span style="font-size:10px;color:#d1d5db;">existing</span>
+              {% endif %}
+              {% endif %}
+            </td>
+          </tr>
+          <!-- Inline edit panel for new courses -->
+          {% if course.is_new %}
+          <tr id="ce-{{ prog.code }}-{{ course.seq }}" style="display:none;background:#f9fafb;">
+            <td colspan="3" style="padding:10px 16px;">
+              <form method="post" action="{% url 'sp_edit_preview_course' job.pk %}" style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+                {% csrf_token %}
+                <input type="hidden" name="prog_code" value="{{ prog.code }}">
+                <input type="hidden" name="seq" value="{{ course.seq }}">
+                <!-- Rename -->
+                <div style="flex:1;min-width:180px;">
+                  <label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Rename course</label>
+                  <input type="text" name="new_name" value="{{ course.name }}"
+                         style="width:100%;padding:6px 10px;border:1px solid #e5e7eb;border-radius:5px;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box;">
+                </div>
+                <!-- Match to existing -->
+                <div style="flex:1;min-width:180px;">
+                  <label style="display:block;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Or match to existing course</label>
+                  <select name="map_to_course_pk"
+                          style="width:100%;padding:6px 10px;border:1px solid #e5e7eb;border-radius:5px;font-size:12px;font-family:inherit;outline:none;background:#fff;">
+                    <option value="">— don't match, create new —</option>
+                    {% for ec in prog.existing_courses %}
+                    <option value="{{ ec.pk }}">{{ ec.sequence_number }}. {{ ec.full_name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div style="display:flex;gap:6px;align-items:flex-end;padding-top:18px;">
+                  <button type="submit" class="sp-btn sp-btn-primary" style="padding:5px 14px;font-size:12px;">Apply</button>
+                  <button type="button" class="sp-btn sp-btn-secondary" style="padding:5px 14px;font-size:12px;"
+                          onclick="toggleCourseEdit('ce-{{ prog.code }}-{{ course.seq }}')">Cancel</button>
+                </div>
+              </form>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </table>
+        {% endif %}
+
+      </div>
+      {% endfor %}
+
+      <!-- New assignments sub-section -->
+      {% if review.new_assignments %}
+      <div style="padding:10px 16px;border-top:1px solid #f3f4f6;">
+        <span style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;">
+          New assignments / modules
+        </span>
+        <span style="font-size:12px;color:#0369a1;font-weight:700;margin-left:8px;">{{ review.new_assignments }}</span>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+  {% endif %}{# /programmes & courses #}
+
+  <!-- Flagged rows preview -->
+  {% if review.flagged_rows %}
+  <div class="sp-card" style="margin-bottom:20px;">
+    <div class="sp-card-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Flagged rows</span>
+      <span style="font-size:11px;font-weight:400;color:#d97706;">{{ review.flagged_count }} row{{ review.flagged_count|pluralize }} will be skipped</span>
+    </div>
+    <div class="sp-card-body" style="padding:0;">
+
+      <!-- Group unrecognised patterns for inline mapping -->
+      {% regroup review.flagged_rows by flag_reason as grouped_flags %}
+
+      {% for group in grouped_flags %}
+      {% if group.grouper == 'unrecognised_programme' %}
+      {# handled in the dedicated matching panel above — skip here #}
+      {% elif group.grouper == 'unrecognised_pattern' %}
+      <div style="padding:12px 16px;border-bottom:1px solid #f3f4f6;background:#fffbeb;">
+        <div style="font-size:12px;font-weight:600;color:#92400e;margin-bottom:10px;">
+          <i class="ti ti-map-pin-off" style="margin-right:4px;"></i>
+          {{ group.list|length }} unrecognised eHub pattern{{ group.list|length|pluralize }} — map them to continue
+        </div>
+
+        {% for row in group.list %}
+        {% with ehub=row.raw_data.ehub_class_name %}
+        <div style="background:#fff;border:1px solid #fde68a;border-radius:6px;padding:10px 12px;margin-bottom:8px;">
+          <div style="font-size:12px;font-weight:700;color:#111827;margin-bottom:8px;">{{ ehub }}</div>
+          <form method="post" action="{% url 'sp_map_preview_pattern' job.pk %}"
+                style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="pattern" value="{{ ehub }}">
+            <select name="programme" required
+                    onchange="filterPreviewCourses(this)"
+                    data-uid="{{ forloop.counter }}"
+                    style="padding:5px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;background:#fff;flex:0 0 auto;">
+              <option value="">— Programme —</option>
+              {% for prog in programmes_for_mapping %}
+              <option value="{{ prog.pk }}">{{ prog.code }}</option>
+              {% endfor %}
+            </select>
+            <select name="course"
+                    id="preview-courses-{{ forloop.counter }}"
+                    style="padding:5px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;background:#fff;flex:1;min-width:160px;">
+              <option value="">— Course (optional) —</option>
+              {% for prog in programmes_for_mapping %}
+              {% for course in prog.courses.all %}
+              <option value="{{ course.pk }}" data-programme="{{ prog.pk }}" style="display:none;">
+                Seq {{ course.sequence_number }}: {{ course.full_name }}
+              </option>
+              {% endfor %}
+              {% endfor %}
+            </select>
+            <button type="submit" class="sp-btn sp-btn-primary" style="font-size:11px;padding:5px 12px;flex-shrink:0;">
+              Map &amp; refresh
+            </button>
+          </form>
+        </div>
+        {% endwith %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="padding:6px 0;">
+      <table style="width:100%;font-size:12px;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#f9fafb;border-bottom:1px solid #f3f4f6;">
+            <th style="padding:8px 16px;text-align:left;font-weight:600;color:#6b7280;font-size:11px;">Reason</th>
+            <th style="padding:8px 16px;text-align:left;font-weight:600;color:#6b7280;font-size:11px;">Detail</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in group.list %}
+          <tr style="border-bottom:1px solid #f9fafb;">
+            <td style="padding:8px 16px;white-space:nowrap;">
+              <span class="sp-flag-chip">{{ row.flag_reason }}</span>
+            </td>
+            <td style="padding:8px 16px;color:#6b7280;max-width:500px;word-break:break-all;">
+              {% if row.raw_data.email %}{{ row.raw_data.email }}{% endif %}
+              {% with ehub=row.raw_data.ehub_class_name %}{% if ehub %} · {{ ehub }}{% endif %}{% endwith %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% endif %}
+      {% endfor %}
+
+      {% if review.flagged_rows|length == 50 %}
+      <div style="padding:8px 16px;color:#9ca3af;font-size:11px;border-top:1px solid #f3f4f6;">
+        Showing first 50 flagged rows.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Warnings preview -->
+  {% if review.warnings %}
+  <div class="sp-alert sp-alert-warning" style="margin-bottom:20px;">
+    <div>
+      <strong>{{ review.warnings|length }} warning(s):</strong>
+      <ul style="margin:4px 0 0;padding-left:16px;">
+        {% for w in review.warnings %}
+          <li>Row {{ w.row }}: {{ w.reason }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Action bar -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;">
+    <div style="font-size:12px;color:#6b7280;max-width:480px;">
+      Review the catalogue changes and learner counts above. Once confirmed, data will be written and health flags computed.
+      Updates to existing learner records are not reversible via delete.
+    </div>
+    <div style="display:flex;gap:10px;flex-shrink:0;margin-left:16px;">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="cancel">
+        <button type="submit" class="sp-btn" style="border:1px solid #e5e7eb;background:#fff;color:#374151;">
+          Cancel upload
+        </button>
+      </form>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="confirm">
+        <button type="submit" class="sp-btn sp-btn-primary">
+          <i class="ti ti-database-import" style="font-size:13px;"></i>
+          Confirm &amp; Ingest
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function toggleCourseEdit(id) {
+  var row = document.getElementById(id);
+  if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+function filterPreviewCourses(progSelect) {
+  var uid = progSelect.dataset.uid;
+  var progPk = progSelect.value;
+  var sel = document.getElementById('preview-courses-' + uid);
+  if (!sel) return;
+  sel.value = '';
+  for (var i = 1; i < sel.options.length; i++) {
+    var show = progPk && sel.options[i].dataset.programme === progPk;
+    sel.options[i].style.display = show ? '' : 'none';
+  }
+}
+</script>
+{% endblock %}

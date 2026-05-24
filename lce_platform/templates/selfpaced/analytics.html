@@ -1,0 +1,1020 @@
+{% extends "selfpaced/base.html" %}
+{% load sp_filters %}
+
+{% block title %}Analytics — LearnSync{% endblock %}
+{% block page_title %}Analytics{% endblock %}
+{% block nav_analytics %}active{% endblock %}
+
+{% block content %}
+
+<!-- ── Filter bar ─────────────────────────────────────────────────────── -->
+<form method="get" id="analytics-filter-form"
+      hx-get="{% url 'sp_analytics' %}"
+      hx-target="#analytics-body"
+      hx-swap="innerHTML"
+      hx-push-url="true"
+      hx-indicator="#analytics-loading">
+<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:14px 16px;background:#fff;border-radius:8px;border:1px solid #e5e7eb;margin-bottom:20px;">
+
+  <!-- Date basis -->
+  <div style="display:flex;flex-direction:column;gap:3px;">
+    <label style="font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;">Date basis</label>
+    <select name="cohort_type" onchange="document.getElementById('analytics-filter-form').submit()"
+            style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;background:#fff;color:#374151;cursor:pointer;">
+      <option value="effective" {% if cohort_type == 'effective' %}selected{% endif %}>Effective start</option>
+      <option value="enrolment" {% if cohort_type == 'enrolment' %}selected{% endif %}>Enrolment date</option>
+      <option value="fsol"      {% if cohort_type == 'fsol'      %}selected{% endif %}>First activity</option>
+    </select>
+  </div>
+
+  <!-- Date range -->
+  <div style="display:flex;flex-direction:column;gap:3px;">
+    <label style="font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;">From</label>
+    <input type="date" name="from_date" value="{{ from_date }}"
+           style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;outline:none;color:#374151;"
+           onchange="document.getElementById('analytics-filter-form').submit()">
+  </div>
+  <div style="display:flex;flex-direction:column;gap:3px;">
+    <label style="font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;">To</label>
+    <input type="date" name="to_date" value="{{ to_date }}"
+           style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;outline:none;color:#374151;"
+           onchange="document.getElementById('analytics-filter-form').submit()">
+  </div>
+
+  <!-- Country multi-select -->
+  <div style="display:flex;flex-direction:column;gap:3px;">
+    <label style="font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;">Country</label>
+    <div style="position:relative;">
+      <button type="button" onclick="msDrop(this)"
+              class="ms-trigger {% if country_filter %}has-selection{% endif %}"
+              data-placeholder="All countries"
+              style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:#374151;cursor:pointer;min-width:140px;white-space:nowrap;">
+        {% if country_filter %}{{ country_filter|length }} selected{% else %}All countries{% endif %}
+        <i class="ti ti-chevron-down" style="font-size:11px;margin-left:auto;color:#9ca3af;"></i>
+      </button>
+      <div class="ms-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:200px;max-height:240px;overflow-y:auto;background:#fff;border:1px solid #e5e7eb;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:50;padding:6px 0;">
+        {% for c in all_countries %}
+        <label style="display:flex;align-items:center;gap:8px;padding:5px 12px;cursor:pointer;font-size:12px;color:#374151;">
+          <input type="checkbox" name="country" value="{{ c }}" {% if c in country_filter %}checked{% endif %}
+                 onchange="document.getElementById('analytics-filter-form').submit()">
+          {{ c }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Programme multi-select -->
+  <div style="display:flex;flex-direction:column;gap:3px;">
+    <label style="font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;">Programme</label>
+    <div style="position:relative;">
+      <button type="button" onclick="msDrop(this)"
+              class="ms-trigger {% if programme_filter %}has-selection{% endif %}"
+              data-placeholder="All programmes"
+              style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:#374151;cursor:pointer;min-width:160px;white-space:nowrap;">
+        {% if programme_filter %}{{ programme_filter|length }} selected{% else %}All programmes{% endif %}
+        <i class="ti ti-chevron-down" style="font-size:11px;margin-left:auto;color:#9ca3af;"></i>
+      </button>
+      <div class="ms-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:200px;max-height:240px;overflow-y:auto;background:#fff;border:1px solid #e5e7eb;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:50;padding:6px 0;">
+        {% for p in all_programmes %}
+        <label style="display:flex;align-items:center;gap:8px;padding:5px 12px;cursor:pointer;font-size:12px;color:#374151;">
+          <input type="checkbox" name="programme" value="{{ p.pk }}" {% if p.pk|stringformat:"s" in programme_filter %}checked{% endif %}
+                 onchange="document.getElementById('analytics-filter-form').submit()">
+          <span style="font-size:11px;background:#f3f4f6;border-radius:3px;padding:0 4px;margin-right:2px;font-weight:600;">{{ p.code }}</span> {{ p.name }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Health multi-select -->
+  <div style="display:flex;flex-direction:column;gap:3px;">
+    <label style="font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;">Health</label>
+    <div style="position:relative;">
+      <button type="button" onclick="msDrop(this)"
+              class="ms-trigger {% if health_filter %}has-selection{% endif %}"
+              data-placeholder="All states"
+              style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:#374151;cursor:pointer;min-width:130px;white-space:nowrap;">
+        {% if health_filter %}{{ health_filter|length }} selected{% else %}All states{% endif %}
+        <i class="ti ti-chevron-down" style="font-size:11px;margin-left:auto;color:#9ca3af;"></i>
+      </button>
+      <div class="ms-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:180px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:50;padding:6px 0;">
+        {% for val, label in health_choices %}
+        <label style="display:flex;align-items:center;gap:8px;padding:5px 12px;cursor:pointer;font-size:12px;color:#374151;">
+          <input type="checkbox" name="health" value="{{ val }}" {% if val in health_filter %}checked{% endif %}
+                 onchange="document.getElementById('analytics-filter-form').submit()">
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick date range presets -->
+  <div style="display:flex;flex-direction:column;gap:3px;">
+    <label style="font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;">Quick range</label>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;">
+      <button type="button" onclick="setQuickRange(4,'w')"  class="qr-btn">4 weeks</button>
+      <button type="button" onclick="setQuickRange(3,'m')"  class="qr-btn">3 months</button>
+      <button type="button" onclick="setQuickRange(6,'m')"  class="qr-btn">6 months</button>
+      <button type="button" onclick="setQuickRange(1,'y')"  class="qr-btn">1 year</button>
+      <button type="button" onclick="setQuickRange(0,'all')" class="qr-btn">All time</button>
+    </div>
+  </div>
+
+  {% if country_filter or programme_filter or health_filter or from_date or to_date %}
+  <a href="{% url 'sp_analytics' %}"
+     style="padding:6px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;color:#6b7280;text-decoration:none;white-space:nowrap;align-self:flex-end;">
+    Clear filters
+  </a>
+  {% endif %}
+
+</div>
+</form>
+<style>
+.qr-btn{padding:5px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:11px;font-family:inherit;background:#fff;color:#374151;cursor:pointer;white-space:nowrap;}
+.qr-btn:hover{background:#f3f4f6;}
+</style>
+
+<!-- Loading indicator shown while HTMX filter request is in flight -->
+<div id="analytics-loading" class="htmx-indicator"
+     style="display:none;height:3px;background:#f3f4f6;border-radius:9999px;overflow:hidden;margin-bottom:12px;">
+  <div style="height:100%;width:100%;background:#0452F0;animation:sp-progress 1.4s ease-in-out infinite;border-radius:9999px;"></div>
+</div>
+
+<style>
+.an-section-header {
+  display: flex; align-items: center; gap: 10px;
+  margin: 24px 0 14px;
+}
+.an-section-header::before {
+  content: ''; display: block; width: 3px; height: 18px;
+  background: #0452F0; border-radius: 2px; flex-shrink: 0;
+}
+.an-section-header span {
+  font-size: 12px; font-weight: 700; color: #374151;
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.an-section-header small {
+  font-size: 11px; color: #9ca3af; font-weight: 400;
+  text-transform: none; letter-spacing: 0;
+}
+</style>
+
+<div id="analytics-body">
+
+<!-- ══ EMPTY STATE — shown when filters return no enrolments ════════════ -->
+{% if not portfolio_solo and not portfolio_multi and not progression_has_data %}
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:32px;text-align:center;margin-bottom:16px;">
+  <div style="width:48px;height:48px;border-radius:12px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+    <i class="ti ti-chart-dots-3" style="font-size:24px;color:#94a3b8;"></i>
+  </div>
+  {% if country_filter or programme_filter or health_filter or from_date or to_date %}
+    <div style="font-size:15px;font-weight:600;color:#374151;margin-bottom:6px;">No results for these filters</div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:16px;">
+      Try widening the date range, removing a country or programme filter, or clearing all filters to see the full dataset.
+    </div>
+    <a href="{% url 'sp_analytics' %}"
+       style="display:inline-flex;align-items:center;gap:6px;background:#0452F0;color:#fff;text-decoration:none;padding:9px 20px;border-radius:7px;font-size:13px;font-weight:600;">
+      <i class="ti ti-x" style="font-size:13px;"></i> Clear all filters
+    </a>
+  {% else %}
+    <div style="font-size:15px;font-weight:600;color:#374151;margin-bottom:6px;">No data yet</div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:16px;">
+      Upload a staff portal CSV to start seeing analytics. Charts and cohort tables appear once enrolments are ingested.
+    </div>
+    <button onclick="spOpenUpload()"
+            style="background:#0452F0;color:#fff;border:none;border-radius:7px;padding:9px 20px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+      <i class="ti ti-upload" style="font-size:13px;"></i> Upload CSV
+    </button>
+  {% endif %}
+</div>
+{% else %}
+
+<!-- ══ HEALTH OVERVIEW ════════════════════════════════════════════════ -->
+<div class="an-section-header"><span>Health Overview</span><small>Overall learner health for the selected filters</small></div>
+<div style="display:grid;grid-template-columns:260px 1fr;gap:14px;margin-bottom:14px;">
+
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px;">Health Breakdown</div>
+    <div style="position:relative;height:180px;"><canvas id="analyticsHealthDonut"></canvas></div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:12px;justify-content:center;">
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block;"></span>Active</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#d97706;display:inline-block;"></span>At Risk</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#7c3aed;display:inline-block;"></span>Dormant</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#2563eb;display:inline-block;"></span>Graduated</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#d1d5db;display:inline-block;"></span>Not Started</span>
+    </div>
+  </div>
+
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px;">Enrolments by Programme</div>
+    <div style="position:relative;height:220px;"><canvas id="analyticsProgBar"></canvas></div>
+  </div>
+
+</div>
+
+<!-- ══ RISK DRIVERS ═══════════════════════════════════════════════════ -->
+<div class="an-section-header"><span>Risk Drivers</span><small>Why are learners at risk or dormant? Click a bar to see those learners</small></div>
+<div class="sp-card" style="padding:16px;margin-bottom:14px;">
+  <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">At-Risk &amp; Dormant — Flag Breakdown</div>
+  <div style="font-size:11px;color:#9ca3af;margin-bottom:12px;">Unique learners carrying each flag across at-risk and dormant enrolments</div>
+  <div style="position:relative;height:220px;"><canvas id="analyticsFlagBar"></canvas></div>
+</div>
+
+<!-- ══ COHORT ANALYSIS ════════════════════════════════════════════════ -->
+<div class="an-section-header"><span>Cohort Analysis</span><small>Current health of each enrolment week — click any row or bar to drill into those learners</small></div>
+<div class="sp-card" style="padding:20px;margin-bottom:14px;">
+
+  <div style="margin-bottom:16px;">
+    <div style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;">Rolling Enrolment Cohorts</div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:2px;">
+      Weekly health breakdown using the <strong>
+      {% if cohort_type == 'effective' %}effective start date (enrolment date → activation date → programme start, whichever is latest)
+      {% elif cohort_type == 'enrolment' %}enrolment date (falls back to activation date)
+      {% else %}first sign of life date
+      {% endif %}</strong>. Date range and all filters above apply.
+    </div>
+  </div>
+
+  {# ── Two charts side by side ── #}
+  {% if cohort_rows %}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+
+    <div>
+      <div style="font-size:10px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">All enrolments incl. not started</div>
+      <div style="position:relative;height:240px;">
+        <canvas id="cohortBar"></canvas>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:10px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Started learners only (excl. not started)</div>
+      <div style="position:relative;height:240px;">
+        <canvas id="cohortBarStarted"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  {# ── Table ── #}
+  <div style="overflow-x:auto;">
+    <table class="sp-table">
+      <thead>
+        <tr>
+          <th>Week</th>
+          <th style="text-align:right;">Total</th>
+          <th style="text-align:right;color:#7c3aed;"><abbr title="Passed the first module of their programme">Activated</abbr></th>
+          <th style="text-align:right;color:#16a34a;">Active</th>
+          <th style="text-align:right;color:#d97706;">At Risk</th>
+          <th style="text-align:right;color:#7c3aed;">Dormant</th>
+          <th style="text-align:right;color:#9ca3af;">Not Started</th>
+          <th style="text-align:right;color:#2563eb;">Graduated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in cohort_rows %}
+        {% with url=row.week_start|add:"&enrol_to="|add:row.week_end %}
+        <tr style="cursor:pointer;" onclick="window.location='{% url 'sp_learner_list' %}?enrol_from={{ row.week_start }}&enrol_to={{ row.week_end }}&cohort_basis={{ cohort_type }}'">
+          <td style="font-size:12px;font-weight:600;color:#374151;white-space:nowrap;">
+            <a href="{% url 'sp_learner_list' %}?enrol_from={{ row.week_start }}&enrol_to={{ row.week_end }}&cohort_basis={{ cohort_type }}"
+               style="color:inherit;text-decoration:none;">{{ row.label }}</a>
+          </td>
+          <td style="text-align:right;font-weight:700;">{{ row.total }}</td>
+          <td style="text-align:right;color:#7c3aed;font-weight:{% if row.activated %}600{% else %}400{% endif %};">
+            {{ row.activated|default:"—" }}
+            {% if row.total and row.activated %}<span style="font-size:10px;color:#9ca3af;font-weight:400;"> ({% widthratio row.activated row.total 100 %}%)</span>{% endif %}
+          </td>
+          <td style="text-align:right;color:#16a34a;font-weight:{% if row.active %}600{% else %}400{% endif %};">{{ row.active|default:"—" }}</td>
+          <td style="text-align:right;color:#d97706;font-weight:{% if row.at_risk %}600{% else %}400{% endif %};">{{ row.at_risk|default:"—" }}</td>
+          <td style="text-align:right;color:#7c3aed;font-weight:{% if row.dormant %}600{% else %}400{% endif %};">{{ row.dormant|default:"—" }}</td>
+          <td style="text-align:right;color:#6b7280;">{{ row.not_started|default:"—" }}</td>
+          <td style="text-align:right;color:#2563eb;font-weight:{% if row.graduated %}600{% else %}400{% endif %};">{{ row.graduated|default:"—" }}</td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div style="height:120px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;">
+    No cohort data for the selected filters and date range.
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- ══ DISTRIBUTION ═══════════════════════════════════════════════════ -->
+<div class="an-section-header"><span>Distribution</span><small>Where are learners coming from, and how are they spread across programmes?</small></div>
+<div style="display:grid;grid-template-columns:1fr 220px;gap:14px;margin-bottom:14px;">
+
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px;">Learners by Country</div>
+    <div style="position:relative;height:{% if chart_country_labels|length > 8 %}280px{% else %}200px{% endif %};"><canvas id="analyticsCountryBar"></canvas></div>
+  </div>
+
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px;">Portfolio Mix</div>
+    {% if portfolio_solo or portfolio_multi %}
+    <div style="position:relative;height:160px;"><canvas id="analyticsPortfolioDonut"></canvas></div>
+    <div style="margin-top:10px;display:flex;flex-direction:column;gap:4px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#374151;">
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:50%;background:#0452F0;flex-shrink:0;display:inline-block;"></span>Single-programme</span>
+        <span style="font-weight:700;">{{ portfolio_solo }}</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#374151;">
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;flex-shrink:0;display:inline-block;"></span>Multi-programme</span>
+        <span style="font-weight:700;">{{ portfolio_multi }}</span>
+      </div>
+    </div>
+    {% else %}
+    <div style="height:160px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;">No data</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- ══ COURSE DETAIL ══════════════════════════════════════════════════ -->
+<div class="an-section-header"><span>Course Detail</span><small>How many learners are on each course — select a programme and health filter</small></div>
+<div class="sp-card" style="padding:16px;margin-bottom:14px;">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+    <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-right:4px;">Learner Distribution by Course</div>
+    {% for prog in active_progs %}
+    <button class="ac-prog-pill" data-pk="{{ prog.pk }}"
+            style="font-size:11px;font-weight:600;border-radius:20px;padding:3px 11px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:inherit;line-height:1.4;">
+      {{ prog.code }}
+    </button>
+    {% endfor %}
+  </div>
+  <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;">
+    <button class="ac-health-pill" data-health="all"             style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:inherit;line-height:1.5;">All</button>
+    <button class="ac-health-pill" data-health="active"          style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:inherit;line-height:1.5;">Active</button>
+    <button class="ac-health-pill" data-health="at_risk"         style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:inherit;line-height:1.5;">At Risk</button>
+    <button class="ac-health-pill" data-health="dormant"         style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:inherit;line-height:1.5;">Dormant</button>
+    <button class="ac-health-pill" data-health="not_yet_started" style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:inherit;line-height:1.5;">Not Started</button>
+    <button class="ac-health-pill" data-health="graduated"       style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:inherit;line-height:1.5;">Prog. Graduated</button>
+    <button class="ac-health-pill" data-health="badges"          style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:inherit;line-height:1.5;">Badges</button>
+  </div>
+  <div id="ac-no-course-msg" style="display:none;height:160px;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;">No course data for this programme</div>
+  <div style="position:relative;height:300px;"><canvas id="analyticsCourseBar"></canvas></div>
+</div>
+
+<!-- ══ PROGRESSION OVER TIME ══════════════════════════════════════════ -->
+{% if progression_has_data %}
+<div class="an-section-header"><span>Progression Over Time</span><small>Day-by-day activity and completion trends using real assignment dates, not upload dates</small></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+
+    <div class="sp-card" style="padding:16px;">
+      <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Daily Active Learners — by Programme</div>
+      <div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">Unique learners who accessed or submitted an assignment each day</div>
+      <div style="position:relative;height:220px;"><canvas id="activationLine"></canvas></div>
+    </div>
+
+    <div class="sp-card" style="padding:16px;">
+      <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Cumulative Active Learners — by Programme</div>
+      <div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">Running total of learners who have had any activity (from programme start)</div>
+      <div style="position:relative;height:220px;"><canvas id="activationCumLine"></canvas></div>
+    </div>
+
+    <div class="sp-card" style="padding:16px;">
+      <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Daily Course Completions — by Programme</div>
+      <div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">Courses completed per day (completion date)</div>
+      <div style="position:relative;height:220px;"><canvas id="completionLine"></canvas></div>
+    </div>
+
+    <div class="sp-card" style="padding:16px;">
+      <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Cumulative Course Completions — by Programme</div>
+      <div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">Running total of courses completed</div>
+      <div style="position:relative;height:220px;"><canvas id="completionCumLine"></canvas></div>
+    </div>
+
+    <div class="sp-card" style="padding:16px;">
+      <div style="font-size:11px;font-weight:600;color:#f97316;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Daily First Module Completions — by Programme</div>
+      <div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">Learners passing the first module each day — the moment of activation</div>
+      <div style="position:relative;height:220px;"><canvas id="firstModuleLine"></canvas></div>
+    </div>
+
+    <div class="sp-card" style="padding:16px;">
+      <div style="font-size:11px;font-weight:600;color:#f97316;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Cumulative First Module Completions — by Programme</div>
+      <div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">Running total of learners who have activated (passed first module)</div>
+      <div style="position:relative;height:220px;"><canvas id="firstModuleCumLine"></canvas></div>
+    </div>
+
+  </div>
+{% endif %}{# /cohort_rows #}
+
+{% endif %}{# /has data — closes the empty-state else block #}
+
+<!-- All chart data — refreshed on every HTMX swap alongside the canvas elements -->
+<script id="analytics-chart-data" type="application/json">{
+  "healthLabels":  {{ chart_health_labels|safe }},
+  "healthData":    {{ chart_health_data|safe }},
+  "progLabels":          {{ chart_prog_labels|safe }},
+  "progTotal":           {{ chart_prog_total|safe }},
+  "progActivated":       {{ chart_prog_activated|safe }},
+  "progActivationRate":  {{ chart_prog_activation_rate|safe }},
+  "progActive":          {{ chart_prog_active|safe }},
+  "progAtRisk":          {{ chart_prog_at_risk|safe }},
+  "progDormant":         {{ chart_prog_dormant|safe }},
+  "progGraduated":       {{ chart_prog_graduated|safe }},
+  "progNotStarted":      {{ chart_prog_not_started|safe }},
+  "flagLabels":    {{ chart_flag_labels|safe }},
+  "flagCounts":    {{ chart_flag_counts|safe }},
+  "countryLabels": {{ chart_country_labels|safe }},
+  "countryCounts": {{ chart_country_counts|safe }},
+  "portfolioSolo": {{ portfolio_solo }},
+  "portfolioMulti":{{ portfolio_multi }},
+  "courseData":    {{ course_chart_data|safe }},
+  "cohortData":    {{ cohort_data|safe }},
+  "progWeekLabels":                    {{ prog_week_labels|safe }},
+  "activationDatasets":                {{ activation_datasets|safe }},
+  "activationCumulativeDatasets":      {{ activation_cumulative_datasets|safe }},
+  "completionDatasets":                {{ completion_datasets|safe }},
+  "completionCumulativeDatasets":      {{ completion_cumulative_datasets|safe }},
+  "firstModuleDatasets":               {{ first_module_datasets|safe }},
+  "firstModuleCumulativeDatasets":     {{ first_module_cumulative_datasets|safe }}
+}</script>
+
+</div><!-- /#analytics-body -->
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>
+(function () {
+
+  var HEALTH_COLORS = {
+    active: '#16a34a', at_risk: '#d97706', dormant: '#7c3aed',
+    not_yet_started: '#9ca3af', graduated: '#2563eb',
+  };
+  var HEALTH_LABELS = {
+    active: 'Active', at_risk: 'At Risk', dormant: 'Dormant',
+    not_yet_started: 'Not Started', graduated: 'Prog. Graduated',
+  };
+  var LEGEND_OPTS = {
+    labels: { font: { size: 10, family: 'Poppins, sans-serif' }, boxWidth: 10, padding: 8 },
+    position: 'bottom',
+  };
+  var DL_SEG = {
+    display: function (ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
+    color: '#fff', font: { size: 9, weight: '600' }, anchor: 'center', align: 'center', clamp: true,
+  };
+
+  // ── Dropdown toggle + close-on-outside-click (filter form lives outside #analytics-body) ─────
+  window.msDrop = function(trigger) {
+    var menu = trigger.nextElementSibling;
+    var open = menu.style.display !== 'none';
+    document.querySelectorAll('.ms-dropdown').forEach(function(d) { d.style.display = 'none'; });
+    if (!open) menu.style.display = 'block';
+  };
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.ms-trigger') && !e.target.closest('.ms-dropdown')) {
+      document.querySelectorAll('.ms-dropdown').forEach(function(d) { d.style.display = 'none'; });
+    }
+  });
+
+  // ── Quick date range helper (sets form inputs + submits) ─────────────
+  window.setQuickRange = function(n, unit) {
+    var form = document.getElementById('analytics-filter-form');
+    var fromInput = form.querySelector('[name="from_date"]');
+    var toInput   = form.querySelector('[name="to_date"]');
+    var today = new Date();
+    var fmt = function(d) {
+      return d.toISOString().slice(0, 10);
+    };
+    if (unit === 'all') {
+      fromInput.value = '';
+      toInput.value   = '';
+    } else {
+      var from = new Date(today);
+      if (unit === 'w') from.setDate(from.getDate() - n * 7);
+      if (unit === 'm') from.setMonth(from.getMonth() - n);
+      if (unit === 'y') from.setFullYear(from.getFullYear() - n);
+      fromInput.value = fmt(from);
+      toInput.value   = fmt(today);
+    }
+    form.submit();
+  };
+
+  function destroyCharts() {
+    ['analyticsHealthDonut','analyticsProgBar','analyticsFlagBar','analyticsCountryBar',
+     'analyticsPortfolioDonut','analyticsCourseBar','cohortBar','cohortBarStarted',
+     'activationLine','activationCumLine','completionLine','completionCumLine',
+     'firstModuleLine','firstModuleCumLine'].forEach(function(id) {
+      var c = document.getElementById(id);
+      if (c) { var existing = Chart.getChart(c); if (existing) existing.destroy(); }
+    });
+  }
+
+  function initAnalyticsCharts() {
+    var dataEl = document.getElementById('analytics-chart-data');
+    if (!dataEl) return;
+    var D = JSON.parse(dataEl.textContent);
+
+    destroyCharts();
+
+    // ── Chart 1: Health donut ──────────────────────────────────────────
+    new Chart(document.getElementById('analyticsHealthDonut'), {
+      type: 'doughnut',
+      data: {
+        labels: D.healthLabels,
+        datasets: [{ data: D.healthData, backgroundColor: ['#16a34a','#d97706','#7c3aed','#2563eb','#d1d5db'], borderWidth: 0 }],
+      },
+      options: {
+        cutout: '62%', responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          datalabels: {
+            display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
+            color: '#fff', font: { size: 10, weight: '600', family: 'Poppins,sans-serif' },
+            anchor: 'center', align: 'center', clamp: true,
+          },
+        },
+      },
+    });
+
+    // ── Chart 2: Enrolments by programme (stacked bar + activated line) ─
+    new Chart(document.getElementById('analyticsProgBar'), {
+      type: 'bar',
+      data: {
+        labels: D.progLabels,
+        datasets: [
+          { label: 'Active',      data: D.progActive,      backgroundColor: '#16a34a', borderWidth: 0, borderRadius: 2 },
+          { label: 'At Risk',     data: D.progAtRisk,      backgroundColor: '#d97706', borderWidth: 0, borderRadius: 2 },
+          { label: 'Dormant',     data: D.progDormant,     backgroundColor: '#7c3aed', borderWidth: 0, borderRadius: 2 },
+          { label: 'Graduated',   data: D.progGraduated,   backgroundColor: '#2563eb', borderWidth: 0, borderRadius: 2 },
+          { label: 'Not Started', data: D.progNotStarted,  backgroundColor: '#d1d5db', borderWidth: 0, borderRadius: 2 },
+          {
+            type: 'line', label: 'Activated',
+            data: D.progActivated,
+            borderColor: '#7c3aed', backgroundColor: 'transparent',
+            borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#7c3aed',
+            tension: 0.2, order: 0,
+          },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+          y: { stacked: true, grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 11 } } },
+        },
+        plugins: {
+          legend: LEGEND_OPTS,
+          datalabels: DL_SEG,
+          tooltip: {
+            mode: 'index', intersect: false,
+            callbacks: {
+              afterBody: function(items) {
+                var idx = items[0] && items[0].dataIndex;
+                if (idx === undefined) return '';
+                var total = D.progTotal[idx] || 0;
+                var act   = D.progActivated[idx] || 0;
+                var rate  = total ? Math.round(act / total * 100) : 0;
+                return 'Activation rate: ' + rate + '%';
+              },
+            },
+          },
+        },
+        animation: { duration: 400 },
+      },
+    });
+
+    // ── Chart 3: Flag breakdown ───────────────────────────────────────
+    new Chart(document.getElementById('analyticsFlagBar'), {
+      type: 'bar',
+      data: {
+        labels: D.flagLabels,
+        datasets: [{ data: D.flagCounts, backgroundColor: '#f97316', borderWidth: 0, borderRadius: 3, borderSkipped: false }],
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          datalabels: { display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; }, color: '#fff', font: { size: 9, weight: '600' }, anchor: 'center', align: 'center' },
+          tooltip: { callbacks: { label: function(ctx) { return ' ' + ctx.parsed.x + ' learners'; } } },
+        },
+        scales: {
+          x: { grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 11 } } },
+          y: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        },
+        animation: { duration: 400 },
+        onClick: function(evt, elements) {
+          if (!elements.length) return;
+          var codes = ['inactive','never_activated','stuck_on_assignment','low_pass_rate','stalled_between_courses','stalled_progression','payment_issue'];
+          window.location.href = '{% url "sp_learner_list" %}?flag=' + codes[elements[0].index];
+        },
+      },
+    });
+
+    // ── Chart 4: Country bar ──────────────────────────────────────────
+    var countryLabels = D.countryLabels;
+    new Chart(document.getElementById('analyticsCountryBar'), {
+      type: 'bar',
+      data: {
+        labels: countryLabels,
+        datasets: [{ data: D.countryCounts, backgroundColor: '#0452F0', borderWidth: 0, borderRadius: 3, borderSkipped: false }],
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        layout: { padding: { right: 36 } },
+        plugins: {
+          legend: { display: false },
+          datalabels: {
+            display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
+            color: '#374151', font: { size: 10, weight: '600', family: 'Poppins,sans-serif' },
+            anchor: 'end', align: 'end', offset: 4,
+          },
+          tooltip: { callbacks: { label: function(ctx) { return ' ' + ctx.parsed.x + ' learner' + (ctx.parsed.x === 1 ? '' : 's'); } } },
+        },
+        scales: {
+          x: { grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 11 } } },
+          y: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        },
+        animation: { duration: 400 },
+        onClick: function(evt, elements) {
+          if (!elements.length) return;
+          var country = countryLabels[elements[0].index];
+          window.location.href = '{% url "sp_learner_list" %}?country=' + encodeURIComponent(country);
+        },
+      },
+    });
+
+    // ── Chart 5: Portfolio donut ──────────────────────────────────────
+    if (D.portfolioSolo || D.portfolioMulti) {
+      new Chart(document.getElementById('analyticsPortfolioDonut'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Single-programme', 'Multi-programme'],
+          datasets: [{ data: [D.portfolioSolo, D.portfolioMulti], backgroundColor: ['#0452F0', '#f59e0b'], borderWidth: 0 }],
+        },
+        options: {
+          cutout: '65%', responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            datalabels: {
+              display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
+              color: '#fff', font: { size: 10, weight: '600', family: 'Poppins,sans-serif' },
+              anchor: 'center', align: 'center', clamp: true,
+            },
+          },
+        },
+      });
+    }
+
+    // ── Chart 6: Course distribution (interactive) ────────────────────
+    var courseRaw    = D.courseData;
+    var courseChart  = null;
+    var activePk     = null;
+    var activeHealth = 'all';
+
+    function setProgPill(pk) {
+      document.querySelectorAll('.ac-prog-pill').forEach(function(b) {
+        var on = String(b.dataset.pk) === String(pk);
+        b.style.background   = on ? '#0452F0' : '#f9fafb';
+        b.style.color        = on ? '#fff'    : '#374151';
+        b.style.borderColor  = on ? '#0452F0' : '#e5e7eb';
+      });
+    }
+
+    function setHealthPill(h) {
+      var HUE = { badges: '#f59e0b', all: '#374151', active: '#16a34a', at_risk: '#d97706', dormant: '#7c3aed', not_yet_started: '#9ca3af', graduated: '#2563eb' };
+      document.querySelectorAll('.ac-health-pill').forEach(function(b) {
+        var on  = b.dataset.health === h;
+        var col = HUE[b.dataset.health] || '#374151';
+        b.style.background  = on ? col  : '#f9fafb';
+        b.style.color       = on ? '#fff' : '#374151';
+        b.style.borderColor = on ? col  : '#e5e7eb';
+      });
+    }
+
+    function renderCourseChart(pk, health) {
+      var prog   = courseRaw.find(function(p) { return String(p.pk) === String(pk); });
+      var noMsg  = document.getElementById('ac-no-course-msg');
+      var canvas = document.getElementById('analyticsCourseBar');
+      if (!prog || !prog.courses || !prog.courses.length) {
+        if (noMsg)  noMsg.style.display  = 'flex';
+        if (canvas) canvas.style.display = 'none';
+        if (courseChart) { courseChart.destroy(); courseChart = null; }
+        return;
+      }
+      if (noMsg)  noMsg.style.display  = 'none';
+      if (canvas) canvas.style.display = 'block';
+
+      var labels   = prog.courses.map(function(c) { return prog.code + '-C' + c.seq; });
+      var stacked  = (health === 'all');
+      var datasets;
+
+      if (health === 'badges') {
+        datasets = [{ label: 'Badges', data: prog.courses.map(function(c) { return c.badges || 0; }), backgroundColor: '#f59e0b', borderWidth: 0, borderRadius: 3 }];
+      } else if (stacked) {
+        datasets = ['active','at_risk','dormant','not_yet_started','graduated'].map(function(key) {
+          return { label: key === 'graduated' ? 'Prog. Graduated' : HEALTH_LABELS[key], data: prog.courses.map(function(c) { return (c.by_health && c.by_health[key]) || 0; }), backgroundColor: HEALTH_COLORS[key], borderWidth: 0, borderRadius: 2 };
+        }).concat([{ label: 'Badges', data: prog.courses.map(function(c) { return c.badges || 0; }), backgroundColor: '#f59e0b', borderWidth: 0, borderRadius: 2 }]);
+      } else {
+        datasets = [{ label: health === 'graduated' ? 'Prog. Graduated' : (HEALTH_LABELS[health] || health), data: prog.courses.map(function(c) { return (c.by_health && c.by_health[health]) || 0; }), backgroundColor: HEALTH_COLORS[health] || '#0452F0', borderWidth: 0, borderRadius: 3 }];
+      }
+
+      if (courseChart) courseChart.destroy();
+      courseChart = new Chart(canvas, {
+        type: 'bar',
+        data: { labels: labels, datasets: datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          layout: { padding: { top: stacked ? 0 : 16 } },
+          scales: {
+            x: { stacked: stacked, ticks: { font: { size: 10 } } },
+            y: { stacked: stacked, beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } },
+          },
+          plugins: {
+            legend: stacked ? LEGEND_OPTS : { display: false },
+            datalabels: stacked ? DL_SEG : { display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; }, color: '#374151', font: { size: 10, weight: '600' }, anchor: 'end', align: 'end', offset: 0 },
+          },
+          animation: { duration: 300 },
+        },
+      });
+    }
+
+    document.querySelectorAll('.ac-prog-pill').forEach(function(b) {
+      b.addEventListener('click', function() { activePk = b.dataset.pk; setProgPill(activePk); renderCourseChart(activePk, activeHealth); });
+    });
+    document.querySelectorAll('.ac-health-pill').forEach(function(b) {
+      b.addEventListener('click', function() { activeHealth = b.dataset.health; setHealthPill(activeHealth); renderCourseChart(activePk, activeHealth); });
+    });
+
+    var firstWithData = courseRaw.find(function(p) { return p.courses && p.courses.length; });
+    activePk = firstWithData ? String(firstWithData.pk) : (courseRaw[0] ? String(courseRaw[0].pk) : null);
+    if (activePk) { setProgPill(activePk); setHealthPill('all'); renderCourseChart(activePk, 'all'); }
+
+    // ── Stacked bar: rolling cohorts (clickable → learner list) ──────
+    var cohortCanvas = document.getElementById('cohortBar');
+    if (cohortCanvas && D.cohortData && D.cohortData.length) {
+      var cohortBasis = '{{ cohort_type }}';
+      // Map basis name to learner filter param value
+      var basisParam = cohortBasis === 'fsol' ? 'fsol' : (cohortBasis === 'enrolment' ? 'enrolment' : 'effective');
+
+      new Chart(cohortCanvas, {
+        type: 'bar',
+        data: {
+          labels: D.cohortData.map(function(r) { return r.label; }),
+          datasets: [
+            { label: 'Active',      data: D.cohortData.map(function(r){return r.active;}),      backgroundColor: '#16a34a', borderWidth:0, borderRadius:2 },
+            { label: 'At Risk',     data: D.cohortData.map(function(r){return r.at_risk;}),     backgroundColor: '#d97706', borderWidth:0, borderRadius:2 },
+            { label: 'Dormant',     data: D.cohortData.map(function(r){return r.dormant;}),     backgroundColor: '#7c3aed', borderWidth:0, borderRadius:2 },
+            { label: 'Not Started', data: D.cohortData.map(function(r){return r.not_started;}), backgroundColor: '#9ca3af', borderWidth:0, borderRadius:2 },
+            { label: 'Graduated',   data: D.cohortData.map(function(r){return r.graduated;}),   backgroundColor: '#2563eb', borderWidth:0, borderRadius:2 },
+            { type: 'line', label: 'Activated', data: D.cohortData.map(function(r){return r.activated;}), borderColor: '#f97316', backgroundColor: 'transparent', borderWidth:2, pointRadius:3, pointBackgroundColor:'#f97316', tension:0.2, order:0 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+            y: { stacked: true, beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 10 } } },
+          },
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 10, family: 'Poppins,sans-serif' } } },
+            datalabels: {
+              display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
+              color: '#fff', font: { size: 9, weight: '600', family: 'Poppins,sans-serif' },
+              anchor: 'center', align: 'center', clamp: true,
+            },
+            tooltip: {
+              mode: 'index', intersect: false,
+              callbacks: {
+                footer: function() { return 'Click to view learners →'; },
+              },
+            },
+          },
+          animation: { duration: 300 },
+          onClick: function(evt, elements) {
+            if (!elements.length) return;
+            var idx  = elements[0].index;
+            var row  = D.cohortData[idx];
+            var from = row.week_start;
+            // week_end = 6 days after week_start
+            var d = new Date(from);
+            d.setDate(d.getDate() + 6);
+            var to = d.toISOString().slice(0, 10);
+            window.location.href = '{% url "sp_learner_list" %}?enrol_from=' + from
+              + '&enrol_to=' + to
+              + '&cohort_basis=' + basisParam;
+          },
+        },
+      });
+      cohortCanvas.style.cursor = 'pointer';
+    }
+
+    // ── Started learners only (excl. Not Started) ─────────────────
+    var cohortStartedCanvas = document.getElementById('cohortBarStarted');
+    if (cohortStartedCanvas && D.cohortData && D.cohortData.length) {
+      new Chart(cohortStartedCanvas, {
+        type: 'bar',
+        data: {
+          labels: D.cohortData.map(function(r) { return r.label; }),
+          datasets: [
+            { label: 'Active',    data: D.cohortData.map(function(r){return r.active;}),    backgroundColor: '#16a34a', borderWidth:0, borderRadius:2 },
+            { label: 'At Risk',   data: D.cohortData.map(function(r){return r.at_risk;}),   backgroundColor: '#d97706', borderWidth:0, borderRadius:2 },
+            { label: 'Dormant',   data: D.cohortData.map(function(r){return r.dormant;}),   backgroundColor: '#7c3aed', borderWidth:0, borderRadius:2 },
+            { label: 'Graduated', data: D.cohortData.map(function(r){return r.graduated;}), backgroundColor: '#2563eb', borderWidth:0, borderRadius:2 },
+            { type: 'line', label: 'Activated', data: D.cohortData.map(function(r){return r.activated;}), borderColor: '#f97316', backgroundColor: 'transparent', borderWidth:2, pointRadius:3, pointBackgroundColor:'#f97316', tension:0.2, order:0 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+            y: { stacked: true, beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 10 } } },
+          },
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 10, family: 'Poppins,sans-serif' } } },
+            datalabels: {
+              display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
+              color: '#fff', font: { size: 9, weight: '600', family: 'Poppins,sans-serif' },
+              anchor: 'center', align: 'center', clamp: true,
+            },
+            tooltip: {
+              mode: 'index', intersect: false,
+              callbacks: {
+                footer: function() { return 'Click to view learners →'; },
+              },
+            },
+          },
+          animation: { duration: 300 },
+          onClick: function(evt, elements) {
+            if (!elements.length) return;
+            var idx  = elements[0].index;
+            var row  = D.cohortData[idx];
+            var from = row.week_start;
+            var d = new Date(from); d.setDate(d.getDate() + 6);
+            var to = d.toISOString().slice(0, 10);
+            window.location.href = '{% url "sp_learner_list" %}?enrol_from=' + from
+              + '&enrol_to=' + to + '&cohort_basis=' + basisParam;
+          },
+        },
+      });
+      cohortStartedCanvas.style.cursor = 'pointer';
+    }
+
+    // ── Progression: weekly activations ─────────────────────────────
+    var actCanvas = document.getElementById('activationLine');
+    if (actCanvas && D.activationDatasets && D.activationDatasets.length) {
+      new Chart(actCanvas, {
+        type: 'line',
+        data: { labels: D.progWeekLabels, datasets: D.activationDatasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10 } } },
+            datalabels: { display: false },
+            tooltip: {
+              mode: 'index', intersect: false,
+              callbacks: {
+                footer: function(items) {
+                  var t = items.reduce(function(s,i){return s+i.parsed.y;},0);
+                  return 'Total: ' + t;
+                }
+              }
+            },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+            y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 10 } } },
+          },
+          animation: { duration: 300 },
+        },
+      });
+    }
+
+    // ── Progression: daily course completions ────────────────────
+    var compCanvas = document.getElementById('completionLine');
+    if (compCanvas && D.completionDatasets && D.completionDatasets.length) {
+      new Chart(compCanvas, {
+        type: 'line',
+        data: { labels: D.progWeekLabels, datasets: D.completionDatasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10 } } },
+            datalabels: { display: false },
+            tooltip: {
+              mode: 'index', intersect: false,
+              callbacks: { footer: function(items) { var t=items.reduce(function(s,i){return s+i.parsed.y;},0); return 'Total: '+t; } }
+            },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+            y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 10 } } },
+          },
+          animation: { duration: 300 },
+        },
+      });
+    }
+
+    // ── Progression: cumulative activations ───────────────────────
+    var actCumCanvas = document.getElementById('activationCumLine');
+    if (actCumCanvas && D.activationCumulativeDatasets && D.activationCumulativeDatasets.length) {
+      new Chart(actCumCanvas, {
+        type: 'line',
+        data: { labels: D.progWeekLabels, datasets: D.activationCumulativeDatasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10 } } },
+            datalabels: { display: false },
+            tooltip: { mode: 'index', intersect: false },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+            y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 10 } } },
+          },
+          animation: { duration: 300 },
+        },
+      });
+    }
+
+    // ── Progression: cumulative course completions ────────────────
+    var compCumCanvas = document.getElementById('completionCumLine');
+    if (compCumCanvas && D.completionCumulativeDatasets && D.completionCumulativeDatasets.length) {
+      new Chart(compCumCanvas, {
+        type: 'line',
+        data: { labels: D.progWeekLabels, datasets: D.completionCumulativeDatasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10 } } },
+            datalabels: { display: false },
+            tooltip: { mode: 'index', intersect: false },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+            y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 10 } } },
+          },
+          animation: { duration: 300 },
+        },
+      });
+    }
+
+    // ── Progression: daily first-module completions ───────────────
+    var fmCanvas = document.getElementById('firstModuleLine');
+    if (fmCanvas && D.firstModuleDatasets && D.firstModuleDatasets.length) {
+      new Chart(fmCanvas, {
+        type: 'line',
+        data: { labels: D.progWeekLabels, datasets: D.firstModuleDatasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10 } } },
+            datalabels: { display: false },
+            tooltip: {
+              mode: 'index', intersect: false,
+              callbacks: { footer: function(items) { var t=items.reduce(function(s,i){return s+i.parsed.y;},0); return 'Total: '+t; } },
+            },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+            y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 10 } } },
+          },
+          animation: { duration: 300 },
+        },
+      });
+    }
+
+    // ── Progression: cumulative first-module completions ──────────
+    var fmCumCanvas = document.getElementById('firstModuleCumLine');
+    if (fmCumCanvas && D.firstModuleCumulativeDatasets && D.firstModuleCumulativeDatasets.length) {
+      new Chart(fmCumCanvas, {
+        type: 'line',
+        data: { labels: D.progWeekLabels, datasets: D.firstModuleCumulativeDatasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10 } } },
+            datalabels: { display: false },
+            tooltip: { mode: 'index', intersect: false },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+            y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 10 } } },
+          },
+          animation: { duration: 300 },
+        },
+      });
+    }
+  }
+
+  // Initial page load
+  initAnalyticsCharts();
+
+  // Re-init after every HTMX partial swap of #analytics-body
+  document.body.addEventListener('htmx:afterSwap', function(e) {
+    if (e.detail.target && e.detail.target.id === 'analytics-body') {
+      initAnalyticsCharts();
+    }
+  });
+
+})();
+</script>
+{% endblock %}

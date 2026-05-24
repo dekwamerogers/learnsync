@@ -1,0 +1,396 @@
+{% extends "selfpaced/base.html" %}
+{% block title %}Review Enrolment CSV — LearnSync{% endblock %}
+{% block page_title %}Review Enrolment CSV{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:760px;">
+
+  <div style="margin-bottom:16px;">
+    <a href="{% url 'sp_enrolment_log' %}" onclick="spBack('{% url 'sp_enrolment_log' %}'); return false;" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+  </div>
+
+  <form method="post" action="{% url 'sp_enrolment_review' job.pk %}">
+    {% csrf_token %}
+
+    {# ── Step 1: Column mapping ── #}
+    <div class="sp-card" style="padding:20px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:4px;">Step 1 — Select columns</div>
+      <div style="font-size:11px;color:#9ca3af;margin-bottom:16px;">
+        {{ review.row_count }} row{{ review.row_count|pluralize }} detected.
+        Confirm which column maps to each field. We've guessed based on the header names.
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#374151;margin-bottom:5px;">
+            Email <span style="color:#dc2626;">*</span>
+          </label>
+          <select name="col_email" required
+                  style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:6px;font-family:'Poppins',sans-serif;background:#fff;">
+            <option value="">— select —</option>
+            {% for col in columns %}
+            <option value="{{ col }}" {% if col == job.column_email %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#374151;margin-bottom:5px;">
+            Programme Name <span style="color:#dc2626;">*</span>
+          </label>
+          <select name="col_programme" required
+                  style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:6px;font-family:'Poppins',sans-serif;background:#fff;">
+            <option value="">— select —</option>
+            {% for col in columns %}
+            <option value="{{ col }}" {% if col == job.column_programme %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#374151;margin-bottom:5px;">
+            Enrolment Date
+          </label>
+          <select name="col_date"
+                  style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:6px;font-family:'Poppins',sans-serif;background:#fff;">
+            <option value="">— none —</option>
+            {% for col in columns %}
+            <option value="{{ col }}" {% if col == job.column_date %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+      </div>
+    </div>
+
+    {# ── Step 2: Programme name mapping ── #}
+    <div class="sp-card" id="step2-card" style="padding:20px;margin-bottom:20px;{% if not mapping_rows %}display:none;{% endif %}">
+      <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:4px;">Step 2 — Map programme names</div>
+      <div style="font-size:11px;color:#9ca3af;margin-bottom:16px;">
+        Match each unique programme name found in the CSV to a programme in the system.
+        Previously saved mappings are pre-filled. Unmapped rows will be skipped.
+      </div>
+
+      <table class="sp-table">
+        <thead>
+          <tr>
+            <th>Name in CSV</th>
+            <th>Maps to programme</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="step2-tbody">
+          {% for row in mapping_rows %}
+          <tr>
+            <td style="font-size:12px;font-weight:600;color:#374151;">{{ row.name }}</td>
+            <td>
+              <select name="mapping_{{ row.name }}"
+                      style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #e5e7eb;border-radius:6px;font-family:'Poppins',sans-serif;background:#fff;">
+                <option value="">— skip these rows —</option>
+                {% for prog in programmes %}
+                <option value="{{ prog.pk }}" {% if prog.pk == row.mapped_pk %}selected{% endif %}>
+                  {{ prog.code }} — {{ prog.name }}
+                </option>
+                {% endfor %}
+              </select>
+            </td>
+            <td>
+              {% if row.mapped_pk %}
+              <span class="sp-badge-health sp-health-active" style="font-size:10px;">Mapped</span>
+              {% else %}
+              <span class="sp-badge-health sp-health-not_yet_started" style="font-size:10px;">Unmapped</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="display:flex;gap:10px;">
+      <button type="submit" class="sp-btn sp-btn-primary" style="font-size:13px;">
+        <i class="ti ti-check" style="font-size:14px;"></i>
+        Confirm &amp; Process
+      </button>
+      <a href="{% url 'sp_enrolment_log' %}" class="sp-btn" style="font-size:13px;">Cancel</a>
+    </div>
+
+  </form>
+
+  {# ── Live preview ── #}
+  <div class="sp-card" style="padding:20px;margin-top:20px;">
+    <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:4px;">Preview — first {{ review.row_count|default:"?" }} rows (showing up to 20)</div>
+    <div style="font-size:11px;color:#9ca3af;margin-bottom:10px;">
+      Updates as you change column selections above. "Existing" = learner already in the system.
+      Dates show the <strong>parsed</strong> value — a ⚠ means the format is not recognised and the date will not be saved.
+    </div>
+    <div id="preview-warning" style="display:none;font-size:11px;color:#dc2626;background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:8px 12px;margin-bottom:12px;"></div>
+    <div style="overflow-x:auto;">
+      <table class="sp-table" id="preview-table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Programme</th>
+            <th>Enrolment date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="preview-tbody">
+          <tr><td colspan="4" style="color:#9ca3af;font-size:12px;text-align:center;padding:20px;">
+            Select columns above to see a preview.
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+{{ sample_data|json_script:"preview-sample" }}
+{{ existing_emails_data|json_script:"preview-existing" }}
+{{ prog_code_map_data|json_script:"preview-prog-codes" }}
+{{ existing_mappings_data|json_script:"preview-mappings" }}
+{{ all_col_unique_data|json_script:"preview-all-col-unique" }}
+{{ programmes_list_data|json_script:"preview-programmes-list" }}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var sample         = JSON.parse(document.getElementById('preview-sample').textContent);
+  var existingEmails = new Set(JSON.parse(document.getElementById('preview-existing').textContent));
+  var progCodes      = JSON.parse(document.getElementById('preview-prog-codes').textContent);
+  var savedMappings  = JSON.parse(document.getElementById('preview-mappings').textContent);
+  var allColUnique   = JSON.parse(document.getElementById('preview-all-col-unique').textContent);
+  var programmesList = JSON.parse(document.getElementById('preview-programmes-list').textContent);
+
+  // ── Utility: HTML-escape for text content and attribute values ──
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Mirror the Python _parse_date logic so the preview shows actual parsed results
+  var MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12,
+    january:1,february:2,march:3,april:4,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
+
+  function tryParseDate(raw) {
+    if (!raw) return null;
+    var s = raw.trim().split('T')[0].split(' ')[0];
+    var m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (m) { var d = new Date(+m[1], +m[2]-1, +m[3]); return isNaN(d) ? null : d; }
+    m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) { var d = new Date(+m[3], +m[2]-1, +m[1]); return isNaN(d) ? null : d; }
+    m = s.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+    if (m) { var mo = MONTHS[m[2].toLowerCase()]; if (mo) { var d = new Date(+m[3], mo-1, +m[1]); return isNaN(d)?null:d; } }
+    m = s.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/);
+    if (m) { var mo = MONTHS[m[1].toLowerCase()]; if (mo) { var d = new Date(+m[3], mo-1, +m[2]); return isNaN(d)?null:d; } }
+    return null;
+  }
+
+  function fmtDate(d) {
+    if (!d) return null;
+    return d.getDate().toString().padStart(2,'0') + ' '
+      + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]
+      + ' ' + d.getFullYear();
+  }
+
+  function currentMappings() {
+    var m = {};
+    document.querySelectorAll('[name^="mapping_"]').forEach(function(sel) {
+      var name = sel.name.replace(/^mapping_/, '');
+      if (sel.value) m[name] = sel.value;
+    });
+    for (var k in savedMappings) {
+      if (!m[k]) m[k] = savedMappings[k];
+    }
+    return m;
+  }
+
+  // ── Re-render Step 2 when the programme column selector changes ──
+  function renderStep2(colName) {
+    var card  = document.getElementById('step2-card');
+    var tbody = document.getElementById('step2-tbody');
+    if (!card || !tbody) return;
+
+    // No per-column data available (old jobs uploaded before this feature)
+    if (!allColUnique || !Object.keys(allColUnique).length) return;
+
+    var uniqueVals = allColUnique[colName] || [];
+    if (!uniqueVals.length) {
+      card.style.display = 'none';
+      return;
+    }
+
+    var optionsHtml = '<option value="">— skip these rows —</option>';
+    programmesList.forEach(function(p) {
+      optionsHtml += '<option value="' + p.pk + '">' + esc(p.code) + ' — ' + esc(p.name) + '</option>';
+    });
+
+    var html = '';
+    uniqueVals.forEach(function(name) {
+      var savedPk = String(savedMappings[name] || '');
+      var isMapped = !!savedPk;
+
+      // Build select with pre-selected option where a saved mapping exists
+      var selectOpts = '<option value="">— skip these rows —</option>';
+      programmesList.forEach(function(p) {
+        var sel = (savedPk && String(p.pk) === savedPk) ? ' selected' : '';
+        selectOpts += '<option value="' + p.pk + '"' + sel + '>' + esc(p.code) + ' — ' + esc(p.name) + '</option>';
+      });
+
+      var badge = isMapped
+        ? '<span class="sp-badge-health sp-health-active" style="font-size:10px;">Mapped</span>'
+        : '<span class="sp-badge-health sp-health-not_yet_started" style="font-size:10px;">Unmapped</span>';
+
+      html += '<tr>'
+        + '<td style="font-size:12px;font-weight:600;color:#374151;">' + esc(name) + '</td>'
+        + '<td><select name="mapping_' + esc(name) + '" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #e5e7eb;border-radius:6px;font-family:\'Poppins\',sans-serif;background:#fff;">'
+        + selectOpts
+        + '</select></td>'
+        + '<td>' + badge + '</td>'
+        + '</tr>';
+    });
+
+    tbody.innerHTML = html;
+    card.style.display = '';
+
+    // Re-attach listeners and update preview
+    document.querySelectorAll('[name^="mapping_"]').forEach(function(sel) {
+      sel.addEventListener('change', function() {
+        // Update the badge in the same row immediately
+        var badge = this.closest('tr').querySelector('.sp-badge-health');
+        if (badge) {
+          if (this.value) {
+            badge.className = 'sp-badge-health sp-health-active';
+            badge.textContent = 'Mapped';
+          } else {
+            badge.className = 'sp-badge-health sp-health-not_yet_started';
+            badge.textContent = 'Unmapped';
+          }
+        }
+        renderPreview();
+      });
+    });
+
+    renderPreview();
+  }
+
+  function renderPreview() {
+    var colEmail = document.querySelector('[name="col_email"]').value;
+    var colProg  = document.querySelector('[name="col_programme"]').value;
+    var colDate  = document.querySelector('[name="col_date"]').value;
+    var mappings = currentMappings();
+
+    var tbody   = document.getElementById('preview-tbody');
+    var warning = document.getElementById('preview-warning');
+    if (!colEmail && !colProg) {
+      tbody.innerHTML = '<tr><td colspan="4" style="color:#9ca3af;font-size:12px;text-align:center;padding:20px;">Select columns above to see a preview.</td></tr>';
+      if (warning) warning.style.display = 'none';
+      return;
+    }
+
+    var html = '';
+    sample.forEach(function(row) {
+      var email    = colEmail ? (row[colEmail] || '').trim().toLowerCase() : '';
+      var progName = colProg  ? (row[colProg]  || '').trim() : '';
+      var dateVal  = colDate  ? (row[colDate]  || '').trim() : '';
+
+      if (!email) return;
+
+      var progPk   = mappings[progName] || '';
+      var progCode = progPk ? (progCodes[progPk] || progName) : '';
+      var isExisting = existingEmails.has(email);
+      var isMapped   = !!progPk;
+
+      var statusHtml;
+      if (!isMapped && progName) {
+        statusHtml = '<span style="font-size:10px;background:#f3f4f6;color:#6b7280;border-radius:4px;padding:1px 6px;">No mapping — skip</span>';
+      } else if (isExisting) {
+        statusHtml = '<span style="font-size:10px;background:#dbeafe;color:#1d4ed8;border-radius:4px;padding:1px 6px;">Existing</span>';
+      } else {
+        statusHtml = '<span style="font-size:10px;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 6px;">New learner</span>';
+      }
+
+      var parsedDate = dateVal ? tryParseDate(dateVal) : null;
+      var dateHtml;
+      if (!colDate || !dateVal) {
+        dateHtml = '<span style="color:#d1d5db;">—</span>';
+      } else if (parsedDate) {
+        dateHtml = '<span style="font-size:12px;color:#374151;">' + fmtDate(parsedDate) + '</span>'
+          + ' <span style="font-size:10px;color:#9ca3af;">' + esc(dateVal) + '</span>';
+      } else {
+        dateHtml = '<span style="font-size:11px;color:#dc2626;" title="Format not recognised — date will not be saved">⚠ ' + esc(dateVal) + '</span>';
+      }
+
+      var progHtml = progCode
+        ? '<span style="font-size:11px;background:#f3f4f6;border-radius:3px;padding:0 5px;font-weight:700;">' + esc(progCode) + '</span>'
+        : (progName
+          ? '<span style="color:#f97316;font-size:11px;">' + esc(progName) + ' (unmapped)</span>'
+          : '<span style="color:#d1d5db;">—</span>');
+
+      html += '<tr>'
+        + '<td style="font-size:12px;color:#374151;">' + esc(email) + '</td>'
+        + '<td>' + progHtml + '</td>'
+        + '<td>' + dateHtml + '</td>'
+        + '<td>' + statusHtml + '</td>'
+        + '</tr>';
+    });
+
+    tbody.innerHTML = html || '<tr><td colspan="4" style="color:#9ca3af;font-size:12px;text-align:center;padding:16px;">No valid rows in sample.</td></tr>';
+
+    if (warning) {
+      var badDates = sample.filter(function(row) {
+        var v = colDate ? (row[colDate] || '').trim() : '';
+        return v && !tryParseDate(v);
+      });
+      if (colDate && badDates.length) {
+        var example = (badDates[0][colDate] || '').trim();
+        warning.textContent = '⚠ ' + badDates.length + ' row(s) have an unrecognised date format (e.g. "' + example + '"). These dates will NOT be saved. Supported: DD/MM/YYYY, YYYY-MM-DD, MM/DD/YYYY, DD Mon YYYY.';
+        warning.style.display = 'block';
+      } else {
+        warning.style.display = 'none';
+      }
+    }
+  }
+
+  // Wire up column dropdowns
+  ['col_email', 'col_date'].forEach(function(name) {
+    var el = document.querySelector('[name="' + name + '"]');
+    if (el) el.addEventListener('change', renderPreview);
+  });
+
+  var colProgEl = document.querySelector('[name="col_programme"]');
+  if (colProgEl) {
+    colProgEl.addEventListener('change', function() {
+      renderStep2(this.value);
+      renderPreview();
+    });
+  }
+
+  // Wire up initial server-rendered mapping selects (for old jobs without allColUnique)
+  document.querySelectorAll('[name^="mapping_"]').forEach(function(sel) {
+    sel.addEventListener('change', function() {
+      var badge = this.closest('tr').querySelector('.sp-badge-health');
+      if (badge) {
+        if (this.value) {
+          badge.className = 'sp-badge-health sp-health-active';
+          badge.textContent = 'Mapped';
+        } else {
+          badge.className = 'sp-badge-health sp-health-not_yet_started';
+          badge.textContent = 'Unmapped';
+        }
+      }
+      renderPreview();
+    });
+  });
+
+  // Initial render
+  renderPreview();
+})();
+</script>
+{% endblock %}

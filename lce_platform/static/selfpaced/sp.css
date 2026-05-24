@@ -1,0 +1,424 @@
+/* ============================================================
+   LearnSync — brand overrides on top of Argon Tailwind
+   ============================================================ */
+
+/* --- Fonts ------------------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+:root {
+  --sp-navy:       #03134F;
+  --sp-blue:       #0452F0;
+  --sp-blue-light: #e8effe;
+
+  /* Health status palette */
+  --sp-active:    #16a34a;   /* green-600 */
+  --sp-at-risk:   #d97706;   /* amber-600 */
+  --sp-dormant:   #7c3aed;   /* violet-600 */
+  --sp-graduated: #2563eb;   /* blue-600 */
+  --sp-not-started: #6b7280; /* gray-500 */
+}
+
+body {
+  font-family: 'Poppins', sans-serif !important;
+}
+
+/* --- Sidebar ---------------------------------------------- */
+#sp-sidebar {
+  background-color: var(--sp-navy) !important;
+  width: 220px;
+}
+
+#sp-sidebar .sp-brand-text {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+#sp-sidebar .sp-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  text-decoration: none;
+  margin: 1px 8px;
+}
+
+#sp-sidebar .sp-nav-item:hover {
+  background: rgba(255,255,255,0.07);
+  color: #ffffff;
+}
+
+#sp-sidebar .sp-nav-item.active {
+  background-color: var(--sp-blue);
+  color: #ffffff;
+}
+
+#sp-sidebar .sp-nav-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+  padding: 16px 24px 4px;
+}
+
+#sp-sidebar .sp-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  line-height: 1.6;
+}
+
+#sp-sidebar .sp-badge-yellow {
+  background: #f59e0b;
+  color: #fff;
+}
+
+#sp-sidebar .sp-badge-muted {
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.8);
+}
+
+#sp-sidebar .sp-divider {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  margin: 8px 16px;
+}
+
+#sp-sidebar .sp-user-area {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+#sp-sidebar .sp-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--sp-blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+#sp-sidebar .sp-user-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.3;
+}
+
+#sp-sidebar .sp-user-role {
+  font-size: 10px;
+  color: rgba(255,255,255,0.45);
+}
+
+/* --- Top bar ---------------------------------------------- */
+#sp-topbar {
+  height: 56px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  gap: 16px;
+}
+
+#sp-topbar .sp-page-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  flex: 1;
+  min-width: 0;
+}
+
+#sp-topbar .sp-search {
+  display: flex;
+  align-items: center;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 6px 12px;
+  gap: 8px;
+  width: 220px;
+}
+
+#sp-topbar .sp-search input {
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: #374151;
+  font-family: 'Poppins', sans-serif;
+  width: 100%;
+}
+
+#sp-topbar .sp-search input::placeholder {
+  color: #9ca3af;
+}
+
+#sp-topbar .sp-btn-upload {
+  background: var(--sp-blue);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Poppins', sans-serif;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+#sp-topbar .sp-btn-upload:hover { opacity: 0.88; }
+
+#sp-topbar .sp-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+  text-decoration: none;
+}
+
+#sp-topbar .sp-icon-btn:hover { background: #f3f4f6; }
+
+#sp-topbar .sp-bell-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  background: var(--sp-blue);
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+}
+
+/* --- Data freshness indicator ----------------------------- */
+#sp-freshness {
+  padding: 6px 24px;
+  font-size: 11px;
+  color: #9ca3af;
+  background: #f9fafb;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#sp-freshness.stale {
+  color: #d97706;
+  background: #fffbeb;
+  border-bottom-color: #fde68a;
+}
+
+/* --- Content area ----------------------------------------- */
+#sp-content {
+  padding: 24px;
+}
+
+/* --- Upload modal ----------------------------------------- */
+#sp-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#sp-modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 480px;
+  max-width: 95vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  overflow: hidden;
+}
+
+#sp-modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#sp-modal-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+#sp-modal-body { padding: 20px 24px; }
+#sp-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* --- Health status badges ---------------------------------- */
+.sp-badge-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.sp-health-active      { background: #dcfce7; color: var(--sp-active); }
+.sp-health-at_risk     { background: #fef3c7; color: var(--sp-at-risk); }
+.sp-health-dormant     { background: #ede9fe; color: var(--sp-dormant); }
+.sp-health-graduated   { background: #dbeafe; color: var(--sp-graduated); }
+.sp-health-not_yet_started { background: #f3f4f6; color: var(--sp-not-started); }
+
+/* --- Flag chips ------------------------------------------- */
+.sp-flag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #f3f4f6;
+  color: #374151;
+}
+
+/* --- Cards ------------------------------------------------- */
+.sp-card {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+.sp-card-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sp-card-body { padding: 18px; }
+
+/* --- Buttons ---------------------------------------------- */
+.sp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  transition: opacity 0.15s;
+  text-decoration: none;
+}
+
+.sp-btn-primary {
+  background: var(--sp-blue);
+  color: #fff;
+}
+
+.sp-btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.sp-btn:hover { opacity: 0.85; }
+
+/* --- Tables ----------------------------------------------- */
+.sp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sp-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  padding: 10px 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.sp-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+}
+.sp-table tbody tr:hover { background: #f9fafb; }
+.sp-table tbody tr:last-child td { border-bottom: none; }
+
+/* --- Messages --------------------------------------------- */
+.sp-messages {
+  padding: 0 24px;
+  margin-top: 12px;
+}
+
+.sp-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.sp-alert-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.sp-alert-warning { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+.sp-alert-error   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.sp-alert-info    { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+
+/* --- Main layout ------------------------------------------ */
+.sp-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sp-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #f9fafb;
+}

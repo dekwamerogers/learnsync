@@ -1,0 +1,631 @@
+{% extends "selfpaced/base.html" %}
+
+{% block title %}Help & Guide — LearnSync{% endblock %}
+{% block page_title %}Help & Guide{% endblock %}
+{% block nav_help %}active{% endblock %}
+
+{% block content %}
+<style>
+.h-shell { display:grid; grid-template-columns:220px 1fr; gap:24px; align-items:start; }
+.h-toc { position:sticky; top:72px; }
+.h-toc-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+.h-toc-list a { display:block; padding:6px 12px; border-radius:6px; font-size:12px; color:#6b7280; text-decoration:none; font-weight:500; }
+.h-toc-list a:hover, .h-toc-list a.active { background:#eff6ff; color:#0452F0; }
+.h-toc-group { font-size:10px; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:.06em; padding:10px 12px 4px; }
+.h-section { scroll-margin-top:72px; margin-bottom:32px; }
+.h-section h2 { font-size:17px; font-weight:700; color:#111827; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+.h-section h2 i { color:#0452F0; }
+.h-section .h-lead { font-size:13px; color:#6b7280; margin:0 0 16px; }
+.h-card { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin-bottom:12px; }
+.h-card h3 { font-size:13px; font-weight:700; color:#111827; margin:0 0 8px; }
+.h-card p, .h-card li { font-size:12px; color:#374151; line-height:1.65; }
+.h-card ul, .h-card ol { padding-left:18px; margin:6px 0; }
+.h-card li { margin-bottom:3px; }
+.h-tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+.h-tag-active   { background:#dcfce7; color:#16a34a; }
+.h-tag-at_risk  { background:#fef3c7; color:#d97706; }
+.h-tag-dormant  { background:#ede9fe; color:#7c3aed; }
+.h-tag-grad     { background:#dbeafe; color:#2563eb; }
+.h-tag-ns       { background:#f3f4f6; color:#6b7280; }
+.h-formula      { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; font-family:monospace; font-size:12px; color:#374151; margin:8px 0; }
+.h-step { display:flex; gap:12px; align-items:flex-start; margin-bottom:14px; }
+.h-step-num { width:26px; height:26px; background:#0452F0; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; }
+.h-step-body { flex:1; }
+.h-step-body strong { display:block; font-size:13px; color:#111827; margin-bottom:2px; }
+.h-step-body span { font-size:12px; color:#6b7280; }
+.h-two-col { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media(max-width:900px){ .h-shell{grid-template-columns:1fr;} .h-toc{display:none;} .h-two-col{grid-template-columns:1fr;} }
+</style>
+
+<div class="h-shell">
+
+  <!-- ── Table of contents ────────────────────────────────── -->
+  <div class="h-toc sp-card" style="padding:12px;">
+    <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.06em;padding:4px 12px 8px;">Contents</div>
+    <ul class="h-toc-list">
+      <li class="h-toc-group">Getting started</li>
+      <li><a href="#setup-order">Recommended setup order</a></li>
+      <li><a href="#workflow">Activity CSV workflow</a></li>
+      <li><a href="#enrolment-csv">Enrolment CSV workflow</a></li>
+      <li><a href="#data-model">What the data means</a></li>
+
+      <li class="h-toc-group">Health & flags</li>
+      <li><a href="#health-status">Health statuses</a></li>
+      <li><a href="#flags">Flags explained</a></li>
+      <li><a href="#health-calc">How health is calculated</a></li>
+
+      <li class="h-toc-group">Metrics</li>
+      <li><a href="#dashboard-metrics">Dashboard metrics</a></li>
+      <li><a href="#rates">Rates & percentages</a></li>
+      <li><a href="#pace">Pace & pods</a></li>
+
+      <li class="h-toc-group">Views & charts</li>
+      <li><a href="#home-charts">Home dashboard charts</a></li>
+      <li><a href="#analytics-charts">Analytics charts</a></li>
+      <li><a href="#progression-charts">Progression charts</a></li>
+
+      <li class="h-toc-group">Workflows</li>
+      <li><a href="#interventions">Interventions</a></li>
+      <li><a href="#pods">Pods</a></li>
+      <li><a href="#admin-tasks">Admin tasks</a></li>
+    </ul>
+  </div>
+
+  <!-- ── Main content ─────────────────────────────────────── -->
+  <div>
+
+    <!-- ── SETUP ORDER ──────────────────────────────────────── -->
+    <div class="h-section" id="setup-order">
+      <h2><i class="ti ti-list-numbers"></i> Recommended Setup Order</h2>
+      <p class="h-lead">Before uploading any CSV data, a few system settings must be in place. Getting these right first avoids having to re-process data later.</p>
+
+      <div class="h-card">
+        <h3>First-time setup checklist</h3>
+        <div class="h-step">
+          <div class="h-step-num">1</div>
+          <div class="h-step-body">
+            <strong>Configure monitored countries</strong>
+            <span>Go to <em>Admin → Countries</em> and add the countries whose learners you want to track. If you skip this, <em>all</em> countries in the CSV will be processed. Once set, the filter applies to both the activity CSV and the enrolment CSV — so it must be done before either upload.</span>
+          </div>
+        </div>
+        <div class="h-step">
+          <div class="h-step-num">2</div>
+          <div class="h-step-body">
+            <strong>Upload the enrolment CSV</strong>
+            <span>Go to <em>Admin → Enrolment CSV</em> and upload the programme-enrolment export. This populates formal enrolment dates, activation dates, and learner profile fields (name, country, payment status). It should run before or alongside the first activity CSV so that enrolment dates are available for pace calculations.</span>
+          </div>
+        </div>
+        <div class="h-step">
+          <div class="h-step-num">3</div>
+          <div class="h-step-body">
+            <strong>Upload the activity CSV</strong>
+            <span>Use the <em>Upload CSV</em> button in the top bar to upload the assignment-level export from the staff portal. This is the primary data source for progress, health, and charts.</span>
+          </div>
+        </div>
+        <div class="h-step">
+          <div class="h-step-num">4</div>
+          <div class="h-step-body">
+            <strong>Ongoing uploads</strong>
+            <span>For routine refreshes, upload a new activity CSV each time. Upload a fresh enrolment CSV whenever enrolment or activation dates have changed in the source system. Countries only need updating if your monitored scope changes.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── UPLOAD WORKFLOW ────────────────────────────────── -->
+    <div class="h-section" id="workflow">
+      <h2><i class="ti ti-upload"></i> Activity CSV Workflow</h2>
+      <p class="h-lead">The activity CSV is an assignment-level export from the staff portal. This is the primary data source — all progress records, health statuses, and snapshots are derived from it. One row equals one learner's status on one assignment.</p>
+
+      <div class="h-card">
+        <h3>Step-by-step ingestion flow</h3>
+        <div class="h-step">
+          <div class="h-step-num">1</div>
+          <div class="h-step-body">
+            <strong>Upload the CSV</strong>
+            <span>Click <em>Upload CSV</em> in the top bar. The file is parsed immediately. One row = one learner's status on one assignment.</span>
+          </div>
+        </div>
+        <div class="h-step">
+          <div class="h-step-num">2</div>
+          <div class="h-step-body">
+            <strong>Preview & review</strong>
+            <span>The system detects programmes and courses automatically. You'll see a breakdown of how many new learners, courses, and assignments will be added, plus any rows it couldn't place (flagged rows). Resolve flagged rows before confirming.</span>
+          </div>
+        </div>
+        <div class="h-step">
+          <div class="h-step-num">3</div>
+          <div class="h-step-body">
+            <strong>Confirm ingestion</strong>
+            <span>Click <em>Confirm</em>. The pipeline runs in the background through 6 phases: parse → catalogue → learners → enrolments → health → snapshots.</span>
+          </div>
+        </div>
+        <div class="h-step">
+          <div class="h-step-num">4</div>
+          <div class="h-step-body">
+            <strong>Health is recomputed</strong>
+            <span>Every learner's health status and flags are recalculated automatically using today's date and the latest data. No manual step needed.</span>
+          </div>
+        </div>
+        <div class="h-step">
+          <div class="h-step-num">5</div>
+          <div class="h-step-body">
+            <strong>Snapshots are stored</strong>
+            <span>A snapshot of every enrolment's state is saved against this upload date. Snapshots power the week-on-week progression charts in Analytics.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="h-card">
+        <h3>Flagged rows</h3>
+        <ul>
+          <li><strong>Unrecognised pattern</strong> — the eHub class name didn't match any known programme. Map it via the flag detail page or the Pattern Registry.</li>
+          <li><strong>Missing sequence number</strong> — the system couldn't determine which course within a programme this row belongs to. Check the CSV's <em>Course sequence number</em> column.</li>
+          <li><strong>Unresolved course</strong> — the programme was identified but the specific course number doesn't exist in the catalogue yet. Create the course via Admin → Programmes.</li>
+        </ul>
+      </div>
+
+      <div class="h-card">
+        <h3>Country filtering</h3>
+        <p>If monitored countries are configured (Admin → Countries), only learners whose country matches are processed for progress and enrolment data. Rows from unmonitored countries are still used to discover new courses and programmes in the catalogue. <strong>Countries must be set before uploading any CSV</strong> — see the <a href="#setup-order">Recommended setup order</a> above.</p>
+      </div>
+    </div>
+
+    <!-- ── ENROLMENT CSV ──────────────────────────────────── -->
+    <div class="h-section" id="enrolment-csv">
+      <h2><i class="ti ti-file-spreadsheet"></i> Enrolment CSV Workflow</h2>
+      <p class="h-lead">The enrolment CSV is a supplementary export (separate from the activity CSV) that provides formal enrolment dates, activation dates, learner profile fields, and graduation status. It is the authoritative source for these fields — they override whatever was previously stored.</p>
+
+      <div class="h-card">
+        <h3>Step-by-step enrolment CSV flow</h3>
+        <div class="h-step">
+          <div class="h-step-num">1</div>
+          <div class="h-step-body">
+            <strong>Go to Admin → Enrolment CSV</strong>
+            <span>Click <em>Upload Enrolment CSV</em>. The file is parsed and a review page is shown immediately — no data is written yet.</span>
+          </div>
+        </div>
+        <div class="h-step">
+          <div class="h-step-num">2</div>
+          <div class="h-step-body">
+            <strong>Map columns</strong>
+            <span>The system auto-detects the email, programme name, and enrolment date columns from the CSV headers. Confirm or correct them on the review page. Also map any programme names in the CSV to their matching programmes in the system (e.g. "ALX SE" → Software Engineering).</span>
+          </div>
+        </div>
+        <div class="h-step">
+          <div class="h-step-num">3</div>
+          <div class="h-step-body">
+            <strong>Confirm processing</strong>
+            <span>Click <em>Confirm</em>. The upload runs in the background. New learners found here are created; existing learner profiles are updated with the latest name, country, payment status, eHub/LMS URLs from this CSV.</span>
+          </div>
+        </div>
+        <div class="h-step">
+          <div class="h-step-num">4</div>
+          <div class="h-step-body">
+            <strong>Dates are written to enrolments</strong>
+            <span>Enrolment date and activation date are set (or updated) on each (learner, programme) pair. These dates feed directly into pace calculations — without them, the pace clock may start from a later or earlier date than intended.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="h-card">
+        <h3>What the enrolment CSV provides</h3>
+        <ul>
+          <li><strong>Enrolment date</strong> — the formal date a learner joined a programme. Set as the selected date column at review time.</li>
+          <li><strong>Activation date</strong> — read from the <em>Activation date</em> column if present. Used as the effective start for pace when it's later than the enrolment date.</li>
+          <li><strong>Graduation date &amp; is_graduated flag</strong> — read from <em>Program graduation date</em> and <em>Is program graduated</em> columns. Marks a learner as graduated without waiting for the activity CSV to detect it.</li>
+          <li><strong>Learner profile fields</strong> — first name, last name, gender, region, country, eHub profile URL, LMS profile URL, and payment status are updated on every run. The enrolment CSV is the authoritative source for these fields.</li>
+        </ul>
+      </div>
+
+      <div class="h-card">
+        <h3>Country filtering</h3>
+        <p>The enrolment CSV also respects the monitored countries list. Rows for learners in unmonitored countries are skipped entirely — unlike the activity CSV, there is no catalogue-discovery pass for unmonitored rows here.</p>
+      </div>
+
+      <div class="h-card">
+        <h3>Re-running &amp; purging</h3>
+        <p>If you mapped the wrong column at review time, use the <em>Reprocess</em> button on the job detail page to re-run with a corrected column selection. To clear all enrolment upload data and start fresh, use <em>Admin → Enrolment CSV → Purge</em> — this removes all stored upload jobs and clears the enrolment dates that were set by those uploads.</p>
+      </div>
+    </div>
+
+    <!-- ── DATA MODEL ─────────────────────────────────────── -->
+    <div class="h-section" id="data-model">
+      <h2><i class="ti ti-database"></i> What the Data Means</h2>
+      <p class="h-lead">LearnSync organises data in a hierarchy: Learner → Enrolment → Course Enrolment → Assignment Progress.</p>
+
+      <div class="h-two-col">
+        <div class="h-card">
+          <h3>Learner</h3>
+          <p>A unique individual, identified by email address. A learner can be enrolled in multiple programmes simultaneously. Their <strong>overall health status</strong> is a rollup across all enrolments using <em>active-wins</em> logic: if any enrolment is Active, the learner is Active; if all are Graduated, the learner is Graduated; otherwise the worst non-graduated status wins.</p>
+        </div>
+        <div class="h-card">
+          <h3>Enrolment</h3>
+          <p>Links a learner to a programme. Tracks activation date, first sign of life, graduation status, and health status at the programme level. Each enrolment has its own health status independent of others.</p>
+        </div>
+        <div class="h-card">
+          <h3>Course Enrolment</h3>
+          <p>Tracks a learner's status within a single course inside a programme. Status can be <em>not started</em>, <em>in progress</em>, <em>completed</em>, or <em>withdrawn</em>. Stores the pass percentage and last activity date for that course.</p>
+        </div>
+        <div class="h-card">
+          <h3>Assignment Progress</h3>
+          <p>The most granular level. One record per learner per assignment. Tracks whether the assignment was accessed, submitted, and passed, plus the dates for each action. This data directly drives health flags.</p>
+        </div>
+      </div>
+
+      <div class="h-card">
+        <h3>Key dates explained</h3>
+        <ul>
+          <li><strong>Enrolment date</strong> — when the learner formally joined the programme.</li>
+          <li><strong>Activation date</strong> — when the learner first showed intent to participate (e.g. logged in, paid, or was marked active).</li>
+          <li><strong>First sign of life (FSOL)</strong> — the earliest date of any real learning activity (assignment access or submission). Used as a fallback when activation date is unavailable.</li>
+          <li><strong>Effective start date</strong> — the best available start date for pace calculations: the later of the learner's enrolment date and the programme's own start date.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ── HEALTH STATUS ──────────────────────────────────── -->
+    <div class="h-section" id="health-status">
+      <h2><i class="ti ti-heart-rate-monitor"></i> Health Statuses</h2>
+      <p class="h-lead">Every enrolment and learner carries a health status. Health is recomputed on every upload and whenever you trigger <em>Recalculate Health</em>.</p>
+
+      <div class="h-two-col">
+        <div class="h-card">
+          <h3><span class="h-tag h-tag-active">Active</span></h3>
+          <p>The learner has recent assignment activity and is making progress. No concerning flags are raised. This is the target state for all learners.</p>
+        </div>
+        <div class="h-card">
+          <h3><span class="h-tag h-tag-at_risk">At Risk</span></h3>
+          <p>The learner has at least one health flag (e.g. inactive, low pass rate, stuck on an assignment). They are still engaged but need attention. Shown in the At-Risk list on the dashboard.</p>
+        </div>
+        <div class="h-card">
+          <h3><span class="h-tag h-tag-dormant">Dormant</span></h3>
+          <p>The learner has had no activity for longer than the dormancy threshold (default 14 days), or has been inactive beyond the dormancy period since their first sign of life. Requires intervention before they disengage entirely.</p>
+        </div>
+        <div class="h-card">
+          <h3><span class="h-tag h-tag-grad">Graduated</span></h3>
+          <p>The learner has completed all courses in the programme and been marked as graduated in the CSV, or the system derived graduation because all courses are marked completed and the total course count is met.</p>
+        </div>
+        <div class="h-card">
+          <h3><span class="h-tag h-tag-ns">Not Started</span></h3>
+          <p>The learner is enrolled but has no first sign of life date and no assignment activity. They have never engaged with the programme content.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── FLAGS ─────────────────────────────────────────── -->
+    <div class="h-section" id="flags">
+      <h2><i class="ti ti-flag"></i> Flags Explained</h2>
+      <p class="h-lead">Flags are the specific reasons an enrolment is At Risk or Dormant. A learner can have multiple flags at once. Each flag has a configurable threshold set per programme under Admin → Programmes.</p>
+
+      <div class="h-card">
+        <h3>Inactive</h3>
+        <p>The learner previously had activity but has not accessed or submitted any assignment for more than the <strong>inactivity threshold</strong> (default: 7 days). The last activity date is tracked to identify how long they have been quiet.</p>
+      </div>
+      <div class="h-card">
+        <h3>Never Activated</h3>
+        <p>The learner has a first sign of life date but has never accessed a single assignment. They appear to have signed up but not engaged with any content. Fires after the <strong>activation threshold</strong> days have passed since FSOL (default: 3 days).</p>
+      </div>
+      <div class="h-card">
+        <h3>Stuck on Assignment</h3>
+        <p>The learner accessed a specific assignment but has not submitted it, and more than the <strong>stuck assignment threshold</strong> days have elapsed since they accessed it (default: 5 days). The flag detail records the assignment name and how many days they have been stuck.</p>
+      </div>
+      <div class="h-card">
+        <h3>Low Pass Rate</h3>
+        <p>The learner has submitted multiple assignments but their pass rate is below the <strong>pass rate threshold</strong> (default: 70%). Calculated as <code>passed / submitted × 100</code>. A low pass rate may indicate the learner is struggling with the content.</p>
+      </div>
+      <div class="h-card">
+        <h3>Stalled Between Courses</h3>
+        <p>The learner completed a course but has not started the next one in sequence, and more than the <strong>inter-course threshold</strong> days have passed since that completion (default: 5 days). Indicates a transition gap.</p>
+      </div>
+      <div class="h-card">
+        <h3>No Onward Progress (Stalled Progression)</h3>
+        <p>The learner completed the last known course in this enrolment and has no active or completed course work in any other programme. They appear to have finished what's available but haven't progressed further.</p>
+      </div>
+      <div class="h-card">
+        <h3>Payment Issue</h3>
+        <p>The learner's payment status is <em>Due Soon</em>, <em>Grace Period</em>, or <em>Overdue</em>. This flag is added on top of the engagement-based health status — a learner can be Active but still carry a Payment Issue flag.</p>
+      </div>
+    </div>
+
+    <!-- ── HEALTH CALCULATION ─────────────────────────────── -->
+    <div class="h-section" id="health-calc">
+      <h2><i class="ti ti-calculator"></i> How Health is Calculated</h2>
+      <p class="h-lead">Health is a multi-step computation that runs once per enrolment on every upload.</p>
+
+      <div class="h-card">
+        <h3>Step 1 — Gather activity data</h3>
+        <p>All <em>AssignmentProgress</em> records for this enrolment are loaded. The system computes the most recent activity date across all accessed and submitted dates.</p>
+      </div>
+      <div class="h-card">
+        <h3>Step 2 — Evaluate each flag</h3>
+        <p>Each flag function runs independently and produces a boolean (or detail dict for stuck/stalled flags). Multiple flags can fire at once.</p>
+      </div>
+      <div class="h-card">
+        <h3>Step 3 — Derive health status</h3>
+        <div class="h-formula">if graduated → GRADUATED
+elif no FSOL and no activity evidence → NOT STARTED
+elif days_since_last_activity > dormancy_threshold → DORMANT
+elif NEVER_ACTIVATED flag and days_since_fsol > dormancy_threshold → DORMANT
+elif any flag is active → AT RISK
+else → ACTIVE</div>
+      </div>
+      <div class="h-card">
+        <h3>Step 4 — Learner-level rollup (active-wins)</h3>
+        <div class="h-formula">if all enrolments are GRADUATED → learner = GRADUATED
+elif any enrolment is ACTIVE → learner = ACTIVE
+elif any enrolment is AT_RISK → learner = AT_RISK
+elif any enrolment is DORMANT → learner = DORMANT
+else → NOT_STARTED</div>
+        <p style="margin-top:8px;">Prerequisite programme enrolments (e.g. WALX) are excluded from this rollup — they are counted separately as "onboarded".</p>
+      </div>
+    </div>
+
+    <!-- ── DASHBOARD METRICS ──────────────────────────────── -->
+    <div class="h-section" id="dashboard-metrics">
+      <h2><i class="ti ti-layout-dashboard"></i> Dashboard Metrics</h2>
+      <p class="h-lead">The first two rows of the home dashboard show summary tiles. All figures exclude prerequisite-only programmes unless stated otherwise.</p>
+
+      <div class="h-card">
+        <h3>Unique Learners</h3>
+        <p>The count of distinct individuals enrolled in at least one non-prerequisite programme. A learner enrolled in three programmes is counted once. Health breakdown underneath uses the active-wins rollup across all their enrolments.</p>
+      </div>
+      <div class="h-card">
+        <h3>Enrolments</h3>
+        <p>The total number of (learner, programme) pairs in started programmes. One learner in three programmes contributes 3 to this count. The breakdown by health status is at the enrolment level — it can exceed the unique learner count.</p>
+      </div>
+      <div class="h-card">
+        <h3>Badges Issued</h3>
+        <p>Unique learners who have completed at least one course in a programme that awards credentials (<em>awards_credentials = True</em>). A badge is issued per course completion, not per graduation.</p>
+      </div>
+      <div class="h-card">
+        <h3>Certificates Issued</h3>
+        <p>The count of enrolments where the learner is <em>graduated</em> in a programme that awards certificates (<em>awards_certificate = True</em>). One certificate per (learner, programme) graduation event.</p>
+      </div>
+      <div class="h-card">
+        <h3>Onboarding / Onboarded badges</h3>
+        <p><strong>Onboarding</strong> (blue) — learners currently enrolled in a prerequisite programme (e.g. WALX) but not yet graduated. <strong>Onboarded</strong> (green) — learners who have graduated from a prerequisite programme. These are tracked separately because prerequisite enrolments are excluded from the main health counts.</p>
+      </div>
+      <div class="h-card">
+        <h3>Health strip (row 2)</h3>
+        <p>Each tile in the second row (Dormant, At Risk, Active, Graduated, Follow-ups Due) is a clickable shortcut to the filtered learner list for that health state. The numbers are learner-level counts using the active-wins rollup.</p>
+      </div>
+    </div>
+
+    <!-- ── RATES ──────────────────────────────────────────── -->
+    <div class="h-section" id="rates">
+      <h2><i class="ti ti-percentage"></i> Rates & Percentages</h2>
+
+      <div class="h-card">
+        <h3>Activation rate</h3>
+        <div class="h-formula">activation_rate = (total_learners − not_started) / total_learners × 100</div>
+        <p>Measures what proportion of enrolled learners have shown any sign of life. A learner who was never activated is excluded from the numerator.</p>
+      </div>
+      <div class="h-card">
+        <h3>Graduation rate</h3>
+        <div class="h-formula">graduation_rate = graduated / (total_learners − not_started) × 100</div>
+        <p>Of learners who activated (i.e. engaged at least once), what proportion have graduated. Excludes never-started learners from the denominator.</p>
+      </div>
+      <div class="h-card">
+        <h3>Pass percentage (course level)</h3>
+        <div class="h-formula">pass_pct = assignments_passed / assignments_submitted × 100</div>
+        <p>Stored on each <em>CourseEnrolment</em>. Counts assignments submitted within that course only. An assignment must be both submitted and passed to count in the numerator.</p>
+      </div>
+      <div class="h-card">
+        <h3>Deltas (▲ / ▼ indicators)</h3>
+        <p>The green/red change arrows on the home dashboard compare the current upload against the <em>previous</em> completed upload's snapshots. They show the absolute difference in count for each metric. A missing delta means there is only one upload in the system.</p>
+      </div>
+    </div>
+
+    <!-- ── PACE & PODS ────────────────────────────────────── -->
+    <div class="h-section" id="pace">
+      <h2><i class="ti ti-circle-dashed"></i> Pace & Pods</h2>
+      <p class="h-lead">Pods group learners by their target graduation month. Pace metrics measure how each learner is tracking against their pod's deadline.</p>
+
+      <div class="h-card">
+        <h3>Pace calculations</h3>
+        <div class="h-formula">current_pace  = courses_completed / weeks_active        (courses per week)
+required_pace = courses_remaining / weeks_remaining      (courses per week)
+ratio         = current_pace / required_pace</div>
+        <ul style="margin-top:8px;">
+          <li><strong>Ahead</strong> — ratio &gt; 1.05 (learner is 5%+ faster than required)</li>
+          <li><strong>On Track</strong> — ratio ≥ (1 − behind_threshold%). Default behind threshold: 20%</li>
+          <li><strong>Behind</strong> — ratio ≥ 0.6 but below on-track threshold</li>
+          <li><strong>Significantly Behind</strong> — ratio &lt; 0.6, or the target date has already passed</li>
+          <li><strong>Completed</strong> — all courses done (courses_remaining = 0)</li>
+        </ul>
+      </div>
+      <div class="h-card">
+        <h3>Courses behind</h3>
+        <div class="h-formula">expected_by_now = required_pace × weeks_active
+courses_behind  = max(0, expected_by_now − courses_completed)
+                  capped at courses_remaining</div>
+        <p>Answers "how many courses should this learner have finished by now?" minus how many they have actually finished. Capped at the number of courses still left so it never exceeds the total remaining workload.</p>
+      </div>
+      <div class="h-card">
+        <h3>Projected completion date</h3>
+        <div class="h-formula">projected = today + (courses_remaining / current_pace) weeks</div>
+        <p>If a learner maintains their current pace, when will they finish? Shown as <em>None</em> if the learner has zero completions so far (no pace to extrapolate from).</p>
+      </div>
+      <div class="h-card">
+        <h3>Pace start date logic</h3>
+        <p>The "clock" for pace starts at the <em>effective start date</em>: if a learner enrolled on or after the programme start, it's their enrolment date. If they enrolled early (before the programme launched), the clock starts at their first sign of life or the programme's start date — whichever is later. This prevents penalising learners for days before the programme existed.</p>
+      </div>
+    </div>
+
+    <!-- ── HOME CHARTS ───────────────────────────────────── -->
+    <div class="h-section" id="home-charts">
+      <h2><i class="ti ti-chart-donut"></i> Home Dashboard Charts</h2>
+
+      <div class="h-card">
+        <h3>Health Breakdown (donut)</h3>
+        <p>Shows the learner-level health distribution using the active-wins rollup. Each segment represents the proportion of unique learners in that health state across all started, non-prerequisite programmes.</p>
+      </div>
+      <div class="h-card">
+        <h3>Learners by Programme (bar chart)</h3>
+        <p>Each bar represents one programme. The bar is stacked by health status (Graduated / Active / At Risk / Dormant / Not Started), showing the full composition of each programme's learner base. Includes onboarding (prerequisite) programmes. Hover over any column to see the total.</p>
+      </div>
+      <div class="h-card">
+        <h3>At-Risk & Dormant — Flag Breakdown (bar chart)</h3>
+        <p>Shows how many unique learners carry each flag, filtered to only At-Risk and Dormant enrolments. A learner with multiple flags is counted once per flag. This helps identify the most common intervention trigger across the portfolio.</p>
+      </div>
+      <div class="h-card">
+        <h3>By Country (donut)</h3>
+        <p>Distribution of the unique learner base by country of residence. Excludes learners with a blank country field. Top 4 countries are listed below the chart.</p>
+      </div>
+      <div class="h-card">
+        <h3>Enrolments by Week (stacked bar)</h3>
+        <p>Shows how many new enrolments started each calendar week, broken down by programme. The date used is the effective start date (best of enrolment date, activation date, programme start date). Only started programmes are included.</p>
+      </div>
+    </div>
+
+    <!-- ── ANALYTICS CHARTS ───────────────────────────────── -->
+    <div class="h-section" id="analytics-charts">
+      <h2><i class="ti ti-chart-dots"></i> Analytics Charts</h2>
+      <p class="h-lead">The Analytics page has a full filter bar (date basis, date range, country, programme, health) that controls all charts simultaneously. An HTMX partial swap refreshes only the charts when a filter changes.</p>
+
+      <div class="h-card">
+        <h3>Health Breakdown (donut)</h3>
+        <p>Learner-level health distribution, filtered to the current selection. Respects all filters including date range, so you can see the health of a specific cohort who enrolled in a particular window.</p>
+      </div>
+      <div class="h-card">
+        <h3>Enrolments by Programme (stacked bar)</h3>
+        <p>Per-programme health breakdown at the enrolment level. Each bar shows the five health states stacked. Only non-prerequisite programmes are included here.</p>
+      </div>
+      <div class="h-card">
+        <h3>At-Risk & Dormant — Flags</h3>
+        <p>Same as the home dashboard flag chart but respects all active analytics filters. Useful for comparing flag distributions between programmes or date ranges.</p>
+      </div>
+      <div class="h-card">
+        <h3>Learners by Country</h3>
+        <p>Top 20 countries by unique learner count for the filtered scope. The bars are coloured distinctly so each country is easy to identify.</p>
+      </div>
+      <div class="h-card">
+        <h3>Portfolio Mix (donut)</h3>
+        <p>Shows how many learners are enrolled in exactly one programme (single-programme) versus two or more (multi-programme). Useful for understanding cross-programme engagement.</p>
+      </div>
+      <div class="h-card">
+        <h3>Learner Distribution by Course</h3>
+        <p>An interactive chart. Select a programme using the pill buttons at the top, then filter by health state. Each bar represents one course within that programme, showing how many learners are currently on (or completed) that course. The <em>Badges</em> toggle shows course-level completion counts.</p>
+      </div>
+      <div class="h-card">
+        <h3>Rolling Enrolment Cohorts</h3>
+        <p>Groups enrolments by week of their start date (effective, enrolment date, or first activity — controlled by the <em>Date basis</em> selector). Each column shows how many learners from that cohort week are in each health state <em>today</em>. Click any column to drill into the learner list for that cohort week. A second chart excludes Not Started learners for a cleaner view of engaged cohorts.</p>
+      </div>
+    </div>
+
+    <!-- ── PROGRESSION CHARTS ────────────────────────────── -->
+    <div class="h-section" id="progression-charts">
+      <h2><i class="ti ti-trending-up"></i> Progression Charts</h2>
+      <p class="h-lead">The Progression Over Time section (bottom of Analytics) uses real activity dates — not upload dates — so it shows true day-by-day learner behaviour.</p>
+
+      <div class="h-card">
+        <h3>Daily Active Learners</h3>
+        <p>For each calendar day, counts the number of unique learners who accessed <em>or</em> submitted any assignment. A learner is counted once per programme per day regardless of how many assignments they touched. The X axis starts from the earliest programme start date.</p>
+      </div>
+      <div class="h-card">
+        <h3>Cumulative Active Learners</h3>
+        <p>A running total of learners who have had <em>any</em> activity up to and including each day. The line for each programme is always non-decreasing. Compare programmes to see how quickly each one accumulated an engaged learner base.</p>
+      </div>
+      <div class="h-card">
+        <h3>Daily Course Completions</h3>
+        <p>How many courses were marked completed on each individual day, grouped by programme. Spikes indicate periods of high completion activity — often around assessments or programme milestones.</p>
+      </div>
+      <div class="h-card">
+        <h3>Cumulative Course Completions</h3>
+        <p>Running total of all course completions per programme. The slope of the line reflects the completion velocity — a steeper slope means completions are accelerating.</p>
+      </div>
+      <div class="h-card">
+        <h3>Quick range buttons</h3>
+        <p>The filter bar includes preset buttons (4 weeks, 3 months, 6 months, 1 year, All time) that set the From/To date inputs and immediately re-filter all charts. The manual date inputs still work for exact ranges.</p>
+      </div>
+    </div>
+
+    <!-- ── INTERVENTIONS ──────────────────────────────────── -->
+    <div class="h-section" id="interventions">
+      <h2><i class="ti ti-message-circle"></i> Interventions</h2>
+      <p class="h-lead">Interventions are logged contact records — calls, emails, or messages sent to a learner. They create an audit trail and enable follow-up tracking.</p>
+
+      <div class="h-card">
+        <h3>Logging an intervention</h3>
+        <p>Open a learner's profile and click <em>Log Intervention</em>. Record the type (call / email / other), a note, and whether a follow-up is required with a date. Bulk intervention logging is available from the learner list.</p>
+      </div>
+      <div class="h-card">
+        <h3>Follow-up tracking</h3>
+        <p>Interventions marked as requiring follow-up appear in the <em>Follow-ups Due</em> tile on the home dashboard when the follow-up date is today or in the past. The tile count is the number of overdue or due-today follow-ups.</p>
+      </div>
+    </div>
+
+    <!-- ── PODS ───────────────────────────────────────────── -->
+    <div class="h-section" id="pods">
+      <h2><i class="ti ti-circle-dashed"></i> Pods</h2>
+      <p class="h-lead">A pod is a group of learners who share the same target graduation month for a given programme. Pods make it easy to compare pace and identify who needs support before the deadline.</p>
+
+      <div class="h-card">
+        <h3>Creating pods</h3>
+        <p>Pods are created automatically when a learner is assigned to one (via the <em>Assign to Pod</em> button on a learner's profile or via the pod CSV import). The pod name is derived from the programme code and target month.</p>
+      </div>
+      <div class="h-card">
+        <h3>Pod CSV import</h3>
+        <p>Upload a Google Form-style CSV via Admin → Pod Import. The import maps learner emails to programme names and target months, then assigns or moves each learner to the appropriate pod. Learners already in a pod are moved if their target month has changed.</p>
+      </div>
+      <div class="h-card">
+        <h3>Recomputing pace</h3>
+        <p>Use the <em>Recompute Pace</em> button on a pod's detail page to refresh all pace metrics. This recalculates current pace, required pace, courses behind, and projected completion date for every learner currently assigned to the pod.</p>
+      </div>
+    </div>
+
+    <!-- ── ADMIN TASKS ─────────────────────────────────────── -->
+    <div class="h-section" id="admin-tasks">
+      <h2><i class="ti ti-settings"></i> Admin Tasks</h2>
+
+      <div class="h-card">
+        <h3>Recalculate Health</h3>
+        <p>Available on the Admin home page and on individual ingestion job detail pages. Recomputes health flags and statuses for all enrolments (or just one programme / one job's enrolments) using today's date and the current threshold configuration. Use this after changing thresholds or correcting data without uploading a new CSV.</p>
+      </div>
+      <div class="h-card">
+        <h3>Pattern Registry</h3>
+        <p>Maps eHub class name patterns to programmes and courses. The ingestion engine checks this registry first before falling back to regex detection. Add or update patterns here when new eHub class name formats appear in your CSVs that the engine fails to auto-detect.</p>
+      </div>
+      <div class="h-card">
+        <h3>Country settings</h3>
+        <p>Controls which countries' learner rows are processed for enrolment and progress data. Rows from unlisted countries are still used for catalogue discovery (new courses/programmes in the activity CSV) but no learner data is written. <strong>Set this up before uploading any CSV</strong> — if countries are added after data has been ingested, re-uploading the CSVs is required to backfill the previously skipped learners. Use <em>Admin → Countries → Purge unmonitored learners</em> to remove learner records that slipped in before the filter was configured.</p>
+      </div>
+      <div class="h-card">
+        <h3>Programme thresholds</h3>
+        <p>Each programme has configurable thresholds that control when health flags fire. Accessible via Admin → Programmes → Edit. Setting a threshold to blank reverts to the system default shown in brackets.</p>
+        <ul>
+          <li><strong>Activation threshold</strong> (default 3 days) — days after FSOL before Never Activated fires</li>
+          <li><strong>Inactivity threshold</strong> (default 7 days) — days since last activity before Inactive fires</li>
+          <li><strong>Dormancy threshold</strong> (default 14 days) — days of inactivity before status becomes Dormant</li>
+          <li><strong>Stuck assignment threshold</strong> (default 5 days) — days accessed-but-not-submitted before Stuck fires</li>
+          <li><strong>Pass rate threshold</strong> (default 70%) — minimum acceptable pass rate before Low Pass Rate fires</li>
+          <li><strong>Inter-course threshold</strong> (default 5 days) — days between course completion and next course start before Stalled fires</li>
+        </ul>
+      </div>
+    </div>
+
+  </div><!-- /main content -->
+</div><!-- /h-shell -->
+
+<script>
+// Highlight active TOC link on scroll
+(function () {
+  var links = document.querySelectorAll('.h-toc-list a');
+  var sections = Array.from(links).map(function(a) {
+    return document.querySelector(a.getAttribute('href'));
+  }).filter(Boolean);
+
+  function onScroll() {
+    var scrollY = window.scrollY + 80; // 56px topbar + ~24px content padding
+    var active = sections[0];
+    sections.forEach(function(s) { if (s.offsetTop <= scrollY) active = s; });
+    links.forEach(function(a) {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + active.id);
+    });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+</script>
+{% endblock %}

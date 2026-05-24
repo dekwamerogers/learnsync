@@ -1,0 +1,89 @@
+{% if job.status == 'processing' or job.status == 'complete' or job.status == 'failed' %}
+<div id="job-progress"
+     {% if job.status == 'processing' %}
+     hx-get="{% url 'sp_job_progress' job.pk %}"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML"
+     {% endif %}>
+
+  <div class="sp-card" style="max-width:700px;margin-bottom:20px;">
+    <div class="sp-card-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Pipeline Progress</span>
+      {% if job.status == 'processing' %}
+      <span style="font-size:11px;color:#d97706;font-weight:500;display:flex;align-items:center;gap:5px;">
+        <span style="width:7px;height:7px;border-radius:50%;background:#d97706;display:inline-block;animation:sp-pulse 1.2s infinite;"></span>
+        Running&hellip;
+        {% with last_log=job.progress_log|last %}{% if last_log %}
+          <span style="font-weight:400;color:#9ca3af;">· last step at {{ last_log.at }}</span>
+        {% endif %}{% endwith %}
+      </span>
+      {% endif %}
+    </div>
+    <div class="sp-card-body" style="padding:16px;">
+
+      <!-- Progress bar -->
+      <div style="margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;margin-bottom:6px;">
+          <span>{{ pipeline_pct }}% complete</span>
+          <span>{% if job.status == 'complete' %}All steps done{% elif job.status == 'failed' %}Failed{% else %}In progress{% endif %}</span>
+        </div>
+        <div style="height:7px;background:#f3f4f6;border-radius:9999px;overflow:hidden;">
+          <div style="height:100%;border-radius:9999px;width:{{ pipeline_pct }}%;
+            background:{% if job.status == 'failed' %}#dc2626{% elif job.status == 'complete' %}#16a34a{% else %}#0452F0{% endif %};
+            transition:width .4s ease;"></div>
+        </div>
+      </div>
+
+      <!-- Step list -->
+      <div>
+        {% for step in pipeline %}
+        <div style="display:flex;gap:12px;padding:9px 0;{% if not forloop.last %}border-bottom:1px solid #f9fafb;{% endif %}
+          {% if not step.is_done and not step.is_current and not step.is_failed %}opacity:.38;{% endif %}">
+
+          <div style="flex-shrink:0;padding-top:1px;">
+            {% if step.is_done %}
+            <div style="width:22px;height:22px;border-radius:50%;background:#f0fdf4;border:2px solid #86efac;
+                        display:flex;align-items:center;justify-content:center;">
+              <i class="ti ti-check" style="font-size:11px;color:#16a34a;"></i>
+            </div>
+            {% elif step.is_failed %}
+            <div style="width:22px;height:22px;border-radius:50%;background:#fef2f2;border:2px solid #fca5a5;
+                        display:flex;align-items:center;justify-content:center;">
+              <i class="ti ti-x" style="font-size:11px;color:#dc2626;"></i>
+            </div>
+            {% elif step.is_current %}
+            <div style="width:22px;height:22px;border-radius:50%;background:#eff6ff;border:2px solid #93c5fd;
+                        display:flex;align-items:center;justify-content:center;">
+              <div style="width:7px;height:7px;border-radius:50%;background:#0452F0;animation:sp-pulse 1.2s infinite;"></div>
+            </div>
+            {% else %}
+            <div style="width:22px;height:22px;border-radius:50%;background:#f9fafb;border:2px solid #e5e7eb;"></div>
+            {% endif %}
+          </div>
+
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:600;color:{% if step.is_done or step.is_current %}#111827{% else %}#9ca3af{% endif %};">
+              {{ step.label }}
+            </div>
+            {% if step.entry %}
+            <div style="font-size:11px;color:#6b7280;margin-top:1px;">{{ step.entry.msg }}</div>
+            {% elif step.is_current %}
+            <div style="font-size:11px;color:#d97706;margin-top:1px;">Working&hellip;</div>
+            {% elif step.is_failed %}
+            <div style="font-size:11px;color:#dc2626;margin-top:1px;">Failed at this step — see errors above</div>
+            {% endif %}
+          </div>
+
+          {% if step.entry %}
+          <div style="font-size:11px;color:#9ca3af;white-space:nowrap;padding-top:2px;">{{ step.entry.at }}</div>
+          {% endif %}
+
+        </div>
+        {% endfor %}
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endif %}

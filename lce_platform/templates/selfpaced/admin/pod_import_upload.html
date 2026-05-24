@@ -1,0 +1,45 @@
+{% extends "selfpaced/base.html" %}
+{% block title %}Upload Pod CSV — LearnSync{% endblock %}
+{% block page_title %}Upload Pod Selection CSV{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:560px;">
+
+  <div style="margin-bottom:16px;">
+    <a href="{% url 'sp_pod_import_log' %}" onclick="spBack('{% url 'sp_pod_import_log' %}'); return false;" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+  </div>
+
+  <div class="sp-card" style="padding:24px;">
+    <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:4px;">Upload Google Form CSV export</div>
+    <div style="font-size:11px;color:#9ca3af;margin-bottom:20px;">
+      Export your Google Form responses as a CSV and upload it here. Expected columns:
+      <strong>Timestamp, Full Name, ALX Associated Email, WhatsApp Number,
+      Which program are you currently enrolled in?, What month did you enrol in?,
+      Which month are you expecting to finish in?</strong>
+    </div>
+
+    {% if messages %}
+    {% for m in messages %}
+    <div class="sp-alert sp-alert-error" style="margin-bottom:14px;"><div>{{ m }}</div></div>
+    {% endfor %}
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" action="{% url 'sp_upload_pod_csv' %}">
+      {% csrf_token %}
+      <div style="border:2px dashed #e5e7eb;border-radius:8px;padding:32px;text-align:center;margin-bottom:16px;cursor:pointer;"
+           onclick="document.getElementById('pod-file').click()">
+        <i class="ti ti-file-spreadsheet" style="font-size:28px;color:#9ca3af;display:block;margin-bottom:8px;"></i>
+        <div style="font-size:13px;color:#374151;font-weight:500;" id="pod-file-label">Click to select CSV file</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:4px;">Google Form export (.csv)</div>
+      </div>
+      <input type="file" id="pod-file" name="file" accept=".csv" style="display:none;"
+             onchange="document.getElementById('pod-file-label').textContent = this.files[0]?.name || 'Click to select CSV file'">
+      <button type="submit" class="sp-btn sp-btn-primary" style="width:100%;justify-content:center;">
+        <i class="ti ti-upload" style="font-size:13px;"></i> Upload &amp; Review
+      </button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "selfpaced/base.html" %}
+{% block title %}Purge Enrolment Uploads — LearnSync{% endblock %}
+{% block page_title %}Purge Enrolment Uploads{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:560px;">
+
+  <div style="margin-bottom:16px;">
+    <a href="{% url 'sp_enrolment_log' %}" onclick="spBack('{% url 'sp_enrolment_log' %}'); return false;" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+  </div>
+
+  <div class="sp-card" style="padding:24px;border-color:#fca5a5;">
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <i class="ti ti-alert-triangle" style="font-size:22px;color:#dc2626;"></i>
+      <div style="font-size:15px;font-weight:700;color:#111827;">Purge all enrolment upload data</div>
+    </div>
+
+    <p style="font-size:13px;color:#374151;margin:0 0 16px;">
+      This will permanently remove all enrolment upload jobs and reverse their effects on the database.
+    </p>
+
+    <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:14px;margin-bottom:20px;">
+      <div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:8px;">What will be deleted / cleared:</div>
+      <ul style="margin:0;padding-left:18px;font-size:12px;color:#7f1d1d;line-height:1.8;">
+        <li><strong>{{ job_count }}</strong> enrolment upload job record{{ job_count|pluralize }}</li>
+        <li><strong>{{ date_count }}</strong> enrolment date{{ date_count|pluralize }} will be set back to blank
+          <span style="color:#9ca3af;">(enrolment_date is only set by uploads — safe to clear)</span></li>
+      </ul>
+    </div>
+
+    {% if orphan_count %}
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:14px;margin-bottom:20px;">
+      <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:6px;">
+        Optional: delete upload-only learners
+      </div>
+      <p style="font-size:12px;color:#78350f;margin:0 0 10px;">
+        <strong>{{ orphan_count }}</strong> learner{{ orphan_count|pluralize }} in the system
+        ha{{ orphan_count|pluralize:"s,ve" }} no <em>first_seen_date</em>, meaning they were never in a main
+        ingestion CSV — likely created exclusively by an enrolment upload.
+        Deleting them also removes their enrolments and course data.
+      </p>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#374151;cursor:pointer;">
+        <input type="checkbox" id="delete-orphans-check" style="width:14px;height:14px;">
+        Delete these {{ orphan_count }} learner{{ orphan_count|pluralize }} and all their records
+      </label>
+    </div>
+    {% endif %}
+
+    <p style="font-size:12px;color:#6b7280;margin:0 0 20px;">
+      <strong>Note:</strong> Fields like <code>activation_date</code>, <code>graduation_date</code>
+      and <code>is_graduated</code> that may have been updated by the upload will be restored
+      automatically on the next main data ingestion.
+    </p>
+
+    <form method="post" action="{% url 'sp_enrolment_purge' %}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="confirm">
+      <input type="hidden" name="delete_orphans" id="delete-orphans-val" value="0">
+
+      <div style="display:flex;gap:10px;">
+        <button type="submit"
+                style="padding:8px 20px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;">
+          Confirm purge
+        </button>
+        <a href="{% url 'sp_enrolment_log' %}"
+           style="padding:8px 16px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;color:#374151;text-decoration:none;">
+          Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var cb = document.getElementById('delete-orphans-check');
+var hid = document.getElementById('delete-orphans-val');
+if (cb) cb.addEventListener('change', function() { hid.value = cb.checked ? '1' : '0'; });
+</script>
+{% endblock %}

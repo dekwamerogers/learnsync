@@ -1,0 +1,137 @@
+{% extends "selfpaced/base.html" %}
+
+{% block title %}Edit Course — {{ programme.code }} — LearnSync{% endblock %}
+{% block page_title %}Edit Course{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+
+<div style="margin-bottom:16px;display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;">
+  <a href="{% url 'sp_admin_programme_list' %}" style="color:#6b7280;text-decoration:none;">Programme Settings</a>
+  <span>›</span>
+  <a href="{% url 'sp_admin_programme_edit' programme.pk %}" style="color:#6b7280;text-decoration:none;">{{ programme.code }}</a>
+  <span>›</span>
+  <span style="color:#374151;">Edit Course</span>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:start;max-width:900px;">
+
+  <!-- Edit form -->
+  <form method="post">
+  {% csrf_token %}
+
+  <div class="sp-card" style="margin-bottom:16px;">
+    <div class="sp-card-header">
+      Course Details
+      <span style="font-size:11px;font-weight:400;color:#9ca3af;">{{ enrolment_count }} enrolment{{ enrolment_count|pluralize }} · {{ assignment_count }} assignment{{ assignment_count|pluralize }}</span>
+    </div>
+    <div class="sp-card-body">
+
+      <div style="display:grid;grid-template-columns:80px 120px 1fr;gap:16px;align-items:start;margin-bottom:16px;">
+
+        <!-- Sequence number -->
+        <div>
+          <label for="id_seq" style="display:block;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Seq #</label>
+          <input type="number" id="id_seq" name="sequence_number" min="0"
+                 value="{% if post %}{{ post.sequence_number }}{% else %}{{ course.sequence_number }}{% endif %}"
+                 style="width:100%;padding:8px 10px;border:1px solid {% if errors.sequence_number %}#fca5a5{% else %}#e5e7eb{% endif %};border-radius:6px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;text-align:center;font-weight:700;">
+          {% if errors.sequence_number %}<div style="font-size:10px;color:#dc2626;margin-top:3px;">{{ errors.sequence_number }}</div>{% endif %}
+        </div>
+
+        <!-- Short code -->
+        <div>
+          <label for="id_code" style="display:block;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Short Code</label>
+          <input type="text" id="id_code" name="code"
+                 value="{% if post %}{{ post.code }}{% else %}{{ course.code }}{% endif %}"
+                 placeholder="e.g. AICE-2"
+                 style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;text-transform:uppercase;">
+          <div style="font-size:10px;color:#9ca3af;margin-top:3px;">Optional abbreviation</div>
+        </div>
+
+        <!-- Full name -->
+        <div>
+          <label for="id_full_name" style="display:block;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Course Name</label>
+          <input type="text" id="id_full_name" name="full_name"
+                 value="{% if post %}{{ post.full_name }}{% else %}{{ course.full_name }}{% endif %}"
+                 style="width:100%;padding:8px 10px;border:1px solid {% if errors.full_name %}#fca5a5{% else %}#e5e7eb{% endif %};border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;">
+          {% if errors.full_name %}<div style="font-size:10px;color:#dc2626;margin-top:3px;">{{ errors.full_name }}</div>{% endif %}
+        </div>
+
+      </div>
+
+      <div style="display:grid;grid-template-columns:140px 1fr;gap:16px;align-items:start;padding-top:14px;border-top:1px solid #f3f4f6;">
+
+        <!-- Expected duration -->
+        <div>
+          <label for="id_duration" style="display:block;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Expected Duration</label>
+          <div style="position:relative;">
+            <input type="number" id="id_duration" name="expected_duration_days" min="1"
+                   value="{% if post %}{{ post.expected_duration_days|default:'' }}{% else %}{{ course.expected_duration_days|default:'' }}{% endif %}"
+                   placeholder="—"
+                   style="width:100%;padding:7px 40px 7px 10px;border:1px solid {% if errors.expected_duration_days %}#fca5a5{% else %}#e5e7eb{% endif %};border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;">
+            <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;color:#9ca3af;pointer-events:none;">days</span>
+          </div>
+          {% if errors.expected_duration_days %}<div style="font-size:10px;color:#dc2626;margin-top:3px;">{{ errors.expected_duration_days }}</div>{% endif %}
+          <div style="font-size:10px;color:#9ca3af;margin-top:3px;">Leave blank if unknown</div>
+        </div>
+
+        <!-- Active toggle -->
+        <div style="display:flex;align-items:flex-start;padding-top:20px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+            <input type="checkbox" name="is_active" id="id_is_active"
+                   {% if post %}{% if post.is_active %}checked{% endif %}{% elif course.is_active %}checked{% endif %}
+                   style="width:15px;height:15px;accent-color:#0452F0;cursor:pointer;">
+            <span>
+              <span style="font-size:13px;font-weight:500;color:#111827;">Active</span>
+              <span style="display:block;font-size:11px;color:#9ca3af;">Inactive courses are hidden from learner timelines</span>
+            </span>
+          </label>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;justify-content:flex-end;">
+    <a href="{% url 'sp_admin_programme_edit' programme.pk %}" class="sp-btn sp-btn-secondary">Cancel</a>
+    <button type="submit" class="sp-btn sp-btn-primary">Save Changes</button>
+  </div>
+
+  </form>
+
+  <!-- Sidebar: merge into another course -->
+  {% if other_courses %}
+  <div class="sp-card" style="margin-top:0;">
+    <div class="sp-card-header" style="font-size:12px;">
+      <i class="ti ti-git-merge" style="margin-right:4px;font-size:13px;"></i>
+      Merge into Another Course
+    </div>
+    <div class="sp-card-body" style="padding:12px 16px;">
+      <div style="font-size:11px;color:#6b7280;margin-bottom:10px;line-height:1.5;">
+        Move all enrolments and assignments from <strong>{{ course.code|default:course.full_name }}</strong> into the selected course, then mark this one inactive.
+      </div>
+      <form method="post" action="{% url 'sp_admin_course_merge' programme.pk %}"
+            onsubmit="return confirm('Merge {{ course.code|default:course.full_name }} into the selected course? This cannot be undone.')">
+        {% csrf_token %}
+        <input type="hidden" name="source_pk" value="{{ course.pk }}">
+        <div style="margin-bottom:10px;">
+          <label style="display:block;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Merge into</label>
+          <select name="target_pk" style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;outline:none;background:#fff;">
+            {% for c in other_courses %}
+            <option value="{{ c.pk }}">{{ c.sequence_number }}. {{ c.full_name }}{% if not c.is_active %} (inactive){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit"
+                style="width:100%;padding:7px 12px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
+          <i class="ti ti-git-merge" style="font-size:12px;margin-right:4px;"></i>Merge
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+{% endblock %}

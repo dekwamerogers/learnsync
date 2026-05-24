@@ -1,0 +1,115 @@
+{% load sp_filters %}
+<tbody>
+  {% for programme in programmes %}
+  <tr>
+    <td>
+      <span style="font-size:12px;font-weight:700;background:#f3f4f6;border-radius:4px;padding:2px 8px;color:#374151;">
+        {{ programme.code }}
+      </span>
+    </td>
+    <td style="font-weight:500;color:#111827;">
+      {{ programme.name }}
+      {% with ds=programme.date_status %}
+      {% if ds == 'upcoming' %}
+        <span style="font-size:10px;background:#fef3c7;color:#d97706;border-radius:9999px;padding:1px 6px;margin-left:6px;font-weight:600;vertical-align:middle;"
+              title="Starts {{ programme.start_date }}">Upcoming</span>
+      {% endif %}
+      {% endwith %}
+    </td>
+
+    {% with d=prog_deltas|get_item:programme.pk %}
+    <td style="font-weight:600;color:#111827;">
+      {{ programme.total_enrolments }}
+      {% if d %}{% include "selfpaced/_delta.html" with val=d.total positive_is_good=True %}{% endif %}
+    </td>
+
+    {% with mix=prog_mix|get_item:programme.pk %}
+    <td style="white-space:nowrap;">
+      {% if mix %}
+        <span style="font-weight:600;color:#111827;">{{ mix.solo }}</span>
+        {% if mix.multi %}
+        <span style="font-size:10px;background:#eff6ff;color:#1d4ed8;border-radius:9999px;padding:1px 6px;margin-left:4px;font-weight:600;"
+              title="{{ mix.multi }} learner{{ mix.multi|pluralize }} also enrolled in other programmes">
+          +{{ mix.multi }} multi
+        </span>
+        {% endif %}
+      {% else %}<span style="color:#9ca3af;">—</span>{% endif %}
+    </td>
+    {% endwith %}
+
+    {# ── Enrolment-health columns (default view) ── #}
+    <td class="col-enrolment">
+      {% if programme.active_count %}<span style="color:#16a34a;font-weight:600;">{{ programme.active_count }}</span>{% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+      {% if d %}{% include "selfpaced/_delta.html" with val=d.active positive_is_good=True %}{% endif %}
+    </td>
+    <td class="col-enrolment">
+      {% if programme.at_risk_count %}<span style="color:#d97706;font-weight:600;">{{ programme.at_risk_count }}</span>{% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+      {% if d %}{% include "selfpaced/_delta.html" with val=d.at_risk positive_is_good=False %}{% endif %}
+    </td>
+    <td class="col-enrolment">
+      {% if programme.dormant_count %}<span style="color:#7c3aed;font-weight:600;">{{ programme.dormant_count }}</span>{% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+      {% if d %}{% include "selfpaced/_delta.html" with val=d.dormant positive_is_good=False %}{% endif %}
+    </td>
+    <td class="col-enrolment">
+      {% if programme.not_yet_started_count %}<span style="color:#6b7280;font-weight:600;">{{ programme.not_yet_started_count }}</span>{% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+    </td>
+    <td class="col-enrolment">
+      {% if programme.graduated_count %}<span style="color:#2563eb;font-weight:600;">{{ programme.graduated_count }}</span>{% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+      {% if d %}{% include "selfpaced/_delta.html" with val=d.graduated positive_is_good=True %}{% endif %}
+    </td>
+    {% endwith %}
+
+    <td>
+      {% if programme.onboarded_count %}
+        <span style="color:#0d9488;font-weight:600;">{{ programme.onboarded_count }}</span>
+      {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+    </td>
+
+    <td style="text-align:center;" title="Activation rate: {{ programme.activation_rate }}%">
+      {% if programme.activated_count %}
+        <span style="font-weight:600;color:#0452F0;">{{ programme.activated_count }}</span>
+        <span style="font-size:10px;color:#9ca3af;margin-left:2px;">{{ programme.activation_rate }}%</span>
+      {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+    </td>
+    <td style="text-align:center;" title="Retention rate: {{ programme.retention_rate }}%">
+      {% if programme.retained_count %}
+        <span style="font-weight:600;color:#0d9488;">{{ programme.retained_count }}</span>
+        <span style="font-size:10px;color:#9ca3af;margin-left:2px;">{{ programme.retention_rate }}%</span>
+      {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+    </td>
+
+    <td style="text-align:center;">
+      {% if programme.awards_credentials %}
+        {% if programme.badges_count %}<span style="font-size:13px;font-weight:600;color:#7c3aed;">{{ programme.badges_count }}</span>
+        {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+      {% else %}<span style="color:#e5e7eb;font-size:11px;" title="{{ programme.code }} does not award badges">—</span>{% endif %}
+    </td>
+    <td style="text-align:center;">
+      {% if programme.awards_certificate %}
+        {% if programme.certificates_count %}<span style="font-size:13px;font-weight:600;color:#2563eb;">{{ programme.certificates_count }}</span>
+        {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+      {% else %}<span style="color:#e5e7eb;font-size:11px;" title="{{ programme.code }} does not award certificates">—</span>{% endif %}
+    </td>
+    <td style="color:#6b7280;">{{ programme.course_count }}</td>
+    <td>
+      <a href="{% url 'sp_programme_detail' programme.pk %}"
+         style="font-size:12px;color:#0452F0;text-decoration:none;font-weight:500;white-space:nowrap;">
+        View →
+      </a>
+    </td>
+  </tr>
+  {% endfor %}
+
+  {# Footer: unique learner count across all programmes (multi-programme learners counted once) #}
+  {% if programmes %}
+  <tr style="background:#f9fafb;border-top:2px solid #e5e7eb;">
+    <td colspan="3" style="padding:8px 12px;">
+      <span style="font-size:11px;font-weight:700;color:#374151;">{{ unique_learner_total }}</span>
+      <span style="font-size:11px;color:#9ca3af;margin-left:4px;">unique learner{{ unique_learner_total|pluralize }} across {{ programmes|length }} programme{{ programmes|length|pluralize }}</span>
+    </td>
+    <td colspan="14" style="font-size:11px;color:#9ca3af;padding:8px 12px;">
+      Multi-programme learners appear in each programme row but are counted once in the unique total.
+    </td>
+  </tr>
+  {% endif %}
+</tbody>

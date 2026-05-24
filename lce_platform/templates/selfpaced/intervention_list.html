@@ -1,0 +1,374 @@
+{% extends "selfpaced/base.html" %}
+
+{% block title %}Interventions — LearnSync{% endblock %}
+{% block page_title %}Interventions{% endblock %}
+{% block nav_interventions %}active{% endblock %}
+
+{% block interventions_badge %}
+  {% if follow_up_count %}
+    <span class="sp-badge sp-badge-yellow">{{ follow_up_count }}</span>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+<!-- Top bar: tabs + log button -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+  <div style="display:flex;gap:2px;border-bottom:1px solid #e5e7eb;">
+    <a href="?tab=follow_ups"
+       style="padding:8px 16px;font-size:13px;font-weight:500;text-decoration:none;border-bottom:2px solid {% if tab == 'follow_ups' %}#0452F0{% else %}transparent{% endif %};color:{% if tab == 'follow_ups' %}#0452F0{% else %}#6b7280{% endif %};">
+      Follow-ups Due
+      {% if follow_up_count %}
+        <span style="font-size:11px;background:#fef3c7;color:#b45309;border-radius:10px;padding:1px 7px;margin-left:4px;font-weight:600;">{{ follow_up_count }}</span>
+      {% endif %}
+    </a>
+    <a href="?tab=all"
+       style="padding:8px 16px;font-size:13px;font-weight:500;text-decoration:none;border-bottom:2px solid {% if tab == 'all' %}#0452F0{% else %}transparent{% endif %};color:{% if tab == 'all' %}#0452F0{% else %}#6b7280{% endif %};">
+      All Interventions
+    </a>
+  </div>
+  <div style="display:flex;gap:8px;">
+    {% if tab == 'all' %}
+    <a href="?tab=all{% if q %}&q={{ q }}{% endif %}&export=csv"
+       class="sp-btn sp-btn-secondary" style="font-size:12px;">
+      <i class="ti ti-download" style="font-size:13px;"></i>
+      Export CSV
+    </a>
+    {% endif %}
+    <button class="sp-btn sp-btn-primary" onclick="spOpenLogModal()">
+      <i class="ti ti-plus" style="font-size:13px;"></i>
+      Log Intervention
+    </button>
+  </div>
+</div>
+
+
+<!-- Follow-ups tab -->
+{% if tab == 'follow_ups' %}
+<div class="sp-card">
+  {% if follow_ups %}
+  <table class="sp-table">
+    <thead>
+      <tr>
+        <th>Learner</th>
+        <th>Programme</th>
+        <th>Due Date</th>
+        <th>Type</th>
+        <th>Reason</th>
+        <th>Outcome</th>
+        <th>Logged By</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for iv in follow_ups %}
+      <tr>
+        <td>
+          <a href="{% url 'sp_learner_profile' iv.learner.email %}"
+             style="font-weight:500;color:#111827;text-decoration:none;font-size:13px;">
+            {{ iv.learner.full_name|default:iv.learner.email }}
+          </a>
+          <div style="font-size:11px;color:#9ca3af;">{{ iv.learner.email }}</div>
+        </td>
+        <td style="font-size:12px;color:#6b7280;">
+          {% if iv.enrolment %}
+            <span style="background:#f3f4f6;border-radius:4px;padding:1px 6px;">{{ iv.enrolment.programme.code }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td style="white-space:nowrap;">
+          {% if iv.follow_up_date < today %}
+            <span style="font-size:12px;color:#dc2626;font-weight:600;">{{ iv.follow_up_date|date:"d M Y" }}</span>
+            <div style="font-size:10px;color:#dc2626;">overdue</div>
+          {% else %}
+            <span style="font-size:12px;color:#d97706;font-weight:600;">{{ iv.follow_up_date|date:"d M Y" }}</span>
+          {% endif %}
+        </td>
+        <td style="font-size:12px;color:#374151;">{{ iv.get_type_display }}</td>
+        <td style="font-size:12px;color:#374151;max-width:200px;">{{ iv.reason|default:"—"|truncatechars:60 }}</td>
+        <td style="font-size:12px;">
+          {% if iv.outcome == 're_engaged' %}<span style="color:#16a34a;">Re-engaged</span>
+          {% elif iv.outcome == 'no_response' %}<span style="color:#9ca3af;">No response</span>
+          {% elif iv.outcome == 'promised_action' %}<span style="color:#d97706;">Promised action</span>
+          {% elif iv.outcome == 'withdrew' %}<span style="color:#dc2626;">Withdrew</span>
+          {% else %}{{ iv.get_outcome_display }}{% endif %}
+        </td>
+        <td style="font-size:12px;color:#6b7280;">{{ iv.logged_by.get_full_name|default:iv.logged_by.username }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:48px;text-align:center;color:#9ca3af;">
+    <i class="ti ti-circle-check" style="font-size:32px;display:block;margin-bottom:8px;color:#16a34a;"></i>
+    <div style="font-size:13px;">No follow-ups due.</div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+
+<!-- All interventions tab -->
+{% if tab == 'all' %}
+
+<form method="get" action="" style="margin-bottom:12px;display:flex;gap:8px;align-items:center;">
+  <input type="hidden" name="tab" value="all">
+  <div style="position:relative;flex:1;max-width:320px;">
+    <i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:13px;pointer-events:none;"></i>
+    <input type="text" name="q" value="{{ q }}" placeholder="Search learner or reason…"
+           style="width:100%;padding:7px 10px 7px 28px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;outline:none;background:#fff;"
+           autocomplete="off">
+  </div>
+  <button type="submit" class="sp-btn sp-btn-secondary">Search</button>
+  {% if q %}<a href="?tab=all" class="sp-btn sp-btn-secondary">Clear</a>{% endif %}
+</form>
+
+<div style="font-size:12px;color:#6b7280;margin-bottom:12px;">{{ total }} intervention{{ total|pluralize }}</div>
+
+<div class="sp-card">
+  {% if page_obj.object_list %}
+  <table class="sp-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Learner</th>
+        <th>Programme</th>
+        <th>Type</th>
+        <th>Outcome</th>
+        <th>Follow-up</th>
+        <th>By</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for iv in page_obj.object_list %}
+      <tr>
+        <td style="font-size:12px;color:#6b7280;white-space:nowrap;">{{ iv.intervention_date|date:"d M Y" }}</td>
+        <td>
+          <a href="{% url 'sp_learner_profile' iv.learner.email %}"
+             style="font-weight:500;color:#111827;text-decoration:none;font-size:13px;">
+            {{ iv.learner.full_name|default:iv.learner.email }}
+          </a>
+        </td>
+        <td style="font-size:12px;color:#6b7280;">
+          {% if iv.enrolment %}
+            <span style="background:#f3f4f6;border-radius:4px;padding:1px 6px;">{{ iv.enrolment.programme.code }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td style="font-size:12px;color:#374151;">{{ iv.get_type_display }}</td>
+        <td style="font-size:12px;">
+          {% if iv.outcome == 're_engaged' %}<span style="color:#16a34a;">Re-engaged</span>
+          {% elif iv.outcome == 'no_response' %}<span style="color:#9ca3af;">No response</span>
+          {% elif iv.outcome == 'promised_action' %}<span style="color:#d97706;">Promised action</span>
+          {% elif iv.outcome == 'withdrew' %}<span style="color:#dc2626;">Withdrew</span>
+          {% else %}{{ iv.get_outcome_display }}{% endif %}
+        </td>
+        <td style="font-size:12px;color:#6b7280;white-space:nowrap;">
+          {% if iv.follow_up_required %}
+            {% if iv.follow_up_date %}<span style="color:#d97706;">{{ iv.follow_up_date|date:"d M Y" }}</span>
+            {% else %}<span style="color:#d97706;">Yes</span>{% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td style="font-size:12px;color:#6b7280;">{{ iv.logged_by.get_full_name|default:iv.logged_by.username }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if page_obj.has_other_pages %}
+  <div style="padding:12px 16px;border-top:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;">
+    <span style="font-size:12px;color:#6b7280;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    <div style="display:flex;gap:4px;">
+      {% if page_obj.has_previous %}
+        <a href="?tab=all{% if q %}&q={{ q }}{% endif %}&page={{ page_obj.previous_page_number }}"
+           class="sp-btn sp-btn-secondary" style="font-size:12px;padding:4px 10px;">← Prev</a>
+      {% endif %}
+      {% if page_obj.has_next %}
+        <a href="?tab=all{% if q %}&q={{ q }}{% endif %}&page={{ page_obj.next_page_number }}"
+           class="sp-btn sp-btn-secondary" style="font-size:12px;padding:4px 10px;">Next →</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <div style="padding:48px;text-align:center;color:#9ca3af;font-size:13px;">
+    {% if q %}No interventions matching "{{ q }}".{% else %}No interventions logged yet.{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+
+<!-- Log Intervention Modal -->
+<div id="sp-log-backdrop" style="display:none;" onclick="spCloseLogOnBackdrop(event)">
+  <div id="sp-log-modal">
+    <div id="sp-modal-header">
+      <h3>Log Intervention</h3>
+      <button onclick="spCloseLogModal()"
+              style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:20px;line-height:1;padding:0;">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>
+    <div id="sp-modal-body">
+      <form id="sp-log-form">
+        {% csrf_token %}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+
+          <div style="grid-column:1/-1;">
+            <label class="sp-form-label">Learner email</label>
+            <input type="email" name="learner_email" id="log-learner-email" required
+                   placeholder="learner@example.com"
+                   style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;outline:none;">
+          </div>
+
+          <div>
+            <label class="sp-form-label">Date</label>
+            <input type="date" name="intervention_date" id="log-date" required
+                   style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;outline:none;">
+          </div>
+
+          <div>
+            <label class="sp-form-label">Type</label>
+            <select name="type" required
+                    style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;outline:none;">
+              <option value="">Select…</option>
+              {% for val, label in types %}
+                <option value="{{ val }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div style="grid-column:1/-1;">
+            <label class="sp-form-label">Outcome</label>
+            <select name="outcome" required
+                    style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;outline:none;">
+              <option value="">Select…</option>
+              {% for val, label in outcomes %}
+                <option value="{{ val }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div style="grid-column:1/-1;">
+            <label class="sp-form-label">Reason / Summary</label>
+            <input type="text" name="reason" placeholder="Brief reason for outreach"
+                   style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;outline:none;">
+          </div>
+
+          <div style="grid-column:1/-1;">
+            <label class="sp-form-label">Notes</label>
+            <textarea name="notes" rows="3" placeholder="Optional notes"
+                      style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;outline:none;resize:vertical;"></textarea>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px;grid-column:1/-1;">
+            <input type="checkbox" id="log-followup" name="follow_up_required" value="1"
+                   style="width:15px;height:15px;cursor:pointer;" onchange="spToggleFollowUp(this)">
+            <label for="log-followup" style="font-size:13px;color:#374151;cursor:pointer;">Follow-up required</label>
+          </div>
+
+          <div id="log-followup-date-wrap" style="display:none;grid-column:1/-1;">
+            <label class="sp-form-label">Follow-up date</label>
+            <input type="date" name="follow_up_date"
+                   style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;outline:none;">
+          </div>
+
+        </div>
+
+        <div id="log-error" class="sp-alert sp-alert-error" style="display:none;margin-bottom:8px;"></div>
+        <div id="log-success" class="sp-alert sp-alert-success" style="display:none;margin-bottom:8px;">
+          <i class="ti ti-circle-check" style="font-size:15px;flex-shrink:0;"></i>
+          Intervention logged successfully.
+        </div>
+      </form>
+    </div>
+    <div id="sp-modal-footer">
+      <button class="sp-btn sp-btn-secondary" onclick="spCloseLogModal()">Cancel</button>
+      <button class="sp-btn sp-btn-primary" onclick="spSubmitLog()">
+        <i class="ti ti-check" style="font-size:13px;"></i>
+        Save
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block extra_css %}
+<style>
+#sp-log-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#sp-log-modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 520px;
+  max-width: 95vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  overflow: hidden;
+}
+.sp-form-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+</style>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+function spOpenLogModal() {
+  document.getElementById('sp-log-form').reset();
+  document.getElementById('log-error').style.display = 'none';
+  document.getElementById('log-success').style.display = 'none';
+  document.getElementById('log-followup-date-wrap').style.display = 'none';
+  document.getElementById('log-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('sp-log-backdrop').style.display = 'flex';
+}
+function spCloseLogModal() {
+  document.getElementById('sp-log-backdrop').style.display = 'none';
+}
+function spCloseLogOnBackdrop(e) {
+  if (e.target === document.getElementById('sp-log-backdrop')) spCloseLogModal();
+}
+function spToggleFollowUp(checkbox) {
+  document.getElementById('log-followup-date-wrap').style.display = checkbox.checked ? 'block' : 'none';
+}
+function spSubmitLog() {
+  const form = document.getElementById('sp-log-form');
+  const data = new FormData(form);
+  const errEl = document.getElementById('log-error');
+  const okEl = document.getElementById('log-success');
+  errEl.style.display = 'none';
+  okEl.style.display = 'none';
+
+  fetch('{% url "sp_log_intervention" %}', {
+    method: 'POST',
+    body: data,
+    headers: { 'X-CSRFToken': data.get('csrfmiddlewaretoken') },
+  })
+    .then(r => r.json())
+    .then(json => {
+      if (json.ok) {
+        okEl.style.display = 'flex';
+        setTimeout(() => { spCloseLogModal(); location.reload(); }, 900);
+      } else {
+        errEl.textContent = json.error || 'Something went wrong.';
+        errEl.style.display = 'flex';
+      }
+    })
+    .catch(() => {
+      errEl.textContent = 'Network error. Please try again.';
+      errEl.style.display = 'flex';
+    });
+}
+</script>
+{% endblock %}

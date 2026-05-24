@@ -1,0 +1,124 @@
+{{ chart_data|json_script:"prog-chart-data" }}
+
+<div style="margin-top:28px;" data-charts-ready="1">
+  <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:14px;letter-spacing:-.01em;">
+    Programme Dynamics
+  </div>
+
+  {# ── Row 1: Global mix donut + Per-programme health stacked bar ── #}
+  <div style="display:grid;grid-template-columns:220px 1fr;gap:14px;margin-bottom:14px;">
+
+    {# Donut: global single vs multi-programme learner split #}
+    <div class="sp-card" style="padding:16px;">
+      <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">
+        Portfolio mix
+      </div>
+      {% if global_solo or global_multi %}
+      <div style="position:relative;height:160px;">
+        <canvas id="chart-global-mix"></canvas>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:4px;">
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#374151;">
+          <span style="width:10px;height:10px;border-radius:50%;background:#0452F0;flex-shrink:0;"></span>
+          <span>Single-programme</span>
+          <span style="margin-left:auto;font-weight:700;">{{ global_solo }}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#374151;">
+          <span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>
+          <span>Multi-programme</span>
+          <span style="margin-left:auto;font-weight:700;">{{ global_multi }}</span>
+        </div>
+      </div>
+      {% else %}
+      <div style="height:160px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;">No data</div>
+      {% endif %}
+    </div>
+
+    {# Stacked horizontal bar: health breakdown per programme #}
+    <div class="sp-card" style="padding:16px;">
+      <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">
+        Health breakdown by programme
+      </div>
+      <div style="position:relative;height:280px;">
+        <canvas id="chart-health-bar"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  {# ── Row 2: Per-programme solo vs multi ── #}
+  <div style="margin-bottom:14px;">
+    <div class="sp-card" style="padding:16px;">
+      <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em;">
+        Single vs multi-programme per cohort
+      </div>
+      <div style="position:relative;height:280px;">
+        <canvas id="chart-mix-bar"></canvas>
+      </div>
+    </div>
+  </div>
+
+  {# ── Row 3: Enrollment timeline — monthly stacked bar ── #}
+  <div style="margin-bottom:14px;">
+    <div class="sp-card" style="padding:16px;">
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px;">
+        <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;">
+          Enrolments by Week
+        </div>
+        <div style="font-size:10px;color:#9ca3af;">
+          Uses enrolment date where available, otherwise first activity date
+        </div>
+      </div>
+      {% if timeline_has_data %}
+      <div style="position:relative;height:260px;">
+        <canvas id="chart-enrol-timeline"></canvas>
+      </div>
+      {% else %}
+      <div style="height:120px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;">
+        No date data — upload the enrolment CSV or wait for a data ingestion.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Row 4: Learner progression — interactive (full width) ── #}
+  <div style="margin-bottom:14px;">
+    <div class="sp-card" style="padding:16px;">
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-right:4px;">
+          Learner distribution by course
+        </div>
+        {# Programme pills #}
+        {% for prog in programmes %}
+        <button class="prog-pill"
+                data-pk="{{ prog.pk }}"
+                style="font-size:11px;font-weight:600;border-radius:20px;padding:3px 11px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:'Poppins',sans-serif;line-height:1.4;">
+          {{ prog.code }}
+        </button>
+        {% endfor %}
+      </div>
+
+      {# Filter pills: All = all 6 segments stacked; individual = drill-down #}
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px;">
+        <button class="health-pill" data-health="all"             style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:'Poppins',sans-serif;line-height:1.5;">All</button>
+        <button class="health-pill" data-health="active"          style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:'Poppins',sans-serif;line-height:1.5;">Active</button>
+        <button class="health-pill" data-health="at_risk"         style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:'Poppins',sans-serif;line-height:1.5;">At Risk</button>
+        <button class="health-pill" data-health="dormant"         style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:'Poppins',sans-serif;line-height:1.5;">Dormant</button>
+        <button class="health-pill" data-health="not_yet_started" style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:'Poppins',sans-serif;line-height:1.5;">Not Started</button>
+        <button class="health-pill" data-health="graduated"       style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:'Poppins',sans-serif;line-height:1.5;">Prog. Graduated</button>
+        <button class="health-pill" data-health="badges"          style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:'Poppins',sans-serif;line-height:1.5;">Badges</button>
+      </div>
+
+      <div id="no-progression-msg" style="display:none;height:160px;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;">
+        No current-course data for this programme
+      </div>
+      <div style="position:relative;height:400px;">
+        <canvas id="chart-progression-main"></canvas>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+

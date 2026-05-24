@@ -1,0 +1,625 @@
+{% extends "selfpaced/base.html" %}
+{% load sp_filters %}
+
+{% block title %}{{ learner.full_name|default:learner.email }} — LearnSync{% endblock %}
+{% block page_title %}Learner Profile{% endblock %}
+{% block nav_learners %}active{% endblock %}
+
+{% block content %}
+
+<div style="margin-bottom:16px;">
+  <a href="{% url 'sp_learner_list' %}" onclick="spBack('{% url 'sp_learner_list' %}'); return false;" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+</div>
+
+<!-- Header card -->
+<div class="sp-card" style="margin-bottom:20px;">
+  <div class="sp-card-body">
+    <div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;">
+
+      <!-- Avatar -->
+      <div style="width:52px;height:52px;border-radius:50%;background:#e8effe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span style="font-size:18px;font-weight:700;color:#0452F0;">
+          {{ learner.first_name|first|upper }}{{ learner.last_name|first|upper }}
+        </span>
+      </div>
+
+      <!-- Identity -->
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:18px;font-weight:700;color:#111827;line-height:1.2;">{{ learner.full_name|default:"—"|title }}</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:2px;">{{ learner.email }}</div>
+        {% if learner.phone_number %}
+          <div style="font-size:12px;color:#6b7280;margin-top:2px;"><i class="ti ti-phone" style="font-size:11px;color:#9ca3af;margin-right:3px;"></i>{{ learner.phone_number }}</div>
+        {% endif %}
+        {% if learner.country %}
+          <div style="font-size:12px;color:#9ca3af;margin-top:2px;">{{ learner.country }}{% if learner.region %}, {{ learner.region }}{% endif %}</div>
+        {% endif %}
+        {% if learner.gender %}
+          <div style="font-size:12px;color:#9ca3af;margin-top:1px;">{{ learner.gender }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Status badges -->
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+        {% with s=learner.overall_health_status %}
+          {% if s == 'graduated' %}<span class="sp-badge-health sp-health-graduated">Graduated</span>
+          {% elif s == 'dormant' %}<span class="sp-badge-health sp-health-dormant">Dormant</span>
+          {% elif s == 'at_risk' %}<span class="sp-badge-health sp-health-at_risk">At Risk</span>
+          {% elif s == 'active' %}<span class="sp-badge-health sp-health-active">Active</span>
+          {% else %}<span class="sp-badge-health sp-health-not_yet_started">Not Started</span>
+          {% endif %}
+        {% endwith %}
+        {% with p=learner.payment_status %}
+          {% if p == 'compliant' %}<span style="font-size:11px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:2px 8px;">Compliant</span>
+          {% elif p == 'due_soon' %}<span style="font-size:11px;color:#d97706;background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:2px 8px;">Due Soon</span>
+          {% elif p == 'grace_period' %}<span style="font-size:11px;color:#d97706;background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:2px 8px;">Grace Period</span>
+          {% elif p == 'overdue' %}<span style="font-size:11px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:2px 8px;font-weight:600;">Overdue</span>
+          {% elif p == 'unknown' %}<span style="font-size:11px;color:#9ca3af;background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;padding:2px 8px;">Unpaid</span>
+          {% else %}<span style="font-size:11px;color:#9ca3af;">Payment unknown</span>
+          {% endif %}
+        {% endwith %}
+      </div>
+
+    </div>
+
+    <!-- Meta row -->
+    <div style="display:flex;gap:16px;flex-wrap:wrap;border-top:1px solid #f3f4f6;margin-top:14px;padding-top:12px;font-size:12px;color:#6b7280;align-items:center;">
+      {% if learner.has_logged_into_ehub %}
+        <span style="color:#16a34a;"><i class="ti ti-check" style="font-size:11px;"></i> eHub login</span>
+      {% else %}
+        <span style="color:#9ca3af;">No eHub login</span>
+      {% endif %}
+      {% if learner.has_logged_into_lms %}
+        <span style="color:#16a34a;"><i class="ti ti-check" style="font-size:11px;"></i> LMS login</span>
+      {% else %}
+        <span style="color:#9ca3af;">No LMS login</span>
+      {% endif %}
+      {% if learner.has_shown_up_in_course %}
+        <span style="color:#16a34a;"><i class="ti ti-check" style="font-size:11px;"></i> Shown up in course</span>
+      {% endif %}
+      {% if learner.ehub_profile_url %}
+        <a href="{{ learner.ehub_profile_url }}" target="_blank" rel="noopener" style="color:#0452F0;text-decoration:none;">
+          <i class="ti ti-external-link" style="font-size:12px;"></i> eHub
+        </a>
+      {% endif %}
+      {% if learner.lms_profile_url %}
+        <a href="{{ learner.lms_profile_url }}" target="_blank" rel="noopener" style="color:#0452F0;text-decoration:none;">
+          <i class="ti ti-external-link" style="font-size:12px;"></i> LMS
+        </a>
+      {% endif %}
+      {% if learner.other_programme_names %}
+        <span>Also: {{ learner.other_programme_names }}</span>
+      {% elif learner.other_programmes_count %}
+        <span>Also in {{ learner.other_programmes_count }} other programme{{ learner.other_programmes_count|pluralize }}</span>
+      {% endif %}
+      <span style="margin-left:auto;">Updated {{ learner.last_updated_date|date:"d M Y H:i" }}</span>
+    </div>
+
+    <!-- Current Issues — visible immediately, no scrolling required -->
+    {% if learner.overall_health_status == 'at_risk' or learner.overall_health_status == 'dormant' %}
+    <div style="border-top:1px solid #f3f4f6;margin-top:12px;padding-top:12px;display:flex;flex-direction:column;gap:8px;">
+      {% for enrolment in enrolments %}
+      {% if enrolment.active_flags and enrolment.health_status != 'graduated' and enrolment.health_status != 'not_yet_started' %}
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <span style="font-size:11px;font-weight:700;color:#374151;background:#f3f4f6;border-radius:3px;padding:2px 7px;white-space:nowrap;flex-shrink:0;margin-top:1px;">{{ enrolment.programme.code }}</span>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+          {% for flag in enrolment.active_flags %}
+            {% if flag == 'inactive' %}
+              <span style="font-size:12px;color:#b45309;font-weight:500;"><i class="ti ti-clock-pause" style="font-size:12px;"></i> Inactive · {{ enrolment.last_activity|timeago }}</span>
+            {% elif flag == 'never_activated' %}
+              <span style="font-size:12px;color:#b45309;font-weight:500;"><i class="ti ti-user-x" style="font-size:12px;"></i> Never activated · first activity {{ enrolment.first_sign_of_life_date|timeago }}</span>
+            {% elif flag == 'stuck_on_assignment' %}
+              {% with d=enrolment.flag_detail.stuck_on_assignment %}
+              <span style="font-size:12px;color:#b45309;font-weight:500;"><i class="ti ti-flag-2" style="font-size:12px;"></i> Stuck — {% if d %}{{ d.assignment|truncatechars:45 }}{% else %}assignment{% endif %}</span>
+              {% endwith %}
+            {% elif flag == 'low_pass_rate' %}
+              {% with d=enrolment.flag_detail.low_pass_rate %}
+              <span style="font-size:12px;color:#dc2626;font-weight:500;"><i class="ti ti-trending-down" style="font-size:12px;"></i> Low pass rate{% if d %} ({{ d.rate }}%){% endif %}</span>
+              {% endwith %}
+            {% elif flag == 'stalled_between_courses' %}
+              {% with d=enrolment.flag_detail.stalled_between_courses %}
+              <span style="font-size:12px;color:#b45309;font-weight:500;"><i class="ti ti-player-pause" style="font-size:12px;"></i> Stalled — {% if d %}completed {{ d.completed_course|truncatechars:30 }}, {{ d.next_course|truncatechars:25 }} not started{% else %}between courses{% endif %}</span>
+              {% endwith %}
+            {% elif flag == 'stalled_progression' %}
+              <span style="font-size:12px;color:#7e22ce;font-weight:500;"><i class="ti ti-barrier-block" style="font-size:12px;"></i> No onward progress</span>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- Two-column body: enrolments left, interventions right -->
+<div style="display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start;">
+
+<!-- Left: enrolment cards -->
+<div>
+
+{% for enrolment in enrolments %}
+{% with s=enrolment.health_status %}
+<div class="sp-card" style="margin-bottom:16px;">
+  <div class="sp-card-header" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;"
+       onclick="toggleCard(this)"
+       data-collapsed="{% if s == 'graduated' or s == 'not_yet_started' %}1{% else %}0{% endif %}">
+    <span>
+      {{ enrolment.programme.name }}
+      <span style="color:#9ca3af;font-weight:400;font-size:11px;">({{ enrolment.programme.code }})</span>
+    </span>
+    <span style="display:flex;align-items:center;gap:8px;">
+      {% with f=enrolment.active_flags|first %}
+      {% if f and s == 'at_risk' or s == 'dormant' %}
+        <span style="font-size:11px;color:#b45309;font-weight:500;white-space:nowrap;">
+          {% if f == 'inactive' %}{{ enrolment.last_activity|timeago }}
+          {% elif f == 'never_activated' %}Never activated
+          {% elif f == 'stuck_on_assignment' %}Stuck on assignment
+          {% elif f == 'low_pass_rate' %}{% with d=enrolment.flag_detail.low_pass_rate %}{% if d %}{{ d.rate }}% pass rate{% else %}Low pass rate{% endif %}{% endwith %}
+          {% elif f == 'stalled_between_courses' %}Stalled
+          {% elif f == 'stalled_progression' %}No onward progress
+          {% endif %}
+          {% if enrolment.active_flags|length > 1 %}<span style="color:#9ca3af;font-weight:400;"> +{{ enrolment.active_flags|length|add:"-1" }}</span>{% endif %}
+        </span>
+      {% endif %}
+      {% endwith %}
+      {% if s == 'graduated' %}<span class="sp-badge-health sp-health-graduated">Graduated</span>
+      {% elif s == 'dormant' %}<span class="sp-badge-health sp-health-dormant">Dormant</span>
+      {% elif s == 'at_risk' %}<span class="sp-badge-health sp-health-at_risk">At Risk</span>
+      {% elif s == 'active' %}<span class="sp-badge-health sp-health-active">Active</span>
+      {% else %}<span class="sp-badge-health sp-health-not_yet_started">Not Started</span>
+      {% endif %}
+      <i class="ti {% if s == 'graduated' or s == 'not_yet_started' %}ti-chevron-right{% else %}ti-chevron-down{% endif %} card-chevron" style="font-size:13px;color:#9ca3af;"></i>
+    </span>
+  </div>
+  <div class="sp-card-body" {% if s == 'graduated' or s == 'not_yet_started' %}style="display:none;"{% endif %}>
+
+    <!-- Active flags — structured alert rows -->
+    {% if enrolment.active_flags %}
+    <div style="margin-bottom:16px;display:flex;flex-direction:column;gap:6px;">
+      {% for flag in enrolment.active_flags %}
+
+        {% if flag == 'inactive' %}
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:6px;background:#fffbeb;border:1px solid #fde68a;">
+          <i class="ti ti-clock-pause" style="font-size:16px;color:#d97706;flex-shrink:0;margin-top:1px;"></i>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#92400e;">Inactive</div>
+            <div style="font-size:11px;color:#b45309;margin-top:2px;">
+              Last activity {{ enrolment.last_activity|timeago }}{% if enrolment.last_activity %} &mdash; {{ enrolment.last_activity|date:"d M Y" }}{% endif %}
+            </div>
+          </div>
+        </div>
+
+        {% elif flag == 'never_activated' %}
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:6px;background:#fffbeb;border:1px solid #fde68a;">
+          <i class="ti ti-user-x" style="font-size:16px;color:#d97706;flex-shrink:0;margin-top:1px;"></i>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#92400e;">Never activated</div>
+            <div style="font-size:11px;color:#b45309;margin-top:2px;">
+              First activity {{ enrolment.first_sign_of_life_date|timeago }} &mdash; no assignments accessed yet
+            </div>
+          </div>
+        </div>
+
+        {% elif flag == 'stuck_on_assignment' %}
+        {% with d=enrolment.flag_detail.stuck_on_assignment %}
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:6px;background:#fffbeb;border:1px solid #fde68a;">
+          <i class="ti ti-flag-2" style="font-size:16px;color:#d97706;flex-shrink:0;margin-top:1px;"></i>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#92400e;">Stuck on assignment</div>
+            {% if d %}
+            <div style="font-size:11px;color:#b45309;margin-top:2px;">
+              {{ d.assignment }}{% if d.days %} &mdash; accessed {{ d.days }} day{{ d.days|pluralize }} ago, not yet submitted{% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endwith %}
+
+        {% elif flag == 'low_pass_rate' %}
+        {% with d=enrolment.flag_detail.low_pass_rate %}
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:6px;background:#fef2f2;border:1px solid #fecaca;">
+          <i class="ti ti-trending-down" style="font-size:16px;color:#dc2626;flex-shrink:0;margin-top:1px;"></i>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#991b1b;">Low pass rate</div>
+            {% if d %}
+            <div style="font-size:11px;color:#b91c1c;margin-top:2px;">
+              {{ d.passed }} of {{ d.submitted }} submitted assignments passed &mdash; {{ d.rate }}%
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endwith %}
+
+        {% elif flag == 'stalled_between_courses' %}
+        {% with d=enrolment.flag_detail.stalled_between_courses %}
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:6px;background:#fffbeb;border:1px solid #fde68a;">
+          <i class="ti ti-player-pause" style="font-size:16px;color:#d97706;flex-shrink:0;margin-top:1px;"></i>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#92400e;">Stalled — not started next course</div>
+            {% if d %}
+            <div style="font-size:11px;color:#b45309;margin-top:2px;">
+              Completed <strong>{{ d.completed_course }}</strong> &mdash; <strong>{{ d.next_course }}</strong> not started ({{ d.days }} days)
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endwith %}
+
+        {% elif flag == 'stalled_progression' %}
+        {% with d=enrolment.flag_detail.stalled_progression %}
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:6px;background:#faf5ff;border:1px solid #e9d5ff;">
+          <i class="ti ti-barrier-block" style="font-size:16px;color:#9333ea;flex-shrink:0;margin-top:1px;"></i>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#6b21a8;">No onward progress</div>
+            {% if d %}
+            <div style="font-size:11px;color:#7e22ce;margin-top:2px;">
+              Completed <strong>{{ d.completed_course }}</strong> &mdash; no activity in next programme ({{ d.days_since_completion }} days)
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endwith %}
+
+        {% else %}
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:6px;background:#f3f4f6;border:1px solid #e5e7eb;">
+          <i class="ti ti-alert-circle" style="font-size:16px;color:#6b7280;flex-shrink:0;margin-top:1px;"></i>
+          <div style="font-size:13px;font-weight:600;color:#374151;">{{ flag }}</div>
+        </div>
+        {% endif %}
+
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Activity summary — only show columns with real data -->
+    {% with esd=enrolment.effective_start_date %}
+    <div style="display:flex;flex-wrap:wrap;gap:20px;margin-bottom:14px;">
+      {% if esd %}
+      <div>
+        <div style="font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">
+          Enrolled{% if not enrolment.enrolment_date %}<span title="Inferred — no enrolment date on record" style="font-size:9px;font-weight:400;color:#d1d5db;cursor:help;"> *</span>{% endif %}
+        </div>
+        <div style="font-size:13px;font-weight:600;color:#111827;margin-top:2px;">{{ esd|date:"d M Y" }}</div>
+      </div>
+      {% endif %}
+      {% if enrolment.current_course and s != 'graduated' %}
+      <div>
+        <div style="font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Current Course</div>
+        <div style="font-size:13px;font-weight:600;color:#111827;margin-top:2px;">{{ enrolment.current_course.full_name }}</div>
+      </div>
+      {% endif %}
+      {% if enrolment.first_sign_of_life_date %}
+      <div>
+        <div style="font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">First Activity</div>
+        <div style="font-size:13px;font-weight:600;color:#111827;margin-top:2px;">{{ enrolment.first_sign_of_life_date|date:"d M Y" }}</div>
+      </div>
+      {% endif %}
+      {% if enrolment.last_activity and s != 'graduated' %}
+      <div>
+        <div style="font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Last Activity</div>
+        <div style="font-size:13px;font-weight:600;color:#111827;margin-top:2px;">
+          {{ enrolment.last_activity|timeago }}
+          <span style="font-size:11px;font-weight:400;color:#9ca3af;margin-left:4px;">{{ enrolment.last_activity|date:"d M Y" }}</span>
+        </div>
+      </div>
+      {% endif %}
+      {% if s == 'graduated' and enrolment.graduation_date %}
+      <div>
+        <div style="font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Graduated</div>
+        <div style="font-size:13px;font-weight:600;color:#16a34a;margin-top:2px;">{{ enrolment.graduation_date|date:"d M Y" }}</div>
+      </div>
+      {% endif %}
+    </div>
+    {% endwith %}
+
+    <!-- Graduation: badges (course completions) + certificate (programme) -->
+    {% if enrolment.programme.awards_credentials or enrolment.programme.awards_certificate %}
+    {% with ces=enrolment.course_enrolments.all %}
+    {% with badges=ces|completed_courses %}
+    <div style="display:grid;grid-template-columns:{% if enrolment.programme.awards_credentials and enrolment.programme.awards_certificate %}1fr 1fr{% else %}1fr{% endif %};gap:12px;padding:12px 0;margin-bottom:14px;border-top:1px solid #f3f4f6;border-bottom:1px solid #f3f4f6;">
+      {% if enrolment.programme.awards_credentials %}
+      <div>
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">
+          <i class="ti ti-rosette" style="font-size:11px;"></i> Badges — Course Completions
+        </div>
+        <div style="display:flex;align-items:baseline;gap:6px;">
+          <span style="font-size:24px;font-weight:700;color:{% if badges > 0 %}#16a34a{% else %}#9ca3af{% endif %};">{{ badges }}</span>
+          <span style="font-size:12px;color:#6b7280;">of {{ ces|length }} course{{ ces|length|pluralize }}</span>
+        </div>
+        {% if badges == 0 %}
+          <div style="font-size:11px;color:#9ca3af;margin-top:2px;">No courses completed yet</div>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% if enrolment.programme.awards_certificate %}
+      <div>
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">
+          <i class="ti ti-certificate" style="font-size:11px;"></i> Certificate — Programme Graduation
+        </div>
+        {% if enrolment.is_graduated %}
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:20px;color:#16a34a;font-weight:700;">✓</span>
+            <span style="font-size:13px;color:#16a34a;font-weight:600;">Graduated</span>
+          </div>
+          {% if enrolment.graduation_date %}
+            <div style="font-size:11px;color:#9ca3af;margin-top:2px;">{{ enrolment.graduation_date|date:"d M Y" }}</div>
+          {% endif %}
+          {% if enrolment.is_graduated_on_savanna %}
+            <div style="font-size:11px;color:#6b7280;margin-top:2px;"><i class="ti ti-check" style="font-size:10px;"></i> Savanna record</div>
+          {% endif %}
+        {% else %}
+          <div style="font-size:13px;color:#9ca3af;font-weight:600;margin-top:3px;">Not yet graduated</div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endwith %}
+    {% endwith %}
+    {% endif %}
+
+    <!-- Course progress list -->
+    {% if enrolment.course_enrolments.all %}
+    <div>
+      <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Course Progress</div>
+      {% for ce in enrolment.course_enrolments.all %}
+      {% with aps=ce.assignment_progress.all %}
+      <div style="padding:10px 0;{% if not forloop.last %}border-bottom:1px solid #f9fafb;{% endif %}">
+
+        <!-- Two-column layout: course info left, assignments right -->
+        <div style="display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:start;">
+
+          <!-- Left: course name + counts + status row -->
+          <div style="min-width:0;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                <span style="font-size:11px;color:#9ca3af;font-weight:500;flex-shrink:0;width:18px;">{{ ce.course.sequence_number }}.</span>
+                <span style="font-size:13px;color:#111827;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ ce.course.full_name }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                {% if ce.pass_percentage is not None %}
+                  <span style="font-size:12px;font-weight:600;color:#374151;">{{ ce.pass_percentage|floatformat:0 }}%</span>
+                {% endif %}
+                {% if ce.last_activity_date %}
+                  <span style="font-size:11px;color:#9ca3af;white-space:nowrap;">{{ ce.last_activity_date|timeago }}</span>
+                {% endif %}
+                {% if ce.status == 'completed' %}
+                  <span style="font-size:11px;font-weight:600;color:#16a34a;white-space:nowrap;">
+                    <i class="ti ti-circle-check" style="font-size:12px;"></i> Completed
+                    {% if ce.completion_date %}<span style="font-weight:400;color:#9ca3af;"> {{ ce.completion_date|date:"d M Y" }}</span>{% endif %}
+                  </span>
+                {% elif ce.status == 'in_progress' %}
+                  <span style="font-size:11px;font-weight:600;color:#d97706;white-space:nowrap;">In Progress</span>
+                {% elif ce.status == 'withdrawn' %}
+                  <span style="font-size:11px;font-weight:600;color:#dc2626;white-space:nowrap;">Withdrawn</span>
+                {% else %}
+                  <span style="font-size:11px;color:#9ca3af;white-space:nowrap;">Not Started</span>
+                {% endif %}
+              </div>
+            </div>
+            {% with sub=aps|ap_submitted tot=aps|length passed=aps|ap_passed %}
+            {% if tot > 0 and sub > 0 %}
+            <div style="font-size:11px;color:#9ca3af;margin-top:3px;padding-left:24px;">
+              {{ sub }}/{{ tot }} submitted · {{ passed }}/{{ sub }} passed
+            </div>
+            {% endif %}
+            {% endwith %}
+          </div>
+
+          <!-- Right: assignment list -->
+          {% if aps %}
+          <div style="border-left:1px solid #f3f4f6;padding-left:12px;">
+            {% for ap in aps %}
+            <div style="display:flex;align-items:baseline;gap:6px;{% if not forloop.first %}margin-top:4px;border-top:1px solid #f9fafb;padding-top:4px;{% endif %}">
+              <span style="font-size:10px;color:#d1d5db;flex-shrink:0;width:14px;">{{ ap.assignment.sequence_in_course }}.</span>
+              <span style="font-size:11px;color:#374151;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ ap.assignment.name }}">{{ ap.assignment.name }}</span>
+              <span style="flex-shrink:0;">
+                {% if ap.is_passed %}
+                  <span style="font-size:10px;font-weight:600;color:#16a34a;">✓{% if ap.passed_on_first_attempt %}<span style="font-weight:400;color:#9ca3af;"> 1st</span>{% endif %}</span>
+                {% elif ap.is_submitted %}
+                  <span style="font-size:10px;font-weight:600;color:#dc2626;">✗</span>
+                {% elif ap.is_accessed %}
+                  <span style="font-size:10px;color:#d97706;">Viewed</span>
+                {% else %}
+                  <span style="font-size:10px;color:#e5e7eb;">—</span>
+                {% endif %}
+              </span>
+              {% if ap.submitted_date %}
+              <span style="font-size:10px;color:#9ca3af;white-space:nowrap;flex-shrink:0;">{{ ap.submitted_date|date:"d M" }}</span>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div></div>
+          {% endif %}
+
+        </div>
+      </div>
+      {% endwith %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Snapshot history — hidden for prerequisite programmes (WALX etc.) -->
+    {% if enrolment.recent_snapshots and not enrolment.programme.is_prerequisite %}
+    <div style="border-top:1px solid #f3f4f6;padding-top:12px;margin-top:14px;">
+      <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Snapshot History</div>
+      <table style="width:100%;font-size:12px;border-collapse:collapse;">
+        <thead>
+          <tr style="color:#9ca3af;">
+            <th style="font-weight:600;text-align:left;padding:3px 0;">Date</th>
+            <th style="font-weight:600;text-align:right;padding:3px 8px;">Submitted</th>
+            <th style="font-weight:600;text-align:right;padding:3px 8px;">Passed</th>
+            <th style="font-weight:600;text-align:right;padding:3px 8px;">Pass Rate</th>
+            <th style="font-weight:600;text-align:right;padding:3px 8px;">Courses Done</th>
+            <th style="font-weight:600;text-align:right;padding:3px 0;">Health</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for snap in enrolment.recent_snapshots|slice:":6" %}
+          <tr style="border-top:1px solid #f9fafb;">
+            <td style="padding:4px 0;color:#6b7280;">{{ snap.snapshot_date|date:"d M Y" }}</td>
+            <td style="padding:4px 8px;text-align:right;color:#374151;">{{ snap.assignments_submitted }}</td>
+            <td style="padding:4px 8px;text-align:right;color:#374151;">{{ snap.assignments_passed }}</td>
+            <td style="padding:4px 8px;text-align:right;color:#374151;">
+              {% if snap.pass_rate is not None %}{{ snap.pass_rate|floatformat:0 }}%{% else %}—{% endif %}
+            </td>
+            <td style="padding:4px 8px;text-align:right;color:#374151;">{{ snap.courses_completed }}</td>
+            <td style="padding:4px 0;text-align:right;">
+              {% with s=snap.health_status %}
+                {% if s == 'graduated' %}<span class="sp-badge-health sp-health-graduated" style="font-size:10px;">Graduated</span>
+                {% elif s == 'dormant' %}<span class="sp-badge-health sp-health-dormant" style="font-size:10px;">Dormant</span>
+                {% elif s == 'at_risk' %}<span class="sp-badge-health sp-health-at_risk" style="font-size:10px;">At Risk</span>
+                {% elif s == 'active' %}<span class="sp-badge-health sp-health-active" style="font-size:10px;">Active</span>
+                {% else %}<span class="sp-badge-health sp-health-not_yet_started" style="font-size:10px;">Not Started</span>
+                {% endif %}
+              {% endwith %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endwith %}
+{% empty %}
+<div class="sp-card" style="margin-bottom:16px;">
+  <div class="sp-card-body">
+    <p style="color:#9ca3af;font-size:13px;margin:0;">No enrolments found for this learner.</p>
+  </div>
+</div>
+{% endfor %}
+
+</div><!-- /left column -->
+
+<!-- Right column: pod assignments + interventions sidebar -->
+<div style="position:sticky;top:16px;display:flex;flex-direction:column;gap:16px;">
+
+{% if pod_rows %}
+<div class="sp-card">
+  <div class="sp-card-header" style="display:flex;align-items:center;gap:6px;">
+    <i class="ti ti-layout-grid" style="font-size:14px;color:#6b7280;"></i>
+    Pod Assignments
+  </div>
+  <div>
+    {% for row in pod_rows %}
+    <div style="padding:10px 14px;{% if not forloop.last %}border-bottom:1px solid #f3f4f6;{% endif %}">
+      <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:4px;">{{ row.enrolment.programme.code }}</div>
+      {% if row.current %}
+        <div style="font-size:12px;color:#111827;font-weight:500;margin-bottom:4px;">
+          <i class="ti ti-circle-check" style="color:#16a34a;font-size:12px;"></i>
+          {{ row.current.pod.name }}
+        </div>
+        <div style="font-size:11px;color:#9ca3af;margin-bottom:6px;">
+          Target: {{ row.current.pod.target_month|date:"M Y" }}
+        </div>
+      {% else %}
+        <div style="font-size:12px;color:#9ca3af;margin-bottom:6px;">No pod assigned</div>
+      {% endif %}
+      {% if row.available_pods %}
+      <form method="post" action="{% url 'sp_learner_assign_pod' learner.email %}" style="display:flex;gap:6px;align-items:center;">
+        {% csrf_token %}
+        <input type="hidden" name="programme_pk" value="{{ row.enrolment.programme_id }}">
+        <select name="pod_pk"
+                style="flex:1;font-size:11px;padding:4px 6px;border:1px solid #e5e7eb;border-radius:5px;font-family:inherit;background:#fff;min-width:0;">
+          <option value="">— select pod —</option>
+          {% for pod in row.available_pods %}
+          <option value="{{ pod.pk }}" {% if row.current and row.current.pod_id == pod.pk %}selected{% endif %}>
+            {{ pod.name }} ({{ pod.target_month|date:"M Y" }})
+          </option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="sp-btn sp-btn-primary"
+                style="font-size:11px;height:28px;padding:0 10px;white-space:nowrap;">
+          {% if row.current %}Switch{% else %}Assign{% endif %}
+        </button>
+      </form>
+      {% else %}
+        <span style="font-size:11px;color:#d1d5db;">No active pods for this programme</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+  <div class="sp-card">
+    <div class="sp-card-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Interventions</span>
+      {% if interventions %}
+        <span style="font-size:11px;background:#f3f4f6;color:#6b7280;border-radius:10px;padding:1px 8px;font-weight:600;">{{ interventions|length }}</span>
+      {% endif %}
+    </div>
+    {% if interventions %}
+    <div style="display:flex;flex-direction:column;max-height:600px;overflow-y:auto;">
+      {% for iv in interventions %}
+      <div style="padding:10px 14px;{% if not forloop.last %}border-bottom:1px solid #f3f4f6;{% endif %}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:2px;">
+          <span style="font-size:12px;font-weight:600;color:#374151;text-transform:capitalize;">{{ iv.type|cut:'_' }}</span>
+          <span style="font-size:11px;color:#9ca3af;white-space:nowrap;flex-shrink:0;">{{ iv.intervention_date|date:"d M Y" }}</span>
+        </div>
+        {% if iv.enrolment %}
+          <span style="font-size:10px;background:#f3f4f6;border-radius:3px;padding:1px 5px;color:#374151;">{{ iv.enrolment.programme.code }}</span>
+        {% endif %}
+        {% if iv.reason %}
+          <div style="font-size:11px;color:#6b7280;margin-top:3px;">{{ iv.reason|truncatechars:80 }}</div>
+        {% endif %}
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;">
+          {% if iv.outcome == 're_engaged' %}<span style="font-size:10px;color:#16a34a;font-weight:600;">Re-engaged</span>
+          {% elif iv.outcome == 'no_response' %}<span style="font-size:10px;color:#9ca3af;">No response</span>
+          {% elif iv.outcome == 'promised_action' %}<span style="font-size:10px;color:#d97706;font-weight:600;">Promised action</span>
+          {% elif iv.outcome == 'withdrew' %}<span style="font-size:10px;color:#dc2626;font-weight:600;">Withdrew</span>
+          {% elif iv.outcome and iv.outcome != 'not_applicable' %}<span style="font-size:10px;color:#6b7280;">{{ iv.get_outcome_display }}</span>
+          {% endif %}
+          {% if iv.follow_up_required %}
+            <span style="font-size:10px;color:#d97706;"><i class="ti ti-clock" style="font-size:10px;"></i> {{ iv.follow_up_date|date:"d M"|default:"Follow-up" }}</span>
+          {% endif %}
+          <span style="font-size:10px;color:#d1d5db;margin-left:auto;">{{ iv.logged_by.get_full_name|default:iv.logged_by.username }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="padding:20px 14px;color:#9ca3af;font-size:12px;text-align:center;">
+      <i class="ti ti-message-off" style="font-size:20px;display:block;margin-bottom:4px;"></i>
+      No interventions yet
+    </div>
+    {% endif %}
+
+    <!-- Log intervention link -->
+    <div style="padding:10px 14px;border-top:1px solid #f3f4f6;">
+      <a href="{% url 'sp_intervention_list' %}?q={{ learner.email }}"
+         style="font-size:12px;color:#0452F0;text-decoration:none;font-weight:500;">
+        <i class="ti ti-plus" style="font-size:12px;"></i> Log intervention
+      </a>
+    </div>
+  </div>
+</div><!-- /right column -->
+
+</div><!-- /two-column grid -->
+
+<script>
+window.toggleCard = function(header) {
+  var body = header.nextElementSibling;
+  var chevron = header.querySelector('.card-chevron');
+  var isCollapsed = header.dataset.collapsed === '1';
+  if (isCollapsed) {
+    body.style.display = '';
+    chevron.classList.remove('ti-chevron-right');
+    chevron.classList.add('ti-chevron-down');
+    header.dataset.collapsed = '0';
+  } else {
+    body.style.display = 'none';
+    chevron.classList.remove('ti-chevron-down');
+    chevron.classList.add('ti-chevron-right');
+    header.dataset.collapsed = '1';
+  }
+};
+</script>
+
+{% endblock %}

@@ -1,0 +1,348 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}LearnSync{% endblock %}</title>
+
+  <!-- Poppins -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tabler Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+
+  <!-- Argon Tailwind base -->
+  <link href="{% static 'selfpaced/css/argon-dashboard-tailwind.min.css' %}" rel="stylesheet">
+  <link href="{% static 'selfpaced/css/nucleo-icons.css' %}" rel="stylesheet">
+
+  <!-- LCE brand overrides -->
+  <link href="{% static 'selfpaced/sp.css' %}" rel="stylesheet">
+
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body class="m-0 antialiased leading-default bg-gray-50 text-slate-700">
+
+<div class="sp-shell">
+
+  <!-- =========================================================
+       SIDEBAR
+  ========================================================= -->
+  <aside id="sp-sidebar" class="fixed inset-y-0 left-0 flex flex-col z-50" style="width:220px;">
+
+    <!-- Brand -->
+    <div style="padding:20px 16px 12px;">
+      <a href="{% url 'sp_home' %}" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+        <!-- ALX logomark: small blue square -->
+        <div style="width:28px;height:28px;background:#0452F0;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <span style="color:#fff;font-weight:800;font-size:12px;font-family:'Poppins',sans-serif;">A</span>
+        </div>
+        <span class="sp-brand-text">LearnSync</span>
+      </a>
+    </div>
+
+    <hr class="sp-divider">
+
+    <!-- Navigation -->
+    <nav style="flex:1;overflow-y:auto;padding:4px 0;">
+
+      <span class="sp-nav-group-label">Daily Work</span>
+
+      <a href="{% url 'sp_home' %}"
+         class="sp-nav-item {% block nav_home %}{% endblock %}">
+        <i class="ti ti-home" style="font-size:16px;"></i>
+        Home
+        {% block home_badge %}{% endblock %}
+      </a>
+
+      <a href="{% url 'sp_learner_list' %}"
+         class="sp-nav-item {% block nav_learners %}{% endblock %}">
+        <i class="ti ti-users" style="font-size:16px;"></i>
+        Learners
+      </a>
+
+      <a href="{% url 'sp_intervention_list' %}"
+         class="sp-nav-item {% block nav_interventions %}{% endblock %}">
+        <i class="ti ti-message-circle" style="font-size:16px;"></i>
+        Interventions
+        {% block interventions_badge %}{% endblock %}
+      </a>
+
+      <hr class="sp-divider" style="margin-top:8px;">
+      <span class="sp-nav-group-label">Programmes</span>
+
+      <a href="{% url 'sp_programme_list' %}"
+         class="sp-nav-item {% block nav_programmes %}{% endblock %}">
+        <i class="ti ti-school" style="font-size:16px;"></i>
+        Programmes
+      </a>
+
+      <a href="{% url 'sp_pod_list' %}"
+         class="sp-nav-item {% block nav_pods %}{% endblock %}">
+        <i class="ti ti-circle-dashed" style="font-size:16px;"></i>
+        Pods
+      </a>
+
+      <hr class="sp-divider" style="margin-top:8px;">
+      <span class="sp-nav-group-label">Insights</span>
+
+      <a href="{% url 'sp_portfolio' %}"
+         class="sp-nav-item {% block nav_portfolio %}{% endblock %}">
+        <i class="ti ti-chart-bar" style="font-size:16px;"></i>
+        Overview
+      </a>
+
+      <a href="{% url 'sp_analytics' %}"
+         class="sp-nav-item {% block nav_analytics %}{% endblock %}">
+        <i class="ti ti-chart-dots" style="font-size:16px;"></i>
+        Analytics
+      </a>
+
+      <a href="{% url 'sp_manager_report' %}"
+         class="sp-nav-item {% block nav_manager_report %}{% endblock %}">
+        <i class="ti ti-file-analytics" style="font-size:16px;"></i>
+        Manager Report
+      </a>
+
+      <hr class="sp-divider" style="margin-top:8px;">
+      <span class="sp-nav-group-label">System</span>
+
+      <a href="{% url 'sp_admin_home' %}"
+         class="sp-nav-item {% block nav_admin %}{% endblock %}">
+        <i class="ti ti-settings" style="font-size:16px;"></i>
+        Admin
+      </a>
+
+      <a href="{% url 'sp_pattern_registry' %}"
+         class="sp-nav-item {% block nav_pattern_registry %}{% endblock %}">
+        <i class="ti ti-list-search" style="font-size:16px;"></i>
+        Pattern Registry
+      </a>
+
+      <a href="{% url 'sp_help' %}"
+         class="sp-nav-item {% block nav_help %}{% endblock %}">
+        <i class="ti ti-help-circle" style="font-size:16px;"></i>
+        Help
+      </a>
+
+    </nav>
+
+    <!-- User area -->
+    <div class="sp-user-area">
+      <div class="sp-avatar">
+        {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div class="sp-user-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          {{ request.user.get_full_name|default:request.user.username }}
+        </div>
+        <div class="sp-user-role">{{ request.user.email }}</div>
+      </div>
+      <a href="{% url 'logout' %}" title="Sign out"
+         style="color:rgba(255,255,255,0.4);font-size:15px;text-decoration:none;flex-shrink:0;">
+        <i class="ti ti-logout"></i>
+      </a>
+    </div>
+
+  </aside>
+
+  <!-- =========================================================
+       MAIN AREA (right of sidebar)
+  ========================================================= -->
+  <div class="sp-main" style="margin-left:220px;">
+
+    <!-- Top bar -->
+    <div id="sp-topbar">
+      <span class="sp-page-title">{% block page_title %}{% endblock %}</span>
+
+      <!-- Global search -->
+      <div class="sp-search">
+        <i class="ti ti-search" style="font-size:14px;color:#9ca3af;"></i>
+        <input type="text" placeholder="Search learners…"
+               id="sp-global-search" autocomplete="off">
+      </div>
+
+      <!-- Upload CSV -->
+      <button class="sp-btn-upload" onclick="spOpenUpload()">
+        <i class="ti ti-upload" style="font-size:14px;"></i>
+        Upload CSV
+      </button>
+
+      <!-- Notification bell -->
+      <a href="#" class="sp-icon-btn" title="Notifications">
+        <i class="ti ti-bell" style="font-size:18px;"></i>
+        {% block bell_dot %}{% endblock %}
+      </a>
+    </div>
+
+    <!-- Data freshness indicator -->
+    <div id="sp-freshness" {% block freshness_stale %}{% endblock %}>
+      <i class="ti ti-clock" style="font-size:12px;"></i>
+      {% block freshness_text %}
+        <span>No uploads yet</span>
+      {% endblock %}
+    </div>
+
+    <!-- Django messages -->
+    {% if messages %}
+    <div class="sp-messages">
+      {% for message in messages %}
+        <div class="sp-alert sp-alert-{{ message.tags|default:'info' }}">
+          <i class="ti ti-info-circle" style="font-size:15px;flex-shrink:0;margin-top:1px;"></i>
+          <span>{{ message }}</span>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Page content -->
+    <div id="sp-content" style="flex:1;">
+      {% block content %}{% endblock %}
+    </div>
+
+  </div><!-- /sp-main -->
+
+</div><!-- /sp-shell -->
+
+
+<!-- =========================================================
+     UPLOAD CSV MODAL
+========================================================= -->
+<div id="sp-modal-backdrop" style="display:none;" onclick="spCloseUploadOnBackdrop(event)">
+  <div id="sp-modal">
+    <div id="sp-modal-header">
+      <h3>Upload CSV</h3>
+      <button onclick="spCloseUpload()"
+              style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:20px;line-height:1;padding:0;">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>
+
+    <div id="sp-modal-body">
+      <form id="sp-upload-form"
+            method="post"
+            action="{% url 'sp_upload_csv' %}"
+            enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div style="margin-bottom:16px;">
+          <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;">
+            CSV File
+          </label>
+          <input type="file" name="file" accept=".csv"
+                 style="width:100%;font-size:13px;font-family:'Poppins',sans-serif;"
+                 id="sp-file-input">
+          <p style="font-size:11px;color:#9ca3af;margin-top:4px;">
+            Assignment-level CSV exported from the staff portal. CSV format only.
+          </p>
+        </div>
+
+        <!-- Validation errors shown here via JS -->
+        <div id="sp-upload-errors" style="display:none;">
+          <div class="sp-alert sp-alert-error" id="sp-upload-error-text"></div>
+        </div>
+
+        <div id="sp-upload-progress" style="display:none;margin-top:14px;">
+          <div style="font-size:11px;color:#6b7280;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+            <i class="ti ti-loader-2" style="font-size:13px;animation:sp-spin .8s linear infinite;"></i>
+            Uploading and parsing… this may take a moment for large files.
+          </div>
+          <div style="height:4px;background:#f3f4f6;border-radius:9999px;overflow:hidden;">
+            <div style="height:100%;width:100%;background:#0452F0;border-radius:9999px;
+                        animation:sp-progress 1.4s ease-in-out infinite;"></div>
+          </div>
+        </div>
+
+      </form>
+    </div>
+
+    <div id="sp-modal-footer">
+      <button class="sp-btn sp-btn-secondary" onclick="spCloseUpload()">Cancel</button>
+      <button class="sp-btn sp-btn-primary" id="sp-upload-btn" onclick="spSubmitUpload()">
+        <i class="ti ti-upload" style="font-size:13px;"></i>
+        Upload
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- =========================================================
+     SCRIPTS
+========================================================= -->
+<style>
+@keyframes sp-spin     { to { transform: rotate(360deg); } }
+@keyframes sp-progress { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+</style>
+<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+<script>
+  // Wire Django's CSRF cookie into every non-GET HTMX request
+  document.addEventListener('htmx:configRequest', function(e) {
+    if (!['GET', 'HEAD'].includes(e.detail.verb.toUpperCase())) {
+      const match = document.cookie.match(/csrftoken=([^;]+)/);
+      if (match) e.detail.headers['X-CSRFToken'] = match[1];
+    }
+  });
+</script>
+<script src="{% static 'selfpaced/js/plugins/chartjs.min.js' %}"></script>
+<script src="{% static 'selfpaced/js/plugins/perfect-scrollbar.min.js' %}"></script>
+
+<script>
+// Smart back — uses browser history when the previous page is same-origin,
+// otherwise falls back to the supplied default URL.
+function spBack(fallback) {
+  var ref = document.referrer;
+  if (ref && ref.indexOf(window.location.origin) === 0 && ref !== window.location.href) {
+    history.back();
+  } else {
+    window.location.href = fallback || '/';
+  }
+}
+
+// Upload modal
+function spOpenUpload() {
+  document.getElementById('sp-modal-backdrop').style.display = 'flex';
+}
+function spCloseUpload() {
+  document.getElementById('sp-modal-backdrop').style.display = 'none';
+  document.getElementById('sp-upload-errors').style.display = 'none';
+}
+function spCloseUploadOnBackdrop(e) {
+  if (e.target === document.getElementById('sp-modal-backdrop')) spCloseUpload();
+}
+function spSubmitUpload() {
+  const form = document.getElementById('sp-upload-form');
+  const fileInput = document.getElementById('sp-file-input');
+  if (!fileInput.files.length) {
+    spShowUploadError('Please select a CSV file.');
+    return;
+  }
+  // Show uploading state
+  const btn = document.getElementById('sp-upload-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader-2" style="font-size:13px;animation:sp-spin .8s linear infinite;vertical-align:middle;"></i> Uploading…';
+  }
+  document.getElementById('sp-upload-progress').style.display = 'block';
+  form.submit();
+}
+function spShowUploadError(msg) {
+  const el = document.getElementById('sp-upload-errors');
+  document.getElementById('sp-upload-error-text').textContent = msg;
+  el.style.display = 'block';
+}
+
+// Global search — navigate to learner list with query param
+document.getElementById('sp-global-search').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && this.value.trim()) {
+    window.location.href = '{% url "sp_learner_list" %}?q=' + encodeURIComponent(this.value.trim());
+  }
+});
+</script>
+
+{% block extra_js %}{% endblock %}
+
+</body>
+</html>

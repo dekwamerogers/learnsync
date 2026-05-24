@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+staticfiles/
+media/
+
+# Secrets — NEVER commit these
+lce_platform/.env
+
+# Legacy cohort-based apps (not part of the self-paced platform)
+lce_platform/core/
+lce_platform/ingestion/
+lce_platform/dashboard/
+lce_platform/templates/ingestion/
+lce_platform/templates/dashboard/
+lce_platform/templates/base.html
+
+# Data / CSV files
+*.csv
+lce_platform/self-paced/*.csv
+
+# Local project notes
+notes.md
+
+# Claude Code — local-only settings
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test / coverage
+.coverage
+htmlcov/
+.pytest_cache/

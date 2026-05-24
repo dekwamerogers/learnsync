@@ -1,0 +1,235 @@
+{% extends "selfpaced/base.html" %}
+{% load sp_filters %}
+
+{% block title %}Job #{{ job.pk }} — LearnSync{% endblock %}
+{% block page_title %}Ingestion Job #{{ job.pk }}{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+  <a href="{% url 'sp_ingestion_log' %}" onclick="spBack('{% url 'sp_ingestion_log' %}'); return false;" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+  <div style="display:flex;gap:8px;">
+    {% if job.status == 'pending_review' %}
+    <a href="{% url 'sp_job_review' job.pk %}" class="sp-btn sp-btn-primary" style="font-size:12px;">
+      <i class="ti ti-eye" style="font-size:13px;"></i>
+      Review Upload
+    </a>
+    {% elif job.status == 'pending' or job.status == 'failed' %}
+    <form method="post" action="{% url 'sp_job_retry' job.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="sp-btn sp-btn-primary" style="font-size:12px;">
+        <i class="ti ti-refresh" style="font-size:13px;"></i>
+        {% if job.status == 'failed' %}Retry{% else %}Run Now{% endif %}
+      </button>
+    </form>
+    {% endif %}
+
+    {% if job.status == 'complete' %}
+    <form hx-post="{% url 'sp_recompute_health' %}"
+          hx-target="#job-recompute-widget"
+          hx-swap="outerHTML"
+          hx-confirm="Recompute health flags for enrolments in this job?">
+      {% csrf_token %}
+      <input type="hidden" name="job_pk" value="{{ job.pk }}">
+      <button type="submit" class="sp-btn" style="font-size:12px;">
+        <i class="ti ti-heartbeat" style="font-size:13px;"></i>
+        Recompute Health
+      </button>
+    </form>
+    {% endif %}
+
+    {% if job.status != 'processing' and job.status != 'pending_review' %}
+    <button type="button" class="sp-btn" onclick="document.getElementById('delete-modal').style.display='flex'"
+            style="font-size:12px;border:1px solid #fca5a5;background:#fff;color:#dc2626;">
+      <i class="ti ti-trash" style="font-size:13px;"></i>
+      Delete
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Recompute health widget (shown when recompute is triggered from this page) -->
+<div id="job-recompute-widget"></div>
+
+<!-- Job summary card -->
+<div class="sp-card" style="max-width:700px;margin-bottom:20px;">
+  <div class="sp-card-header">Job Summary</div>
+  <div class="sp-card-body">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px;">
+      <div>
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Status</div>
+        <div style="margin-top:4px;">
+          {% if job.status == 'complete' %}
+            <span class="sp-badge-health sp-health-active">complete</span>
+          {% elif job.status == 'failed' %}
+            <span class="sp-badge-health sp-health-dormant">failed</span>
+          {% elif job.status == 'processing' %}
+            <span class="sp-badge-health sp-health-at_risk">processing</span>
+          {% elif job.status == 'pending_review' %}
+            <span class="sp-badge-health" style="background:#ede9fe;color:#7c3aed;">pending review</span>
+          {% elif job.status == 'cancelled' %}
+            <span class="sp-badge-health" style="background:#f3f4f6;color:#6b7280;">cancelled</span>
+          {% else %}
+            <span class="sp-badge-health sp-health-not_yet_started">{{ job.status }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Rows Processed</div>
+        <div style="font-size:20px;font-weight:700;color:#111827;margin-top:4px;">{{ job.rows_processed|default:"—" }}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">New Learners</div>
+        <div style="font-size:20px;font-weight:700;color:#111827;margin-top:4px;">{{ job.new_learners|default:"0" }}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Flagged Rows</div>
+        <div style="font-size:20px;font-weight:700;color:{% if job.flagged_row_count %}#d97706{% else %}#111827{% endif %};margin-top:4px;">
+          {{ job.flagged_row_count|default:"0" }}
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:12px;color:#6b7280;border-top:1px solid #f3f4f6;padding-top:12px;">
+      <strong>File:</strong> {{ job.file_name }} &nbsp;·&nbsp;
+      <strong>Uploaded:</strong> {{ job.uploaded_at|date:"d M Y H:i" }} &nbsp;·&nbsp;
+      <strong>By:</strong> {{ job.uploaded_by.get_full_name|default:"—" }}
+      {% if created_enrolment_count %}
+      &nbsp;·&nbsp;
+      <strong>Enrolments created:</strong> {{ created_enrolment_count }}
+      {% endif %}
+    </div>
+
+    {% if job.errors %}
+    <div class="sp-alert sp-alert-error" style="margin-top:12px;">
+      <div>
+        <strong>Errors:</strong>
+        <ul style="margin:4px 0 0;padding-left:16px;">
+          {% for e in job.errors %}<li>{{ e }}</li>{% endfor %}
+        </ul>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if job.warnings %}
+    <div class="sp-alert sp-alert-warning" style="margin-top:12px;">
+      <div>
+        <strong>Warnings ({{ job.warnings|length }}):</strong>
+        <ul style="margin:4px 0 0;padding-left:16px;">
+          {% for w in job.warnings|slice:":10" %}
+            <li>Row {{ w.row }}: {{ w.reason }}</li>
+          {% endfor %}
+          {% if job.warnings|length > 10 %}
+            <li style="color:#9ca3af;">…and {{ job.warnings|length|add:"-10" }} more</li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Pipeline progress timeline (HTMX-polled fragment) -->
+{% include "selfpaced/admin/_job_progress.html" %}
+
+<style>
+@keyframes sp-pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+</style>
+
+<!-- Flagged rows -->
+{% if flagged_rows %}
+<div class="sp-card" style="max-width:960px;">
+  <div class="sp-card-header" style="display:flex;align-items:center;justify-content:space-between;">
+    <span>Flagged Rows</span>
+    <span style="font-size:11px;font-weight:400;color:#9ca3af;">{{ flagged_rows.count }} total</span>
+  </div>
+  <table class="sp-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Reason</th>
+        <th>Pattern / Detail</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in flagged_rows %}
+      <tr>
+        <td style="color:#9ca3af;white-space:nowrap;">{{ row.pk }}</td>
+        <td>
+          <span class="sp-flag-chip">{{ row.flag_reason }}</span>
+        </td>
+        <td style="font-size:11px;color:#6b7280;max-width:380px;word-break:break-all;">
+          {% if row.flag_reason == 'unrecognised_pattern' %}
+            {% with ehub_val=row.raw_data|get_item:"eHub class name" %}
+            <span style="color:#374151;font-weight:600;">
+              {% if ehub_val %}{{ ehub_val }}
+              {% else %}{{ row.raw_data|truncatechars:80 }}
+              {% endif %}
+            </span>
+            {% endwith %}
+          {% elif row.flag_reason == 'catalogue_conflict' %}
+            <span style="color:#374151;">
+              Seq {{ row.raw_data.sequence_number }}:
+              <em>{{ row.raw_data.existing_name }}</em> →
+              <strong>{{ row.raw_data.course_name }}</strong>
+              {% if row.raw_data.similarity %}
+              <span style="color:#9ca3af;">({{ row.raw_data.similarity }}% match)</span>
+              {% endif %}
+            </span>
+          {% else %}
+            {{ row.raw_data|truncatechars:100 }}
+          {% endif %}
+        </td>
+        <td style="white-space:nowrap;">
+          {% if row.is_resolved %}
+            <span class="sp-badge-health sp-health-active">{{ row.resolution }}</span>
+          {% else %}
+            <span class="sp-badge-health sp-health-not_yet_started">Unresolved</span>
+          {% endif %}
+        </td>
+        <td style="white-space:nowrap;">
+          {% if row.flag_reason == 'unrecognised_pattern' and not row.is_resolved %}
+          <a href="{% url 'sp_map_flagged_row' job.pk row.pk %}"
+             style="font-size:12px;color:#0452F0;text-decoration:none;font-weight:500;">
+            Map pattern →
+          </a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Delete confirmation modal -->
+<div id="delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:10px;padding:28px;max-width:440px;width:90%;box-shadow:0 20px 40px rgba(0,0,0,.15);">
+    <div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:8px;">Delete Job #{{ job.pk }}?</div>
+    <p style="font-size:13px;color:#6b7280;margin:0 0 12px;">
+      This will permanently delete this job record, all its flagged rows, and any
+      enrolment/learner records that were <strong>first created</strong> by this upload
+      ({{ created_enrolment_count }} enrolment{{ created_enrolment_count|pluralize }}).
+    </p>
+    <p style="font-size:12px;color:#b45309;background:#fef3c7;border-radius:6px;padding:8px 12px;margin:0 0 20px;">
+      Updates made to <em>existing</em> learner records by this job cannot be reversed automatically.
+    </p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button type="button" onclick="document.getElementById('delete-modal').style.display='none'"
+              class="sp-btn" style="border:1px solid #e5e7eb;background:#fff;color:#374151;">
+        Cancel
+      </button>
+      <form method="post" action="{% url 'sp_job_delete' job.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="sp-btn"
+                style="background:#dc2626;color:#fff;border:none;">
+          <i class="ti ti-trash" style="font-size:13px;"></i>
+          Delete permanently
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

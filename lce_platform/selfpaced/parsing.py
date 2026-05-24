@@ -1,0 +1,282 @@
+"""
+CSV parsing helpers for the self-paced ingestion pipeline.
+
+The self-paced CSV is assignment-level: one row per learner per assignment.
+Learner-level fields (name, country, payment status, etc.) repeat on every row.
+"""
+
+import csv
+import logging
+import re
+from datetime import date, datetime
+from io import StringIO
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Required columns — validation fails if any of these are absent
+# ---------------------------------------------------------------------------
+
+REQUIRED_COLUMNS = [
+    'Email',
+    'First name',
+    'Last name',
+    'eHub class name',
+    'Course name',
+    'Course sequence number',
+    'Assignment name',
+    'Assignment type',
+    'Is assignment accessed',
+    'Is assignment submitted',
+    'Is assignment passed',
+    'Payment status',
+]
+
+# ---------------------------------------------------------------------------
+# Canonical column name map: internal key → expected CSV header
+# ---------------------------------------------------------------------------
+
+COLUMN_MAP = {
+    # Learner identity
+    'email':                    'Email',
+    'first_name':               'First name',
+    'last_name':                'Last name',
+    'gender':                   'Gender',
+    'country':                  'Country of residence',
+    'region':                   ('Region', 'Regions'),
+    # Platform access — tuple = fallback aliases tried left-to-right
+    'ehub_profile_url':         ('eHub profile URL', 'eHubb profile', 'eHub profile'),
+    'lms_profile_url':          ('LMS profile URL', 'LMS profile'),
+    'has_logged_into_ehub':     'Has logged into eHub',
+    'has_logged_into_lms':      'Has logged into LMS',
+    'has_shown_up_in_course':   'Has shown up in course',
+    # Cross-enrolment
+    'other_programmes_count':   ('Count of other programmes enrolled', 'No. of other programs enrolled'),
+    'other_programme_names':    ('Other programmes enrolled', 'Other programs enrolled'),
+    # Enrolment & activation
+    'is_enrolment_activated':   ('Is enrolment activated', 'Is enrollment activated'),
+    'activation_date':          'Activation date',
+    'days_since_activation':    ('Days since activation', 'Time since activation (days)'),
+    'first_sign_of_life_date':  'First sign of life date',
+    'days_since_first_sign_of_life': ('Days since first sign of life', 'Time since sign of life (days)'),
+    # Course context
+    'course_sequence_number':   'Course sequence number',
+    'course_name':              'Course name',
+    'ehub_class_name':          'eHub class name',
+    'course_status_on_lms':     ('Course status on LMS', 'Course status (LMS)'),
+    'is_course_graduated':      'Is course graduated',
+    'course_graduation_date':   ('Course graduation date', 'Course graduation time'),
+    # Assignment detail
+    'assignment_name':          'Assignment name',
+    'assignment_type':          'Assignment type',
+    'is_assignment_accessed':   'Is assignment accessed',
+    'assignment_accessed_date': 'Assignment accessed date',
+    'is_assignment_submitted':  'Is assignment submitted',
+    'assignment_submitted_date':'Assignment submitted date',
+    'is_assignment_passed':     'Is assignment passed',
+    'passed_on_first_attempt':  ('Passed on first attempt', 'is_passed_on_first_attempt'),
+    # Programme completion
+    'is_programme_graduated':   ('Is programme graduated', 'Is program graduated'),
+    'programme_graduation_date':('Programme graduation date', 'Program graduation date'),
+    'is_graduated_on_savanna':  ('Is graduated on Savanna', 'Is graduated on savannah'),
+    # Health & payment
+    'health_classification':    'Learner health classification',
+    'payment_status':           'Payment status',
+}
+
+NULL_DATE = date(1970, 1, 1)
+
+
+# ---------------------------------------------------------------------------
+# Primitive converters
+# ---------------------------------------------------------------------------
+
+# CSV cells that mean "no data" — treated as empty string for text fields.
+_NULL_STRINGS = frozenset(['n/a', '#n/a', 'na', 'n.a.', 'none', 'null', 'nil', '-', '--'])
+
+
+def _str(val) -> str:
+    if val is None:
+        return ''
+    return str(val).strip()
+
+
+def _text(val) -> str:
+    """Like _str but converts null-ish placeholders to empty string."""
+    s = _str(val)
+    return '' if s.lower() in _NULL_STRINGS else s
+
+
+def _bool(val) -> bool:
+    return _str(val).lower() in ('yes', 'true', '1')
+
+
+def parse_date(val) -> date | None:
+    """Return None for blank values and the 1970-01-01 epoch sentinel."""
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        d = val.date()
+    elif isinstance(val, date):
+        d = val
+    else:
+        raw = _str(val)
+        if not raw:
+            return None
+        for fmt in (
+            '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M',
+            '%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y',
+        ):
+            try:
+                d = datetime.strptime(raw, fmt).date()
+                break
+            except ValueError:
+                continue
+        else:
+            return None
+    return None if d == NULL_DATE else d
+
+
+def _int(val, default=0) -> int:
+    try:
+        return int(float(_str(val)))
+    except (TypeError, ValueError):
+        return default
+
+
+_SEQ_NUM_RE = re.compile(r'(\d+)')
+
+
+def _seq(val) -> int:
+    """Parse a course sequence number, handling formats like '1', 'C#1', '2.0'."""
+    s = _str(val)
+    m = _SEQ_NUM_RE.search(s)
+    return int(m.group(1)) if m else 0
+
+
+def clean_email(raw: str) -> str:
+    return _str(raw).lower()
+
+
+def normalise_payment_status(raw: str) -> str:
+    """Map free-text payment status from CSV to a PaymentStatus choice key."""
+    v = _str(raw).lower()
+    if not v:
+        return 'unknown'
+    if any(k in v for k in ('compliant', 'up to date', 'paid')):
+        return 'compliant'
+    if any(k in v for k in ('due soon', 'upcoming')):
+        return 'due_soon'
+    if 'grace' in v:
+        return 'grace_period'
+    if any(k in v for k in ('overdue', 'late', 'arrears', 'outstanding')):
+        return 'overdue'
+    return 'unknown'
+
+
+def normalise_assignment_type(raw: str) -> str:
+    v = _str(raw).lower()
+    if v == 'milestone':
+        return 'milestone'
+    if v == 'test':
+        return 'test'
+    return 'other'
+
+
+# ---------------------------------------------------------------------------
+# File loading
+# ---------------------------------------------------------------------------
+
+def load_csv(content: bytes) -> tuple[list[str], list[dict]]:
+    """Parse CSV bytes into (headers, list-of-dicts)."""
+    text = content.decode('utf-8-sig')
+    reader = csv.reader(StringIO(text))
+    all_rows = list(reader)
+    if len(all_rows) < 2:
+        return [], []
+    headers = [_str(h) for h in all_rows[0]]
+    data_rows = [dict(zip(headers, row)) for row in all_rows[1:] if any(row)]
+    return headers, data_rows
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+def validate_columns(headers: list[str]) -> list[str]:
+    """Return a list of error strings. Empty list means validation passed."""
+    errors = []
+    for col in REQUIRED_COLUMNS:
+        if col not in headers:
+            errors.append(f'Missing required column: "{col}"')
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# Row accessor
+# ---------------------------------------------------------------------------
+
+def get(row: dict, key: str):
+    """Retrieve a value from a row using the internal key.
+    COLUMN_MAP values may be a string or a tuple of fallback aliases."""
+    col = COLUMN_MAP.get(key, key)
+    if isinstance(col, tuple):
+        for alias in col:
+            if alias in row:
+                return row[alias]
+        return ''
+    return row.get(col, '')
+
+
+def parse_other_programme_names(raw: str) -> list[str]:
+    """Split a comma-separated list of programme names, filtering blanks and nulls."""
+    if not raw:
+        return []
+    return [
+        name.strip()
+        for name in raw.split(',')
+        if name.strip() and name.strip().lower() not in _NULL_STRINGS
+    ]
+
+
+def row_to_dict(row: dict) -> dict:
+    """
+    Convert a raw CSV row dict into a cleaned, typed dict using internal keys.
+    All date fields are None-safe. All bool fields are normalised.
+    """
+    return {
+        'email':                    clean_email(get(row, 'email')),
+        'first_name':               _text(get(row, 'first_name')),
+        'last_name':                _text(get(row, 'last_name')),
+        'gender':                   _text(get(row, 'gender')),
+        'country':                  _text(get(row, 'country')),
+        'region':                   _text(get(row, 'region')),
+        'ehub_profile_url':         _str(get(row, 'ehub_profile_url')),
+        'lms_profile_url':          _str(get(row, 'lms_profile_url')),
+        'has_logged_into_ehub':     _bool(get(row, 'has_logged_into_ehub')),
+        'has_logged_into_lms':      _bool(get(row, 'has_logged_into_lms')),
+        'has_shown_up_in_course':   _bool(get(row, 'has_shown_up_in_course')),
+        'other_programmes_count':   _int(get(row, 'other_programmes_count')),
+        'other_programme_names':    _text(get(row, 'other_programme_names')),
+        'is_enrolment_activated':   _bool(get(row, 'is_enrolment_activated')),
+        'activation_date':          parse_date(get(row, 'activation_date')),
+        'first_sign_of_life_date':  parse_date(get(row, 'first_sign_of_life_date')),
+        'course_sequence_number':   _seq(get(row, 'course_sequence_number')),
+        'course_name':              _text(get(row, 'course_name')),
+        'ehub_class_name':          _str(get(row, 'ehub_class_name')),
+        'course_status_on_lms':     _text(get(row, 'course_status_on_lms')).lower(),
+        'is_course_graduated':      _bool(get(row, 'is_course_graduated')),
+        'course_graduation_date':   parse_date(get(row, 'course_graduation_date')),
+        'assignment_name':          _text(get(row, 'assignment_name')),
+        'assignment_type':          normalise_assignment_type(get(row, 'assignment_type')),
+        'is_assignment_accessed':   _bool(get(row, 'is_assignment_accessed')),
+        'assignment_accessed_date': parse_date(get(row, 'assignment_accessed_date')),
+        'is_assignment_submitted':  _bool(get(row, 'is_assignment_submitted')),
+        'assignment_submitted_date':parse_date(get(row, 'assignment_submitted_date')),
+        'is_assignment_passed':     _bool(get(row, 'is_assignment_passed')),
+        'passed_on_first_attempt':  _bool(get(row, 'passed_on_first_attempt')),
+        'is_programme_graduated':   _bool(get(row, 'is_programme_graduated')),
+        'programme_graduation_date':parse_date(get(row, 'programme_graduation_date')),
+        'is_graduated_on_savanna':  _bool(get(row, 'is_graduated_on_savanna')),
+        'payment_status':           normalise_payment_status(get(row, 'payment_status')),
+    }

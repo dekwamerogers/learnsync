@@ -1,0 +1,58 @@
+{% extends "selfpaced/base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}Upload CSV — LearnSync{% endblock %}
+{% block page_title %}Upload CSV{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:520px;">
+  <div class="sp-card">
+    <div class="sp-card-header">
+      <span>Upload self-paced CSV</span>
+      <a href="{% url 'sp_ingestion_log' %}" style="font-size:12px;color:#6b7280;text-decoration:none;">
+        View ingestion log →
+      </a>
+    </div>
+    <div class="sp-card-body">
+
+      <p style="font-size:13px;color:#6b7280;margin:0 0 16px;">
+        Upload the assignment-level CSV exported from the staff portal.
+        Columns are validated immediately. Processing runs in the background.
+      </p>
+
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div style="margin-bottom:16px;">
+          <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;">
+            CSV File
+          </label>
+          {{ form.file }}
+          {% if form.file.errors %}
+            {% for error in form.file.errors %}
+              <div class="sp-alert sp-alert-error" style="margin-top:8px;">{{ error }}</div>
+            {% endfor %}
+          {% endif %}
+          <p style="font-size:11px;color:#9ca3af;margin-top:4px;">CSV format only.</p>
+        </div>
+
+        {% if form.non_field_errors %}
+          <div class="sp-alert sp-alert-error" style="margin-bottom:12px;">
+            {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+
+        <div style="display:flex;gap:8px;">
+          <button type="submit" class="sp-btn sp-btn-primary">
+            <i class="ti ti-upload" style="font-size:13px;"></i>
+            Upload &amp; Queue
+          </button>
+          <a href="{% url 'sp_admin_home' %}" class="sp-btn sp-btn-secondary">Cancel</a>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

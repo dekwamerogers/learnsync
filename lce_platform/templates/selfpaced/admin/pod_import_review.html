@@ -1,0 +1,131 @@
+{% extends "selfpaced/base.html" %}
+{% block title %}Review Pod Import — LearnSync{% endblock %}
+{% block page_title %}Review Pod Import{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:760px;">
+
+  <div style="margin-bottom:16px;">
+    <a href="{% url 'sp_pod_import_log' %}" onclick="spBack('{% url 'sp_pod_import_log' %}'); return false;" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+  </div>
+
+  <form method="post" action="{% url 'sp_pod_import_review' job.pk %}">
+    {% csrf_token %}
+
+    {# ── Step 1: Column mapping ── #}
+    <div class="sp-card" style="padding:20px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:4px;">Step 1 — Confirm columns</div>
+      <div style="font-size:11px;color:#9ca3af;margin-bottom:16px;">
+        {{ review.row_count }} row{{ review.row_count|pluralize }} detected. We've guessed the column mapping — adjust if needed.
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#374151;margin-bottom:5px;">
+            Email <span style="color:#dc2626;">*</span>
+          </label>
+          <select name="col_email" required style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:6px;font-family:inherit;background:#fff;">
+            <option value="">— select —</option>
+            {% for col in columns %}
+            <option value="{{ col }}" {% if col == job.column_email %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#374151;margin-bottom:5px;">
+            Programme <span style="color:#dc2626;">*</span>
+          </label>
+          <select name="col_programme" required style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:6px;font-family:inherit;background:#fff;">
+            <option value="">— select —</option>
+            {% for col in columns %}
+            <option value="{{ col }}" {% if col == job.column_programme %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#374151;margin-bottom:5px;">
+            Target month (finish date) <span style="color:#dc2626;">*</span>
+          </label>
+          <select name="col_target" required style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:6px;font-family:inherit;background:#fff;">
+            <option value="">— select —</option>
+            {% for col in columns %}
+            <option value="{{ col }}" {% if col == job.column_target_month %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#374151;margin-bottom:5px;">
+            Enrolment month <span style="color:#9ca3af;font-weight:400;">(optional — fills missing enrolment dates)</span>
+          </label>
+          <select name="col_enrol" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:6px;font-family:inherit;background:#fff;">
+            <option value="">— none —</option>
+            {% for col in columns %}
+            <option value="{{ col }}" {% if col == job.column_enrol_month %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+      </div>
+    </div>
+
+    {# ── Step 2: Programme mapping ── #}
+    {% if mapping_rows %}
+    <div class="sp-card" style="padding:20px;margin-bottom:20px;">
+      <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:4px;">Step 2 — Map programme names</div>
+      <div style="font-size:11px;color:#9ca3af;margin-bottom:16px;">
+        Match each programme name from the form to a programme in the system. Previously saved mappings are pre-filled.
+      </div>
+
+      <table class="sp-table">
+        <thead>
+          <tr>
+            <th>Name in form</th>
+            <th>Maps to programme</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in mapping_rows %}
+          <tr>
+            <td style="font-size:12px;font-weight:600;color:#374151;">{{ row.name }}</td>
+            <td>
+              <select name="mapping_{{ row.name }}"
+                      style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #e5e7eb;border-radius:6px;font-family:inherit;background:#fff;">
+                <option value="">— skip these rows —</option>
+                {% for prog in programmes %}
+                <option value="{{ prog.pk }}" {% if prog.pk == row.mapped_pk %}selected{% endif %}>
+                  {{ prog.code }} — {{ prog.name }}
+                </option>
+                {% endfor %}
+              </select>
+            </td>
+            <td>
+              {% if row.mapped_pk %}
+              <span class="sp-badge-health sp-health-active" style="font-size:10px;">Mapped</span>
+              {% else %}
+              <span class="sp-badge-health sp-health-not_yet_started" style="font-size:10px;">Unmapped</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <div style="display:flex;gap:10px;">
+      <button type="submit" class="sp-btn sp-btn-primary">
+        <i class="ti ti-check"></i> Confirm &amp; Process
+      </button>
+      <a href="{% url 'sp_pod_import_log' %}" class="sp-btn">Cancel</a>
+    </div>
+
+  </form>
+
+</div>
+{% endblock %}

@@ -1,0 +1,95 @@
+<div id="pod-import-status"
+     {% if job.status == 'processing' %}
+     hx-get="{% url 'sp_pod_import_status' job.pk %}"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML"
+     {% endif %}>
+
+  <div class="sp-card" style="padding:20px;margin-bottom:16px;">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;color:#111827;">{{ job.file_name }}</div>
+      {% if job.status == 'complete' %}
+        <span class="sp-badge-health sp-health-active">complete</span>
+      {% elif job.status == 'processing' %}
+        <span class="sp-badge-health sp-health-at_risk" style="animation:sp-pulse 1.5s infinite;">processing</span>
+      {% elif job.status == 'failed' %}
+        <span class="sp-badge-health sp-health-dormant">failed</span>
+      {% else %}
+        <span class="sp-badge-health sp-health-not_yet_started">{{ job.status }}</span>
+      {% endif %}
+    </div>
+
+    {% if job.status == 'processing' %}
+    <div style="margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;margin-bottom:6px;">
+        <span style="display:flex;align-items:center;gap:5px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:#d97706;display:inline-block;animation:sp-pulse 1.2s infinite;"></span>
+          Processing…
+        </span>
+        <span>{{ job.rows_processed }}{% if total %} / {{ total }}{% endif %} rows</span>
+      </div>
+      <div style="height:7px;background:#f3f4f6;border-radius:9999px;overflow:hidden;">
+        <div style="height:100%;border-radius:9999px;background:#0452F0;width:{{ pct }}%;transition:width .4s;"></div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px;">
+      <div>
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Processed</div>
+        <div style="font-size:22px;font-weight:700;color:#111827;margin-top:4px;">{{ job.rows_processed }}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Assigned</div>
+        <div style="font-size:22px;font-weight:700;color:#16a34a;margin-top:4px;">{{ job.rows_created }}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Moved</div>
+        <div style="font-size:22px;font-weight:700;color:#0452F0;margin-top:4px;">{{ job.rows_updated }}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Skipped</div>
+        <div style="font-size:22px;font-weight:700;color:#9ca3af;margin-top:4px;">{{ job.rows_skipped }}</div>
+      </div>
+    </div>
+
+    <div style="font-size:12px;color:#6b7280;border-top:1px solid #f3f4f6;padding-top:12px;">
+      <strong>Uploaded:</strong> {{ job.uploaded_at|date:"d M Y H:i" }}
+      &nbsp;·&nbsp;
+      <strong>By:</strong> {{ job.uploaded_by.get_full_name|default:job.uploaded_by.username|default:"—" }}
+    </div>
+    {% if job.column_email %}
+    <div style="font-size:12px;color:#6b7280;margin-top:6px;">
+      <strong>Email:</strong> <em>{{ job.column_email }}</em>
+      &nbsp;·&nbsp; <strong>Programme:</strong> <em>{{ job.column_programme }}</em>
+      &nbsp;·&nbsp; <strong>Target month:</strong> <em>{{ job.column_target_month }}</em>
+      {% if job.column_enrol_month %}&nbsp;·&nbsp; <strong>Enrol month:</strong> <em>{{ job.column_enrol_month }}</em>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if job.errors %}
+    <div class="sp-alert sp-alert-error" style="margin-top:14px;">
+      <strong>Errors ({{ job.errors|length }}):</strong>
+      <ul style="margin:4px 0 0;padding-left:16px;">
+        {% for e in job.errors %}<li style="font-size:12px;">{{ e }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if job.status == 'complete' or job.status == 'failed' %}
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <a href="{% url 'sp_pod_list' %}" class="sp-btn sp-btn-primary" style="font-size:12px;">
+        <i class="ti ti-layout-grid"></i> View Pods
+      </a>
+      <form method="post" action="{% url 'sp_pod_import_rerun' job.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="sp-btn" style="font-size:12px;">
+          <i class="ti ti-refresh"></i> Re-run
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+  </div>
+</div>

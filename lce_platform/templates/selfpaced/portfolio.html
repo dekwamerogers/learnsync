@@ -1,0 +1,176 @@
+{% extends "selfpaced/base.html" %}
+
+{% block title %}Overview — LearnSync{% endblock %}
+{% block page_title %}Portfolio Overview{% endblock %}
+{% block nav_portfolio %}active{% endblock %}
+
+{% block content %}
+<style>
+.pf-kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px; }
+.pf-health-bar { height:5px; border-radius:4px; overflow:hidden; display:flex; background:#f3f4f6; margin-top:6px; }
+@media(max-width:1100px){ .pf-kpi-row{ grid-template-columns:repeat(3,1fr); } }
+@media(max-width:700px){  .pf-kpi-row{ grid-template-columns:repeat(2,1fr); } }
+</style>
+
+<!-- ── Portfolio KPIs ────────────────────────────────────── -->
+<div class="pf-kpi-row">
+
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Unique Learners</div>
+    <div style="font-size:32px;font-weight:700;color:#111827;margin-top:4px;line-height:1;">{{ total_learners }}</div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:6px;">Across all active programmes</div>
+  </div>
+
+  <div class="sp-card" style="padding:16px;">
+    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Enrolments</div>
+    <div style="font-size:32px;font-weight:700;color:#111827;margin-top:4px;line-height:1;">{{ total_enrolments }}</div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:6px;">Learner–programme pairs</div>
+  </div>
+
+  <a href="{% url 'sp_learner_list' %}?health=dormant&health=at_risk" style="text-decoration:none;">
+    <div class="sp-card" style="padding:16px;{% if total_dormant or total_at_risk %}border-color:#fde68a;{% endif %}">
+      <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Need Attention</div>
+      <div style="font-size:32px;font-weight:700;color:{% if total_dormant or total_at_risk %}#d97706{% else %}#9ca3af{% endif %};margin-top:4px;line-height:1;">{{ total_dormant|add:total_at_risk }}</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:6px;">{{ total_dormant }} dormant · {{ total_at_risk }} at risk</div>
+    </div>
+  </a>
+
+  <a href="{% url 'sp_learner_list' %}?health=active" style="text-decoration:none;">
+    <div class="sp-card" style="padding:16px;">
+      <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Active</div>
+      <div style="font-size:32px;font-weight:700;color:#16a34a;margin-top:4px;line-height:1;">{{ total_active }}</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:6px;">Making progress now</div>
+    </div>
+  </a>
+
+  <a href="{% url 'sp_learner_list' %}?graduated=certificate" style="text-decoration:none;">
+    <div class="sp-card" style="padding:16px;">
+      <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Graduated</div>
+      <div style="font-size:32px;font-weight:700;color:#2563eb;margin-top:4px;line-height:1;">{{ total_graduated }}</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:6px;">Programme completions</div>
+    </div>
+  </a>
+
+</div>
+
+<!-- ── Programme breakdown ────────────────────────────────── -->
+<div class="sp-card">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #f3f4f6;">
+    <div>
+      <div style="font-size:13px;font-weight:700;color:#111827;">Programme Health Breakdown</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px;">Sorted by learners needing attention (dormant + at risk). Click any row to view that programme.</div>
+    </div>
+    <a href="{% url 'sp_analytics' %}" style="font-size:12px;color:#0452F0;text-decoration:none;white-space:nowrap;">
+      Deep analysis →
+    </a>
+  </div>
+
+  {% if rows %}
+  <div style="overflow-x:auto;">
+  <table class="sp-table">
+    <thead>
+      <tr>
+        <th>Programme</th>
+        <th style="text-align:right;">Learners</th>
+        <th style="text-align:right;color:#7c3aed;">Dormant</th>
+        <th style="text-align:right;color:#d97706;">At Risk</th>
+        <th style="text-align:right;color:#16a34a;">Active</th>
+        <th style="text-align:right;color:#2563eb;">Graduated</th>
+        <th style="text-align:right;color:#9ca3af;">Not Started</th>
+        <th style="text-align:right;">Activation</th>
+        <th style="text-align:right;">Grad Rate</th>
+        <th style="text-align:right;">Courses</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr onclick="window.location='{% url 'sp_programme_detail' row.programme.pk %}'" style="cursor:pointer;">
+
+        <td>
+          <div style="font-weight:600;color:#111827;font-size:13px;">{{ row.programme.code }}</div>
+          <div style="font-size:11px;color:#9ca3af;margin-top:1px;">{{ row.programme.name }}</div>
+          {% if row.total %}
+          <div class="pf-health-bar" style="width:120px;">
+            {% if row.dormant %}<div style="width:{% widthratio row.dormant row.total 100 %}%;background:#7c3aed;"></div>{% endif %}
+            {% if row.at_risk %}<div style="width:{% widthratio row.at_risk row.total 100 %}%;background:#d97706;"></div>{% endif %}
+            {% if row.active %}<div style="width:{% widthratio row.active row.total 100 %}%;background:#16a34a;"></div>{% endif %}
+            {% if row.graduated %}<div style="width:{% widthratio row.graduated row.total 100 %}%;background:#2563eb;"></div>{% endif %}
+            {% if row.not_started %}<div style="flex:1;background:#e5e7eb;"></div>{% endif %}
+          </div>
+          {% endif %}
+        </td>
+
+        <td style="text-align:right;font-weight:700;color:#111827;">{{ row.learners }}</td>
+
+        <td style="text-align:right;">
+          {% if row.dormant %}
+          <a href="{% url 'sp_learner_list' %}?programme={{ row.programme.pk }}&health=dormant"
+             onclick="event.stopPropagation();"
+             style="font-weight:600;color:#7c3aed;text-decoration:none;">{{ row.dormant }}</a>
+          {% else %}<span style="color:#d1d5db;">—</span>{% endif %}
+        </td>
+
+        <td style="text-align:right;">
+          {% if row.at_risk %}
+          <a href="{% url 'sp_learner_list' %}?programme={{ row.programme.pk }}&health=at_risk"
+             onclick="event.stopPropagation();"
+             style="font-weight:600;color:#d97706;text-decoration:none;">{{ row.at_risk }}</a>
+          {% else %}<span style="color:#d1d5db;">—</span>{% endif %}
+        </td>
+
+        <td style="text-align:right;">
+          {% if row.active %}
+          <a href="{% url 'sp_learner_list' %}?programme={{ row.programme.pk }}&health=active"
+             onclick="event.stopPropagation();"
+             style="font-weight:600;color:#16a34a;text-decoration:none;">{{ row.active }}</a>
+          {% else %}<span style="color:#d1d5db;">—</span>{% endif %}
+        </td>
+
+        <td style="text-align:right;">
+          {% if row.graduated %}
+          <a href="{% url 'sp_learner_list' %}?programme={{ row.programme.pk }}&graduated=certificate"
+             onclick="event.stopPropagation();"
+             style="font-weight:600;color:#2563eb;text-decoration:none;">{{ row.graduated }}</a>
+          {% else %}<span style="color:#d1d5db;">—</span>{% endif %}
+        </td>
+
+        <td style="text-align:right;">
+          {% if row.not_started %}
+          <a href="{% url 'sp_learner_list' %}?programme={{ row.programme.pk }}&health=not_yet_started"
+             onclick="event.stopPropagation();"
+             style="font-weight:600;color:#9ca3af;text-decoration:none;">{{ row.not_started }}</a>
+          {% else %}<span style="color:#d1d5db;">—</span>{% endif %}
+        </td>
+
+        <td style="text-align:right;font-size:12px;font-weight:600;color:#374151;">
+          {% if row.activation_rate is not None %}{{ row.activation_rate }}%{% else %}<span style="color:#d1d5db;">—</span>{% endif %}
+        </td>
+
+        <td style="text-align:right;font-size:12px;font-weight:600;color:#2563eb;">
+          {% if row.grad_rate is not None %}{{ row.grad_rate }}%{% else %}<span style="color:#d1d5db;">—</span>{% endif %}
+        </td>
+
+        <td style="text-align:right;font-size:12px;color:#6b7280;">{{ row.courses }}</td>
+
+        <td>
+          <a href="{% url 'sp_programme_detail' row.programme.pk %}"
+             style="font-size:12px;color:#0452F0;text-decoration:none;white-space:nowrap;">
+            View →
+          </a>
+        </td>
+
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div style="padding:48px;text-align:center;color:#9ca3af;">
+    <i class="ti ti-chart-bar" style="font-size:32px;display:block;margin-bottom:8px;"></i>
+    <div style="font-size:13px;">No programme data yet. Upload a CSV to get started.</div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "selfpaced/base.html" %}
+{% block title %}Enrolment Upload #{{ job.pk }} — LearnSync{% endblock %}
+{% block page_title %}Enrolment Upload #{{ job.pk }}{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;">
+
+  <div style="margin-bottom:16px;">
+    <a href="{% url 'sp_enrolment_log' %}" onclick="spBack('{% url 'sp_enrolment_log' %}'); return false;" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+  </div>
+
+  {% include "selfpaced/admin/_enrolment_status.html" %}
+
+  {% if job.status != 'processing' and columns %}
+  <div class="sp-card" style="padding:20px;margin-bottom:16px;">
+    <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:4px;">Re-process with corrected date column</div>
+    <div style="font-size:11px;color:#9ca3af;margin-bottom:14px;">
+      If the enrolment date column was missing or wrong, select the correct one and re-run.
+      Existing dates already set will be updated if the CSV has a different value.
+    </div>
+    <form method="post" action="{% url 'sp_enrolment_reprocess' job.pk %}">
+      {% csrf_token %}
+      <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:#374151;margin-bottom:5px;">Enrolment Date column</label>
+          <select name="col_date"
+                  style="font-size:12px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-family:'Poppins',sans-serif;background:#fff;min-width:220px;">
+            <option value="">— none —</option>
+            {% for col in columns %}
+            <option value="{{ col }}" {% if col == job.column_date %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit"
+                style="padding:7px 16px;background:#0452F0;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;">
+          Re-run
+        </button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

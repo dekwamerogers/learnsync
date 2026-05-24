@@ -1,0 +1,91 @@
+{% extends "selfpaced/base.html" %}
+
+{% block title %}Ingestion Log — LearnSync{% endblock %}
+{% block page_title %}Ingestion Log{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+{% for job in jobs %}{% if job.status == 'processing' or job.status == 'pending' %}
+<script>setTimeout(function(){ location.reload(); }, 4000);</script>
+{% endif %}{% endfor %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+  <span style="font-size:13px;color:#6b7280;">{{ jobs.count }} upload{{ jobs.count|pluralize }}</span>
+  <a href="{% url 'sp_upload_csv' %}" class="sp-btn sp-btn-primary">
+    <i class="ti ti-upload" style="font-size:13px;"></i>
+    Upload CSV
+  </a>
+</div>
+
+<div class="sp-card">
+  {% if jobs %}
+  <table class="sp-table">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Uploaded</th>
+        <th>By</th>
+        <th>Status</th>
+        <th>Rows</th>
+        <th>New</th>
+        <th>Flagged</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job in jobs %}
+      <tr>
+        <td style="font-weight:500;color:#111827;">{{ job.file_name }}</td>
+        <td style="color:#6b7280;white-space:nowrap;">{{ job.uploaded_at|date:"d M Y H:i" }}</td>
+        <td style="color:#6b7280;">{{ job.uploaded_by.get_full_name|default:job.uploaded_by.username|default:"—" }}</td>
+        <td>
+          {% if job.status == 'complete' %}
+            <span class="sp-badge-health sp-health-active">complete</span>
+          {% elif job.status == 'failed' %}
+            <span class="sp-badge-health sp-health-dormant">failed</span>
+          {% elif job.status == 'processing' %}
+            <span class="sp-badge-health sp-health-at_risk">processing</span>
+          {% elif job.status == 'pending_review' %}
+            <span class="sp-badge-health" style="background:#ede9fe;color:#7c3aed;">pending review</span>
+          {% elif job.status == 'cancelled' %}
+            <span class="sp-badge-health" style="background:#f3f4f6;color:#6b7280;">cancelled</span>
+          {% else %}
+            <span class="sp-badge-health sp-health-not_yet_started">{{ job.status }}</span>
+          {% endif %}
+        </td>
+        <td>{{ job.rows_processed }}</td>
+        <td>{{ job.new_learners }}</td>
+        <td>
+          {% if job.flagged_row_count %}
+            <span style="color:#d97706;font-weight:600;">{{ job.flagged_row_count }}</span>
+          {% else %}
+            <span style="color:#9ca3af;">0</span>
+          {% endif %}
+        </td>
+        <td style="white-space:nowrap;">
+          {% if job.status == 'pending_review' %}
+          <a href="{% url 'sp_job_review' job.pk %}"
+             style="font-size:12px;color:#7c3aed;text-decoration:none;font-weight:600;">
+            Review →
+          </a>
+          {% else %}
+          <a href="{% url 'sp_job_detail' job.pk %}"
+             style="font-size:12px;color:#0452F0;text-decoration:none;font-weight:500;">
+            Details →
+          </a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:40px;text-align:center;color:#9ca3af;">
+    <i class="ti ti-file-off" style="font-size:32px;display:block;margin-bottom:8px;"></i>
+    <div style="font-size:13px;">No uploads yet.</div>
+    <a href="{% url 'sp_upload_csv' %}" class="sp-btn sp-btn-primary" style="margin-top:12px;display:inline-flex;">
+      Upload your first CSV
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "selfpaced/base.html" %}
+{% block title %}Upload Enrolment CSV — LearnSync{% endblock %}
+{% block page_title %}Enrolment CSV Upload{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:560px;">
+
+  <div style="margin-bottom:20px;">
+    <a href="{% url 'sp_enrolment_log' %}" onclick="spBack('{% url 'sp_enrolment_log' %}'); return false;" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+  </div>
+
+  <div class="sp-card" style="padding:24px;">
+    <div style="font-size:15px;font-weight:700;color:#111827;margin-bottom:4px;">Upload Programme Enrolment CSV</div>
+    <div style="font-size:12px;color:#9ca3af;margin-bottom:20px;">
+      Maps learners to programmes with their enrolment date. The next step lets you match
+      programme names to programmes already in the system.
+    </div>
+
+    <form method="post" action="{% url 'sp_upload_enrolment_csv' %}" enctype="multipart/form-data"
+          id="enrolment-upload-form">
+      {% csrf_token %}
+
+      <div style="margin-bottom:20px;">
+        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;">CSV File</label>
+        <input type="file" name="file" accept=".csv" id="enrolment-file-input"
+               style="width:100%;font-size:13px;font-family:'Poppins',sans-serif;">
+        <div style="font-size:11px;color:#9ca3af;margin-top:4px;">
+          Minimum columns needed: learner email, programme name, enrolment date.
+          Column names are detected automatically.
+        </div>
+      </div>
+
+      <div id="enrolment-upload-progress" style="display:none;margin-bottom:14px;">
+        <div style="font-size:11px;color:#6b7280;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+          <i class="ti ti-loader-2" style="font-size:13px;animation:sp-spin .8s linear infinite;"></i>
+          Reading file… please wait.
+        </div>
+        <div style="height:4px;background:#f3f4f6;border-radius:9999px;overflow:hidden;">
+          <div style="height:100%;width:100%;background:#0452F0;border-radius:9999px;
+                      animation:sp-progress 1.4s ease-in-out infinite;"></div>
+        </div>
+      </div>
+
+      <button type="submit" class="sp-btn sp-btn-primary" style="font-size:13px;" id="enrolment-upload-btn">
+        <i class="ti ti-upload" style="font-size:14px;"></i>
+        Upload &amp; Preview
+      </button>
+    </form>
+
+    <script>
+    document.getElementById('enrolment-upload-form').addEventListener('submit', function (e) {
+      var fileInput = document.getElementById('enrolment-file-input');
+      if (!fileInput.files.length) return; // browser validation handles this
+      var btn = document.getElementById('enrolment-upload-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="ti ti-loader-2" style="font-size:14px;animation:sp-spin .8s linear infinite;vertical-align:middle;"></i> Uploading…';
+      document.getElementById('enrolment-upload-progress').style.display = 'block';
+    });
+    </script>
+  </div>
+
+</div>
+{% endblock %}

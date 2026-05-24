@@ -1,0 +1,216 @@
+{% extends "selfpaced/base.html" %}
+{% load sp_filters %}
+
+{% block title %}Edit {{ programme.code }} — LearnSync{% endblock %}
+{% block page_title %}Edit Programme{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+
+<div style="margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+  <a href="{% url 'sp_admin_programme_list' %}" onclick="spBack('{% url 'sp_admin_programme_list' %}'); return false;" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+</div>
+
+<form method="post" style="max-width:640px;">
+{% csrf_token %}
+
+<!-- Identity card -->
+<div class="sp-card" style="margin-bottom:16px;">
+  <div class="sp-card-header">Programme Identity</div>
+  <div class="sp-card-body">
+
+    <div style="display:grid;grid-template-columns:120px 120px 1fr;gap:16px;align-items:start;">
+
+      <!-- Code (read-only) -->
+      <div>
+        <label style="display:block;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Code</label>
+        <div style="font-size:20px;font-weight:700;color:#111827;background:#f3f4f6;border-radius:6px;padding:8px 12px;letter-spacing:.04em;">
+          {{ programme.code }}
+        </div>
+        <div style="font-size:10px;color:#9ca3af;margin-top:4px;">Set by CSV — read only</div>
+      </div>
+
+      <!-- eHub Code -->
+      <div>
+        <label for="id_ehub_code" style="display:block;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">eHub Code</label>
+        <input type="text" id="id_ehub_code" name="ehub_code"
+               value="{{ post.ehub_code|default:programme.ehub_code|default:'' }}"
+               placeholder="e.g. CC"
+               style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;text-transform:uppercase;">
+        <div style="font-size:10px;color:#9ca3af;margin-top:4px;">Alt code in eHub class names</div>
+      </div>
+
+      <!-- Name -->
+      <div>
+        <label for="id_name" style="display:block;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Name</label>
+        <input type="text" id="id_name" name="name"
+               value="{{ post.name|default:programme.name }}"
+               style="width:100%;padding:8px 12px;border:1px solid {% if errors.name %}#fca5a5{% else %}#e5e7eb{% endif %};border-radius:6px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;">
+        {% if errors.name %}<div style="font-size:11px;color:#dc2626;margin-top:3px;">{{ errors.name }}</div>{% endif %}
+      </div>
+
+    </div>
+
+    <!-- Toggles -->
+    <div style="display:flex;gap:24px;margin-top:16px;padding-top:16px;border-top:1px solid #f3f4f6;">
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+        <input type="checkbox" name="is_active" id="id_is_active"
+               {% if post %}{% if post.is_active %}checked{% endif %}{% elif programme.is_active %}checked{% endif %}
+               style="width:15px;height:15px;accent-color:#0452F0;cursor:pointer;">
+        <span>
+          <span style="font-size:13px;font-weight:500;color:#111827;">Active</span>
+          <span style="display:block;font-size:11px;color:#9ca3af;">Visible in the platform and included in learner filters</span>
+        </span>
+      </label>
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+        <input type="checkbox" name="awards_credentials" id="id_awards_credentials"
+               {% if post %}{% if post.awards_credentials %}checked{% endif %}{% elif programme.awards_credentials %}checked{% endif %}
+               style="width:15px;height:15px;accent-color:#0452F0;cursor:pointer;">
+        <span>
+          <span style="font-size:13px;font-weight:500;color:#111827;">Awards Badges</span>
+          <span style="display:block;font-size:11px;color:#9ca3af;">Show course-completion badges for this programme</span>
+        </span>
+      </label>
+
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+        <input type="checkbox" name="awards_certificate" id="id_awards_certificate"
+               {% if post %}{% if post.awards_certificate %}checked{% endif %}{% elif programme.awards_certificate %}checked{% endif %}
+               style="width:15px;height:15px;accent-color:#0452F0;cursor:pointer;">
+        <span>
+          <span style="font-size:13px;font-weight:500;color:#111827;">Awards Certificate</span>
+          <span style="display:block;font-size:11px;color:#9ca3af;">Show graduation certificate for this programme</span>
+        </span>
+      </label>
+
+    </div>
+
+    <!-- Dates -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid #f3f4f6;">
+
+      <div>
+        <label for="id_start_date" style="display:block;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Start Date</label>
+        <input type="date" id="id_start_date" name="start_date"
+               value="{{ post.start_date|default:programme.start_date|default:'' }}"
+               style="width:100%;padding:8px 12px;border:1px solid {% if errors.start_date %}#fca5a5{% else %}#e5e7eb{% endif %};border-radius:6px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;">
+        {% if errors.start_date %}<div style="font-size:11px;color:#dc2626;margin-top:3px;">{{ errors.start_date }}</div>{% endif %}
+        <div style="font-size:10px;color:#9ca3af;margin-top:4px;">Programmes before this date show as Upcoming</div>
+      </div>
+
+      <div>
+        <label for="id_end_date" style="display:block;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">End Date</label>
+        <input type="date" id="id_end_date" name="end_date"
+               value="{{ post.end_date|default:programme.end_date|default:'' }}"
+               style="width:100%;padding:8px 12px;border:1px solid {% if errors.end_date %}#fca5a5{% else %}#e5e7eb{% endif %};border-radius:6px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;">
+        {% if errors.end_date %}<div style="font-size:11px;color:#dc2626;margin-top:3px;">{{ errors.end_date }}</div>{% endif %}
+        <div style="font-size:10px;color:#9ca3af;margin-top:4px;">Programmes past this date are excluded from views</div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- Courses -->
+<div class="sp-card" style="margin-bottom:16px;">
+  <div class="sp-card-header">
+    Courses
+    <span style="font-size:11px;font-weight:400;color:#9ca3af;">{{ courses|length }} in system</span>
+  </div>
+  {% if merge_error %}
+  <div style="padding:8px 16px;background:#fef2f2;border-bottom:1px solid #fecaca;font-size:12px;color:#dc2626;">
+    <i class="ti ti-alert-circle" style="margin-right:4px;"></i>{{ merge_error }}
+  </div>
+  {% endif %}
+  {% if courses %}
+  <table class="sp-table" style="margin:0;">
+    <thead>
+      <tr>
+        <th style="width:48px;text-align:center;">Seq</th>
+        <th>Name</th>
+        <th style="width:80px;text-align:center;">Code</th>
+        <th style="width:80px;text-align:center;">Enrolments</th>
+        <th style="width:80px;text-align:center;">Assignments</th>
+        <th style="width:60px;text-align:center;">Active</th>
+        <th style="width:60px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in courses %}
+      <tr style="{% if not c.is_active %}opacity:0.55;{% endif %}">
+        <td style="text-align:center;font-weight:700;color:#9ca3af;font-size:13px;">{{ c.sequence_number }}</td>
+        <td style="font-size:13px;color:#111827;">
+          {{ c.full_name }}
+        </td>
+        <td style="text-align:center;">
+          {% if c.code %}
+          <span style="font-size:11px;background:#f3f4f6;border-radius:3px;padding:1px 6px;color:#6b7280;font-family:monospace;">{{ c.code }}</span>
+          {% else %}
+          <span style="color:#d1d5db;font-size:11px;">—</span>
+          {% endif %}
+        </td>
+        <td style="text-align:center;font-size:12px;color:#6b7280;">{{ c.enrolment_count }}</td>
+        <td style="text-align:center;font-size:12px;color:#6b7280;">{{ c.assignment_count }}</td>
+        <td style="text-align:center;">
+          {% if c.is_active %}
+          <i class="ti ti-check" style="color:#16a34a;font-size:14px;"></i>
+          {% else %}
+          <i class="ti ti-minus" style="color:#d1d5db;font-size:14px;"></i>
+          {% endif %}
+        </td>
+        <td>
+          <a href="{% url 'sp_admin_course_edit' programme.pk c.pk %}"
+             style="font-size:12px;color:#0452F0;text-decoration:none;font-weight:500;white-space:nowrap;">Edit →</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:32px;text-align:center;color:#9ca3af;font-size:13px;">
+    No courses yet — upload a learner CSV to discover courses automatically.
+  </div>
+  {% endif %}
+  <div style="padding:8px 16px;border-top:1px solid #f3f4f6;font-size:11px;color:#9ca3af;">
+    {{ enrolment_count }} enrolment{{ enrolment_count|pluralize }} across all courses
+  </div>
+</div>
+
+<!-- Thresholds -->
+<div class="sp-card" style="margin-bottom:16px;">
+  <div class="sp-card-header">Health Flag Thresholds <span style="font-size:11px;font-weight:400;color:#9ca3af;">Leave blank to use system default</span></div>
+  <div class="sp-card-body">
+
+    {% for cfg in threshold_config %}
+    <div style="display:grid;grid-template-columns:1fr 120px;gap:12px;align-items:start;{% if not forloop.last %}padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid #f9fafb;{% endif %}">
+      <div>
+        <label for="id_{{ cfg.field }}" style="display:block;font-size:13px;font-weight:500;color:#111827;margin-bottom:2px;">{{ cfg.label }}</label>
+        <div style="font-size:11px;color:#9ca3af;">{{ cfg.hint }}</div>
+        {% if errors|get_item:cfg.field %}<div style="font-size:11px;color:#dc2626;margin-top:2px;">{{ errors|get_item:cfg.field }}</div>{% endif %}
+      </div>
+      <div>
+        <div style="position:relative;">
+          <input type="number" id="id_{{ cfg.field }}" name="{{ cfg.field }}" min="0"
+                 value="{% if post %}{{ post|get_item:cfg.field|default:'' }}{% else %}{{ threshold|get_attr:cfg.field|default_if_none:'' }}{% endif %}"
+                 placeholder="{{ cfg.default }}"
+                 style="width:100%;padding:7px 32px 7px 10px;border:1px solid {% if errors|get_item:cfg.field %}#fca5a5{% else %}#e5e7eb{% endif %};border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;text-align:right;">
+          <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;color:#9ca3af;pointer-events:none;">{{ cfg.unit }}</span>
+        </div>
+        <div style="font-size:10px;color:#d1d5db;margin-top:3px;text-align:right;">default: {{ cfg.default }}{{ cfg.unit }}</div>
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+</div>
+
+<!-- Actions -->
+<div style="display:flex;gap:8px;justify-content:flex-end;">
+  <a href="{% url 'sp_admin_programme_list' %}" class="sp-btn sp-btn-secondary">Cancel</a>
+  <button type="submit" class="sp-btn sp-btn-primary">Save Changes</button>
+</div>
+
+</form>
+
+{% endblock %}
