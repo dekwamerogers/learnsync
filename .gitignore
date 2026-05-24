@@ -22,7 +22,10 @@ staticfiles/
 media/
 
 # Secrets — NEVER commit these
-lce_platform/.env
+lce_platform/
+lce_platform/.env.example
+lce_platform/.env.production
+
 
 # Legacy cohort-based apps (not part of the self-paced platform)
 lce_platform/core/
@@ -56,3 +59,4 @@ Thumbs.db
 .coverage
 htmlcov/
 .pytest_cache/
+
