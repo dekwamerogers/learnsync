@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Count
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -731,10 +732,10 @@ def upload_enrolment_csv(request):
     from selfpaced.models import EnrolmentUploadJob
 
     if request.method == 'POST':
-        if EnrolmentUploadJob.objects.filter(status__in=['pending_review', 'processing']).exists():
+        if EnrolmentUploadJob.objects.filter(status='processing').exists():
             messages.warning(
                 request,
-                'An enrolment upload is already pending review or processing. '
+                'An enrolment upload is currently processing. '
                 'Wait for it to finish before uploading another file.',
             )
             return redirect('sp_enrolment_log')
@@ -968,6 +969,21 @@ def enrolment_reprocess(request, pk):
     t = threading.Thread(target=_run_enrolment_upload, args=(job.pk,), daemon=True)
     t.start()
     return redirect('sp_enrolment_detail', pk=pk)
+
+
+@login_required
+@require_POST
+def delete_enrolment_job(request, pk):
+    """Delete a single enrolment upload job record (does not undo processed enrolments)."""
+    from selfpaced.models import EnrolmentUploadJob
+    job = get_object_or_404(EnrolmentUploadJob, pk=pk)
+    if job.status == 'processing':
+        messages.error(request, f'Job #{pk} is currently processing — wait for it to finish before deleting.')
+        return redirect('sp_enrolment_log')
+    file_name = job.file_name
+    job.delete()
+    messages.success(request, f'Upload "{file_name}" deleted.')
+    return redirect('sp_enrolment_log')
 
 
 @login_required

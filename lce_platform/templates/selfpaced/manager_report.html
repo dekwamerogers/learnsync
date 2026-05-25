@@ -147,6 +147,104 @@
     </div>
   </div>
 
+  <!-- ── Weekly Breakdown ─────────────────────────────────────────────────── -->
+  <div class="rpt-card" style="margin-bottom:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div>
+        <span style="font-size:13px;font-weight:600;color:#111827;">Weekly Activity</span>
+        <span style="font-size:11px;color:#9ca3af;margin-left:8px;">last 13 weeks · enrolled and activated counts are paid learners only · interventions include all learners</span>
+      </div>
+    </div>
+    <!-- Column semantics note -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-bottom:16px;font-size:11px;color:#6b7280;line-height:1.5;">
+      <div><span style="color:#111827;font-weight:600;">Enrolled / Activated / Graduated / Active / At Risk</span><br>
+        All five are <em>cohort-based</em>: every number counts learners whose <strong>effective start date</strong> falls in that week. Enrolled = new enrolments. Activated = of those, how many have since passed their first module. Graduated, Active, At Risk = current standing of that same cohort today. Because all five use the same enrolment cohort, <strong>none of them will ever exceed Enrolled</strong>.</div>
+      <div><span style="color:#111827;font-weight:600;">Interventions</span><br>
+        <em>Event-based</em>: interventions <em>logged</em> during that calendar week, from any cohort. This is a measure of team outreach activity — it is not tied to an enrolment cohort.</div>
+    </div>
+    <canvas id="weeklyChart" style="max-height:280px;"></canvas>
+    <div style="overflow-x:auto;margin-top:20px;">
+      <table class="rpt-tbl">
+        <thead>
+          <tr>
+            <th style="text-align:left;min-width:160px;">Week</th>
+            <th><abbr title="New paid enrolments recorded in this week.">Enrolled</abbr></th>
+            <th><abbr title="Cohort-based: of learners enrolled in this week, how many have passed their first module at any point? Will never exceed Enrolled.">Activated</abbr></th>
+            <th style="color:#0d9488;"><abbr title="Of learners enrolled in this week, how many are currently Active (on track, within thresholds).">Active</abbr></th>
+            <th style="color:#dc2626;"><abbr title="Of learners enrolled in this week, how many are currently At-Risk (at least one warning flag raised).">At Risk</abbr></th>
+            <th><abbr title="Cohort-based: of learners enrolled in this week, how many have since graduated? Will never exceed Enrolled.">Graduated</abbr></th>
+            <th style="color:#f59e0b;"><abbr title="Cohort-based: total course-completion badges earned by learners in this week's cohort (at any point). One badge per passed course.">Badges</abbr></th>
+            <th><abbr title="Interventions logged this week (all learners, not just paid).">Interventions</abbr></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in weekly_rows %}
+          <tr>
+            <td style="text-align:left;color:#6b7280;font-weight:400;">{{ r.label }}</td>
+            <td>{{ r.enrolled }}</td>
+            <td>{{ r.activated }}</td>
+            <td style="color:#0d9488;font-weight:600;">{{ r.active }}</td>
+            <td style="color:#dc2626;font-weight:600;">{{ r.at_risk }}</td>
+            <td>{{ r.graduated }}</td>
+            <td style="color:#f59e0b;font-weight:600;">{{ r.badges }}</td>
+            <td>{{ r.interventions }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Per-programme weekly breakdown -->
+    {% if weekly_by_prog %}
+    <div style="margin-top:24px;border-top:1px solid #e5e7eb;padding-top:18px;">
+      <p style="font-size:12px;font-weight:600;color:#374151;margin:0 0 10px;">By Programme</p>
+      <p style="font-size:11px;color:#9ca3af;margin:0 0 14px;">
+        Enrolled counts use the effective date (later of enrolment date and programme start) — learners added before their programme launched appear in the programme's launch week.
+      </p>
+      {% for p in weekly_by_prog %}
+      <details style="margin-bottom:6px;border:1px solid #e5e7eb;border-radius:6px;">
+        <summary style="cursor:pointer;padding:9px 14px;font-size:12px;font-weight:600;color:#0452F0;
+                        list-style:none;display:flex;align-items:center;gap:8px;user-select:none;">
+          <span style="font-size:11px;color:#9ca3af;font-weight:400;">[+]</span>
+          {{ p.code }} — {{ p.name }}
+        </summary>
+        <div style="overflow-x:auto;padding:0 2px 2px;">
+          <table class="rpt-tbl" style="font-size:11px;">
+            <thead>
+              <tr>
+                <th style="text-align:left;min-width:140px;">Week</th>
+                <th><abbr title="Enrolments effective in this week">Enrolled</abbr></th>
+                <th><abbr title="Cohort-based: of those enrolled this week, how many have activated?">Activated</abbr></th>
+                <th style="color:#0d9488;"><abbr title="Currently Active — cohort of this week">Active</abbr></th>
+                <th style="color:#dc2626;"><abbr title="Currently At Risk — cohort of this week">At Risk</abbr></th>
+                <th><abbr title="Cohort-based: of those enrolled this week, how many have graduated?">Graduated</abbr></th>
+                <th style="color:#f59e0b;"><abbr title="Cohort-based: total badges earned by this cohort at any point">Badges</abbr></th>
+                <th><abbr title="Interventions logged this week (event-based)">Interventions</abbr></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for w in p.weeks %}
+              <tr>
+                <td style="text-align:left;color:#6b7280;font-weight:400;">{{ w.label }}</td>
+                <td>{{ w.enrolled }}</td>
+                <td>{{ w.activated }}</td>
+                <td style="color:#0d9488;font-weight:600;">{{ w.active }}</td>
+                <td style="color:#dc2626;font-weight:600;">{{ w.at_risk }}</td>
+                <td>{{ w.graduated }}</td>
+                <td style="color:#f59e0b;font-weight:600;">{{ w.badges }}</td>
+                <td>{{ w.interventions }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+
   <!-- ── Two-column: flags + payment ────────────────────────────────────── -->
   <div style="display:grid;grid-template-columns:1fr 280px;gap:20px;margin-bottom:20px;align-items:start;">
 
@@ -287,100 +385,6 @@
     {% endfor %}
   </div>
 
-  <!-- ── Weekly Breakdown ─────────────────────────────────────────────────── -->
-  <div class="rpt-card" style="margin-bottom:20px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-      <div>
-        <span style="font-size:13px;font-weight:600;color:#111827;">Weekly Activity</span>
-        <span style="font-size:11px;color:#9ca3af;margin-left:8px;">last 13 weeks · enrolled and activated counts are paid learners only · interventions include all learners</span>
-      </div>
-    </div>
-    <!-- Column semantics note -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-bottom:16px;font-size:11px;color:#6b7280;line-height:1.5;">
-      <div><span style="color:#111827;font-weight:600;">Enrolled / Activated / Graduated / Interventions</span><br>
-        Counts of <em>events that occurred</em> in that calendar week — by enrolment date, first-module completion date, graduation date, and intervention date respectively. A week can show enrolments but zero activations if learners were still working through the material that week; activations appear in whatever week the first-module completion was recorded.</div>
-      <div><span style="color:#0d9488;font-weight:600;">Active</span> &amp; <span style="color:#dc2626;font-weight:600;">At Risk</span><br>
-        <em>Current</em> health status of learners who enrolled in that week's cohort, as of today. These are not historical snapshots — they reflect each cohort's standing right now. A zero simply means no one from that intake is currently in that status.</div>
-    </div>
-    <canvas id="weeklyChart" style="max-height:280px;"></canvas>
-    <div style="overflow-x:auto;margin-top:20px;">
-      <table class="rpt-tbl">
-        <thead>
-          <tr>
-            <th style="text-align:left;min-width:160px;">Week</th>
-            <th><abbr title="New paid enrolments recorded in this week.">Enrolled</abbr></th>
-            <th><abbr title="First-module completions recorded in this week — new activations.">Activated</abbr></th>
-            <th style="color:#0d9488;"><abbr title="Of learners enrolled in this week, how many are currently Active (on track, within thresholds).">Active</abbr></th>
-            <th style="color:#dc2626;"><abbr title="Of learners enrolled in this week, how many are currently At-Risk (at least one warning flag raised).">At Risk</abbr></th>
-            <th><abbr title="Programme graduations recorded in this week.">Graduated</abbr></th>
-            <th><abbr title="Interventions logged this week (all learners, not just paid).">Interventions</abbr></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in weekly_rows %}
-          <tr>
-            <td style="text-align:left;color:#6b7280;font-weight:400;">{{ r.label }}</td>
-            <td>{{ r.enrolled }}</td>
-            <td>{{ r.activated }}</td>
-            <td style="color:#0d9488;font-weight:600;">{{ r.active }}</td>
-            <td style="color:#dc2626;font-weight:600;">{{ r.at_risk }}</td>
-            <td>{{ r.graduated }}</td>
-            <td>{{ r.interventions }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Per-programme weekly breakdown -->
-    {% if weekly_by_prog %}
-    <div style="margin-top:24px;border-top:1px solid #e5e7eb;padding-top:18px;">
-      <p style="font-size:12px;font-weight:600;color:#374151;margin:0 0 10px;">By Programme</p>
-      <p style="font-size:11px;color:#9ca3af;margin:0 0 14px;">
-        Enrolled counts use the effective date (later of enrolment date and programme start) — learners added before their programme launched appear in the programme's launch week.
-      </p>
-      {% for p in weekly_by_prog %}
-      <details style="margin-bottom:6px;border:1px solid #e5e7eb;border-radius:6px;">
-        <summary style="cursor:pointer;padding:9px 14px;font-size:12px;font-weight:600;color:#0452F0;
-                        list-style:none;display:flex;align-items:center;gap:8px;user-select:none;">
-          <span style="font-size:11px;color:#9ca3af;font-weight:400;">[+]</span>
-          {{ p.code }} — {{ p.name }}
-        </summary>
-        <div style="overflow-x:auto;padding:0 2px 2px;">
-          <table class="rpt-tbl" style="font-size:11px;">
-            <thead>
-              <tr>
-                <th style="text-align:left;min-width:140px;">Week</th>
-                <th>Enrolled</th>
-                <th>Activated</th>
-                <th style="color:#0d9488;">Active</th>
-                <th style="color:#dc2626;">At Risk</th>
-                <th>Graduated</th>
-                <th>Interventions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for w in p.weeks %}
-              <tr>
-                <td style="text-align:left;color:#6b7280;font-weight:400;">{{ w.label }}</td>
-                <td>{{ w.enrolled }}</td>
-                <td>{{ w.activated }}</td>
-                <td style="color:#0d9488;font-weight:600;">{{ w.active }}</td>
-                <td style="color:#dc2626;font-weight:600;">{{ w.at_risk }}</td>
-                <td>{{ w.graduated }}</td>
-                <td>{{ w.interventions }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </details>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-  </div>
-
   <!-- ── What's in the downloads ───────────────────────────────────────── -->
   <div style="padding:14px 18px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;">
     <p style="font-size:12px;font-weight:600;color:#374151;margin:0 0 10px;">What's in the downloads</p>
@@ -388,9 +392,10 @@
       <div>
         <p style="font-size:12px;font-weight:600;color:#0452F0;margin:0 0 5px;">
           <i class="ti ti-file-spreadsheet" style="font-size:13px;vertical-align:middle;"></i>
-          Excel — 9 sheets
+          Excel — 10 sheets
         </p>
         <ul style="font-size:11px;color:#6b7280;margin:0;padding-left:16px;line-height:1.9;">
+          <li><strong>Dashboard</strong> — visual summary with KPI cards and embedded charts</li>
           <li><strong>Summary</strong> — key metrics with inline definitions</li>
           <li><strong>By Programme</strong> — full row per programme including activation, retention, badges</li>
           <li><strong>Learner Detail</strong> — one row per enrolled (paid) learner with activation &amp; graduation dates</li>

@@ -19,11 +19,17 @@ def portfolio(request):
     )
     prog_pks = [p.pk for p in programmes]
 
+    # Base queryset — paid learners only (matches programme detail page)
+    paid_enrolments = (
+        Enrolment.objects
+        .filter(programme_id__in=prog_pks)
+        .exclude(learner__payment_status='unknown')
+    )
+
     # Health breakdown per programme
     health_by_prog: dict = defaultdict(lambda: defaultdict(int))
     for row in (
-        Enrolment.objects
-        .filter(programme_id__in=prog_pks)
+        paid_enrolments
         .values('programme_id', 'health_status')
         .annotate(n=Count('id'))
     ):
@@ -37,11 +43,10 @@ def portfolio(request):
         .values('programme_id').annotate(n=Count('id'))
     }
 
-    # Unique learners per programme
+    # Unique paid learners per programme
     learner_count_by_prog = {
         row['programme_id']: row['n']
-        for row in Enrolment.objects
-        .filter(programme_id__in=prog_pks)
+        for row in paid_enrolments
         .values('programme_id')
         .annotate(n=Count('learner_id', distinct=True))
     }
@@ -89,7 +94,7 @@ def portfolio(request):
 
     # Portfolio-level totals
     total_learners = real_learners_qs().count()
-    total_enrolments = Enrolment.objects.filter(programme_id__in=prog_pks).count()
+    total_enrolments = paid_enrolments.count()
     total_dormant = sum(r['dormant'] for r in rows)
     total_at_risk = sum(r['at_risk'] for r in rows)
     total_active = sum(r['active'] for r in rows)

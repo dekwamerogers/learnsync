@@ -46,6 +46,7 @@ urlpatterns = [
     path('admin/enrolment-csv/<int:pk>/', admin_views.enrolment_upload_detail, name='sp_enrolment_detail'),
     path('admin/enrolment-csv/<int:pk>/status/', admin_views.enrolment_status_fragment, name='sp_enrolment_status'),
     path('admin/enrolment-csv/<int:pk>/reprocess/', admin_views.enrolment_reprocess, name='sp_enrolment_reprocess'),
+    path('admin/enrolment-csv/<int:pk>/delete/', admin_views.delete_enrolment_job, name='sp_enrolment_delete'),
     path('admin/enrolment-csv/purge/', admin_views.enrolment_upload_purge, name='sp_enrolment_purge'),
     path('admin/countries/', admin_views.country_settings, name='sp_country_settings'),
     path('admin/countries/purge/', admin_views.purge_unmonitored_learners, name='sp_purge_unmonitored_learners'),

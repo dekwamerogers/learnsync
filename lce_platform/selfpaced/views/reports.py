@@ -221,29 +221,23 @@ def _build_report_data():
             .annotate(week=TruncWeek('_eff'))
         )
 
-    def _first_module_qs():
-        return CourseEnrolment.objects.filter(
-            enrolment__in=base_qs,
-            is_passed=True,
-            completion_date__gte=_lookback,
-            completion_date__isnull=False,
-            course__sequence_number=Subquery(
-                Course.objects.filter(programme_id=OuterRef('enrolment__programme_id'))
-                .order_by('sequence_number').values('sequence_number')[:1]
-            ),
-        ).annotate(week=TruncWeek('completion_date'))
-
     # ── Overall weekly totals ─────────────────────────────────────────────────
     _w_enrolled = {_as_date(r['week']): r['n'] for r in (
         _enrolled_qs(base_qs).values('week').annotate(n=Count('pk'))
     )}
+    # Cohort-based activated: of learners whose effective start falls in this week,
+    # how many have EVER passed their first module?  Uses the same _activated_ids
+    # frozenset built above so the definition is identical to the summary cards.
+    # This guarantees Activated ≤ Enrolled for every row.
     _w_activated = {_as_date(r['week']): r['n'] for r in (
-        _first_module_qs().values('week').annotate(n=Count('id'))
+        _enrolled_qs(base_qs.filter(pk__in=_activated_ids))
+        .values('week').annotate(n=Count('pk'))
     )}
+    # Cohort-based: of learners enrolled in this week, how many have graduated?
+    # Matches the Active / At Risk approach — bucketed by effective enrolment week,
+    # not by graduation_date — so Graduated will never exceed Enrolled.
     _w_graduated = {_as_date(r['week']): r['n'] for r in (
-        base_qs
-        .filter(graduation_date__gte=_lookback, graduation_date__isnull=False)
-        .annotate(week=TruncWeek('graduation_date'))
+        _enrolled_qs(base_qs.filter(health_status=HealthStatus.GRADUATED))
         .values('week').annotate(n=Count('pk'))
     )}
     _w_interventions = {_as_date(r['week']): r['n'] for r in (
@@ -260,20 +254,34 @@ def _build_report_data():
         _enrolled_qs(base_qs.filter(health_status=HealthStatus.AT_RISK))
         .values('week').annotate(n=Count('pk'))
     )}
+    # Cohort-based badges: total passed CourseEnrolments for learners enrolled this week
+    _w_badges = {_as_date(r['week']): r['n'] for r in (
+        _enrolled_qs(base_qs)
+        .values('week')
+        .annotate(n=Count(
+            'course_enrolments',
+            filter=Q(course_enrolments__is_passed=True),
+        ))
+    )}
 
+    _WEEK_COLS = ('enrolled', 'activated', 'active', 'at_risk', 'graduated', 'badges', 'interventions')
     weekly_rows = [
-        {
-            'week_start':    ws,
-            'week_end':      ws + timedelta(days=6),
-            'label':         f'{ws.strftime("%d %b")} – {(ws + timedelta(days=6)).strftime("%d %b")}',
-            'enrolled':      _w_enrolled.get(ws, 0),
-            'activated':     _w_activated.get(ws, 0),
-            'active':        _w_active.get(ws, 0),
-            'at_risk':       _w_at_risk.get(ws, 0),
-            'graduated':     _w_graduated.get(ws, 0),
-            'interventions': _w_interventions.get(ws, 0),
-        }
-        for ws in _week_starts
+        row for row in (
+            {
+                'week_start':    ws,
+                'week_end':      ws + timedelta(days=6),
+                'label':         f'{ws.strftime("%d %b")} – {(ws + timedelta(days=6)).strftime("%d %b")}',
+                'enrolled':      _w_enrolled.get(ws, 0),
+                'activated':     _w_activated.get(ws, 0),
+                'active':        _w_active.get(ws, 0),
+                'at_risk':       _w_at_risk.get(ws, 0),
+                'graduated':     _w_graduated.get(ws, 0),
+                'badges':        _w_badges.get(ws, 0),
+                'interventions': _w_interventions.get(ws, 0),
+            }
+            for ws in _week_starts
+        )
+        if any(row[c] for c in _WEEK_COLS)
     ]
 
     # ── Per-programme per-week breakdown ──────────────────────────────────────
@@ -286,12 +294,13 @@ def _build_report_data():
     ):
         _pw_enrolled[r['programme__code']][_as_date(r['week'])] += r['n']
 
+    # Cohort-based: same week bucket as enrolled, same _activated_ids definition
     _pw_activated = defaultdict(lambda: defaultdict(int))
     for r in (
-        _first_module_qs()
-        .values('enrolment__programme__code', 'week').annotate(n=Count('id'))
+        _enrolled_qs(base_qs.filter(pk__in=_activated_ids))
+        .values('programme__code', 'week').annotate(n=Count('pk'))
     ):
-        _pw_activated[r['enrolment__programme__code']][_as_date(r['week'])] += r['n']
+        _pw_activated[r['programme__code']][_as_date(r['week'])] += r['n']
 
     _pw_active = defaultdict(lambda: defaultdict(int))
     for r in (
@@ -307,14 +316,25 @@ def _build_report_data():
     ):
         _pw_at_risk[r['programme__code']][_as_date(r['week'])] += r['n']
 
+    # Cohort-based: same approach as active/at_risk — bucketed by enrolment week
     _pw_graduated = defaultdict(lambda: defaultdict(int))
     for r in (
-        base_qs
-        .filter(graduation_date__gte=_lookback, graduation_date__isnull=False)
-        .annotate(week=TruncWeek('graduation_date'))
+        _enrolled_qs(base_qs.filter(health_status=HealthStatus.GRADUATED))
         .values('programme__code', 'week').annotate(n=Count('pk'))
     ):
         _pw_graduated[r['programme__code']][_as_date(r['week'])] += r['n']
+
+    # Cohort-based badges: total passed CourseEnrolments for learners enrolled this week
+    _pw_badges = defaultdict(lambda: defaultdict(int))
+    for r in (
+        _enrolled_qs(base_qs)
+        .values('programme__code', 'week')
+        .annotate(n=Count(
+            'course_enrolments',
+            filter=Q(course_enrolments__is_passed=True),
+        ))
+    ):
+        _pw_badges[r['programme__code']][_as_date(r['week'])] += r['n']
 
     _pw_interventions = defaultdict(lambda: defaultdict(int))
     for r in (
@@ -327,23 +347,27 @@ def _build_report_data():
 
     _all_pw_codes = sorted(
         set(_pw_enrolled) | set(_pw_activated) | set(_pw_active)
-        | set(_pw_at_risk) | set(_pw_graduated) | set(_pw_interventions)
+        | set(_pw_at_risk) | set(_pw_graduated) | set(_pw_badges) | set(_pw_interventions)
     )
     weekly_by_prog = [
         {
             'code': code,
             'name': _prog_name_map.get(code, code),
             'weeks': [
-                {
-                    'label':         f'{ws.strftime("%d %b")} – {(ws + timedelta(days=6)).strftime("%d %b")}',
-                    'enrolled':      _pw_enrolled[code].get(ws, 0),
-                    'activated':     _pw_activated[code].get(ws, 0),
-                    'active':        _pw_active[code].get(ws, 0),
-                    'at_risk':       _pw_at_risk[code].get(ws, 0),
-                    'graduated':     _pw_graduated[code].get(ws, 0),
-                    'interventions': _pw_interventions[code].get(ws, 0),
-                }
-                for ws in _week_starts
+                w for w in (
+                    {
+                        'label':         f'{ws.strftime("%d %b")} – {(ws + timedelta(days=6)).strftime("%d %b")}',
+                        'enrolled':      _pw_enrolled[code].get(ws, 0),
+                        'activated':     _pw_activated[code].get(ws, 0),
+                        'active':        _pw_active[code].get(ws, 0),
+                        'at_risk':       _pw_at_risk[code].get(ws, 0),
+                        'graduated':     _pw_graduated[code].get(ws, 0),
+                        'badges':        _pw_badges[code].get(ws, 0),
+                        'interventions': _pw_interventions[code].get(ws, 0),
+                    }
+                    for ws in _week_starts
+                )
+                if any(w[c] for c in _WEEK_COLS)
             ],
         }
         for code in _all_pw_codes
@@ -603,7 +627,7 @@ def _excel_response(data):
 
     # ── Sheet 8: Weekly Breakdown ─────────────────────────────────────────
     ws8 = wb.create_sheet('Weekly Breakdown')
-    ws8.append(['Week', 'Week Start', 'Week End', 'Enrolled', 'Activated', 'Active', 'At Risk', 'Graduated', 'Interventions'])
+    ws8.append(['Week', 'Week Start', 'Week End', 'Enrolled', 'Activated', 'Active', 'At Risk', 'Graduated', 'Badges', 'Interventions'])
     for cell in ws8[1]:
         _hdr(cell)
     _write_sheet_rows(ws8, [
@@ -616,18 +640,19 @@ def _excel_response(data):
             r['active'],
             r['at_risk'],
             r['graduated'],
+            r['badges'],
             r['interventions'],
         )
         for r in data['weekly_rows']
     ])
-    col_widths8 = [20, 12, 12, 12, 12, 12, 12, 12, 16]
+    col_widths8 = [20, 12, 12, 12, 12, 12, 12, 12, 12, 16]
     for i, w in enumerate(col_widths8, 1):
         ws8.column_dimensions[get_column_letter(i)].width = w
     ws8.freeze_panes = 'A2'
 
     # ── Sheet 9: Weekly by Programme ─────────────────────────────────────
     ws9 = wb.create_sheet('Weekly by Programme')
-    ws9.append(['Programme', 'Code', 'Week', 'Enrolled', 'Activated', 'Active', 'At Risk', 'Graduated', 'Interventions'])
+    ws9.append(['Programme', 'Code', 'Week', 'Enrolled', 'Activated', 'Active', 'At Risk', 'Graduated', 'Badges', 'Interventions'])
     for cell in ws9[1]:
         _hdr(cell)
     prog_week_rows = []
@@ -637,13 +662,192 @@ def _excel_response(data):
                 p['name'], p['code'], w['label'],
                 w['enrolled'], w['activated'],
                 w['active'], w['at_risk'],
-                w['graduated'], w['interventions'],
+                w['graduated'], w['badges'], w['interventions'],
             ))
     _write_sheet_rows(ws9, prog_week_rows)
-    col_widths9 = [36, 10, 20, 12, 12, 12, 12, 12, 16]
+    col_widths9 = [36, 10, 20, 12, 12, 12, 12, 12, 12, 16]
     for i, w in enumerate(col_widths9, 1):
         ws9.column_dimensions[get_column_letter(i)].width = w
     ws9.freeze_panes = 'A2'
+
+    # ── Dashboard sheet (inserted at position 0) ─────────────────────────
+    from openpyxl.chart import BarChart, LineChart, Reference
+
+    ws_dash = wb.create_sheet('Dashboard', 0)
+    ws_dash.sheet_properties.tabColor = BLUE
+
+    # ── Title row ──────────────────────────────────────────────────────────
+    ws_dash.merge_cells('B2:T2')
+    ws_dash['B2'] = 'LearnSync — Manager Report Dashboard'
+    ws_dash['B2'].font = Font(bold=True, size=16, color=BLUE)
+    ws_dash['B2'].alignment = Alignment(vertical='center')
+    ws_dash.row_dimensions[2].height = 28
+
+    ws_dash.merge_cells('B3:T3')
+    ws_dash['B3'] = (
+        f"Generated {data['today'].strftime('%d %B %Y')}  ·  "
+        f"Paid learners only  ·  {data['unpaid_count']} unpaid learner(s) excluded"
+    )
+    ws_dash['B3'].font = Font(size=10, color='6B7280')
+
+    # ── KPI cards (row 5-7, 3 columns each) ───────────────────────────────
+    kpi_cards = [
+        (2,  'Active Programmes',   str(data['active_programmes']),                                    BLUE),
+        (5,  'Paid Enrolled',       str(data['total_enrolled']),                                       '0D9488'),
+        (8,  'Activated',           f"{data['total_activated']} ({data['activation_rate']}%)",         '7C3AED'),
+        (11, 'Graduated',           f"{data['total_graduated']} ({data['grad_rate']}%)",               '16A34A'),
+        (14, 'At Risk',             str(data['health_totals'].get('at_risk', 0)),                      'DC2626'),
+        (17, 'Dormant / Not Started',
+             f"{data['health_totals'].get('dormant', 0)} / {data['health_totals'].get('not_yet_started', 0)}",
+             '6B7280'),
+    ]
+    ws_dash.row_dimensions[5].height = 16
+    ws_dash.row_dimensions[6].height = 26
+    ws_dash.row_dimensions[7].height = 6
+
+    for start_col, label, value, color in kpi_cards:
+        end_col = start_col + 2
+        for row in (5, 6, 7):
+            ws_dash.merge_cells(
+                start_row=row, start_column=start_col,
+                end_row=row, end_column=end_col,
+            )
+        lc = ws_dash.cell(row=5, column=start_col, value=label)
+        lc.font = Font(bold=True, color=WHITE, size=9)
+        lc.fill = PatternFill(fill_type='solid', fgColor=color)
+        lc.alignment = Alignment(horizontal='center', vertical='center')
+
+        vc = ws_dash.cell(row=6, column=start_col, value=value)
+        vc.font = Font(bold=True, color=WHITE, size=16)
+        vc.fill = PatternFill(fill_type='solid', fgColor=color)
+        vc.alignment = Alignment(horizontal='center', vertical='center')
+
+        pc = ws_dash.cell(row=7, column=start_col)
+        pc.fill = PatternFill(fill_type='solid', fgColor=color)
+
+        for c in range(start_col, end_col + 1):
+            ws_dash.column_dimensions[get_column_letter(c)].width = 7
+
+    # ── Chart data (written below row 50, used as chart data sources) ─────
+    # Health breakdown data  (row 52–57)
+    HD_ROW = 52
+    ws_dash.cell(row=HD_ROW,     column=1, value='Health Status')
+    ws_dash.cell(row=HD_ROW,     column=2, value='Learners')
+    health_items = [
+        ('Active',      data['health_totals'].get('active', 0)),
+        ('At Risk',     data['health_totals'].get('at_risk', 0)),
+        ('Dormant',     data['health_totals'].get('dormant', 0)),
+        ('Graduated',   data['health_totals'].get('graduated', 0)),
+        ('Not Started', data['health_totals'].get('not_yet_started', 0)),
+    ]
+    for i, (lbl, val) in enumerate(health_items, 1):
+        ws_dash.cell(row=HD_ROW + i, column=1, value=lbl)
+        ws_dash.cell(row=HD_ROW + i, column=2, value=val)
+
+    # Programme comparison data (row 62+)
+    PD_ROW = 62
+    ws_dash.cell(row=PD_ROW, column=1, value='Programme')
+    ws_dash.cell(row=PD_ROW, column=2, value='Enrolled')
+    ws_dash.cell(row=PD_ROW, column=3, value='Activated')
+    ws_dash.cell(row=PD_ROW, column=4, value='Graduated')
+    for i, p in enumerate(data['prog_rows'], 1):
+        ws_dash.cell(row=PD_ROW + i, column=1, value=p['programme__code'])
+        ws_dash.cell(row=PD_ROW + i, column=2, value=p['total'])
+        ws_dash.cell(row=PD_ROW + i, column=3, value=p['activated'])
+        ws_dash.cell(row=PD_ROW + i, column=4, value=p['graduated'])
+
+    # Weekly trend data (row 80+)
+    WD_ROW = 80
+    ws_dash.cell(row=WD_ROW, column=1, value='Week')
+    ws_dash.cell(row=WD_ROW, column=2, value='Enrolled')
+    ws_dash.cell(row=WD_ROW, column=3, value='Activated')
+    ws_dash.cell(row=WD_ROW, column=4, value='Active')
+    ws_dash.cell(row=WD_ROW, column=5, value='At Risk')
+    ws_dash.cell(row=WD_ROW, column=6, value='Graduated')
+    for i, r in enumerate(data['weekly_rows'], 1):
+        ws_dash.cell(row=WD_ROW + i, column=1, value=r['label'])
+        ws_dash.cell(row=WD_ROW + i, column=2, value=r['enrolled'])
+        ws_dash.cell(row=WD_ROW + i, column=3, value=r['activated'])
+        ws_dash.cell(row=WD_ROW + i, column=4, value=r['active'])
+        ws_dash.cell(row=WD_ROW + i, column=5, value=r['at_risk'])
+        ws_dash.cell(row=WD_ROW + i, column=6, value=r['graduated'])
+
+    # At-risk flag data (row 97+)
+    FD_ROW = 97
+    ws_dash.cell(row=FD_ROW, column=1, value='Flag')
+    ws_dash.cell(row=FD_ROW, column=2, value='Learners')
+    for i, f in enumerate(data['flag_rows'], 1):
+        ws_dash.cell(row=FD_ROW + i, column=1, value=f['flag'])
+        ws_dash.cell(row=FD_ROW + i, column=2, value=f['count'])
+
+    # ── Chart 1: Health status horizontal bar ─────────────────────────────
+    hc = BarChart()
+    hc.type   = 'bar'   # horizontal
+    hc.title  = 'Health Status Breakdown'
+    hc.y_axis.title = 'Status'
+    hc.x_axis.title = 'Learners'
+    hc.height = 10
+    hc.width  = 17
+    hc.legend.position = 'b'
+    hc_data = Reference(ws_dash, min_col=2, min_row=HD_ROW,
+                         max_row=HD_ROW + len(health_items))
+    hc_cats = Reference(ws_dash, min_col=1, min_row=HD_ROW + 1,
+                         max_row=HD_ROW + len(health_items))
+    hc.add_data(hc_data, titles_from_data=True)
+    hc.set_categories(hc_cats)
+    ws_dash.add_chart(hc, 'B9')
+
+    # ── Chart 2: Programme comparison grouped bar ─────────────────────────
+    if data['prog_rows']:
+        pc2 = BarChart()
+        pc2.type      = 'col'   # vertical grouped
+        pc2.grouping  = 'clustered'
+        pc2.title     = 'Programme: Enrolled / Activated / Graduated'
+        pc2.y_axis.title = 'Learners'
+        pc2.height    = 10
+        pc2.width     = 22
+        n_prog = len(data['prog_rows'])
+        pc2_data = Reference(ws_dash, min_col=2, max_col=4,
+                              min_row=PD_ROW, max_row=PD_ROW + n_prog)
+        pc2_cats = Reference(ws_dash, min_col=1,
+                              min_row=PD_ROW + 1, max_row=PD_ROW + n_prog)
+        pc2.add_data(pc2_data, titles_from_data=True)
+        pc2.set_categories(pc2_cats)
+        ws_dash.add_chart(pc2, 'L9')
+
+    # ── Chart 3: Weekly trend line ─────────────────────────────────────────
+    if data['weekly_rows']:
+        wc = LineChart()
+        wc.title   = 'Weekly Activity Trend (last 13 weeks)'
+        wc.y_axis.title = 'Learners'
+        wc.height  = 12
+        wc.width   = 34
+        n_weeks = len(data['weekly_rows'])
+        wc_data = Reference(ws_dash, min_col=2, max_col=6,
+                             min_row=WD_ROW, max_row=WD_ROW + n_weeks)
+        wc_cats = Reference(ws_dash, min_col=1,
+                             min_row=WD_ROW + 1, max_row=WD_ROW + n_weeks)
+        wc.add_data(wc_data, titles_from_data=True)
+        wc.set_categories(wc_cats)
+        wc.smooth = True
+        ws_dash.add_chart(wc, 'B24')
+
+    # ── Chart 4: At-risk flags horizontal bar ─────────────────────────────
+    if data['flag_rows']:
+        fc = BarChart()
+        fc.type   = 'bar'
+        fc.title  = 'At-Risk Flags — Learners Affected'
+        fc.x_axis.title = 'Learners'
+        fc.height = 10
+        fc.width  = 17
+        n_flags = len(data['flag_rows'])
+        fc_data = Reference(ws_dash, min_col=2, min_row=FD_ROW,
+                             max_row=FD_ROW + n_flags)
+        fc_cats = Reference(ws_dash, min_col=1,
+                             min_row=FD_ROW + 1, max_row=FD_ROW + n_flags)
+        fc.add_data(fc_data, titles_from_data=True)
+        fc.set_categories(fc_cats)
+        ws_dash.add_chart(fc, 'L24')
 
     buf = io.BytesIO()
     wb.save(buf)

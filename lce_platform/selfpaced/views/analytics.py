@@ -319,6 +319,13 @@ def analytics(request):
                             r['course_enrolment__enrolment__programme_id'],
                             r['course_enrolment__enrolment__learner_id']))
 
+    # ── Day-of-week activity (Mon=0 … Sun=6) ─────────────────────────────
+    # Count unique learners who were active on each day of the week
+    _dow_learners: dict = defaultdict(set)
+    for _d, _prog_id, _learner_id in _raw_activity:
+        _dow_learners[_d.weekday()].add(_learner_id)
+    dow_activity = safe_json([len(_dow_learners.get(i, set())) for i in range(7)])
+
     # Roll up to (date, programme_id) → unique learner count
     _act_by_prog_date: dict = defaultdict(lambda: defaultdict(int))
     for d, prog_id, _ in _raw_activity:
@@ -462,6 +469,7 @@ def analytics(request):
         'chart_country_counts':   chart_country_counts,
         'portfolio_solo':         solo,
         'portfolio_multi':        multi,
+        'dow_activity':           dow_activity,
         'course_chart_data':      safe_json(course_chart_data),
         'active_progs':           active_progs,
         # cohort

@@ -231,3 +231,10 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_BROWSER_XSS_FILTER = True
     X_FRAME_OPTIONS = 'DENY'
+
+# ── Local overrides ────────────────────────────────────────────────────────
+# local_settings.py is gitignored — use it for machine-specific dev overrides.
+try:
+    from .local_settings import *  # noqa: F401, F403
+except ImportError:
+    pass
