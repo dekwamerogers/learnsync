@@ -609,7 +609,7 @@ class MonitoredCountry(models.Model):
 
 class ProgrammeNameMapping(models.Model):
     """Maps a programme name string (as it appears in an enrolment CSV) to a Programme."""
-    csv_name = models.CharField(max_length=300, unique=True)
+    csv_name = models.CharField(max_length=255, unique=True)
     programme = models.ForeignKey(
         Programme, on_delete=models.CASCADE, related_name='name_mappings'
     )
