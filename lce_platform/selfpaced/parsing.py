@@ -94,11 +94,20 @@ NULL_DATE = date(1970, 1, 1)
 # CSV cells that mean "no data" — treated as empty string for text fields.
 _NULL_STRINGS = frozenset(['n/a', '#n/a', 'na', 'n.a.', 'none', 'null', 'nil', '-', '--'])
 
+# MySQL's utf8 charset is only 3 bytes; 4-byte characters (emoji, mathematical
+# script letters, etc.) cause OperationalError 1366.  Strip them defensively so
+# a single unusual learner name doesn't abort the whole upload.
+_4BYTE_RE = re.compile(r'[\U00010000-\U0010FFFF]', re.UNICODE)
+
+
+def _strip_4byte(s: str) -> str:
+    return _4BYTE_RE.sub('', s)
+
 
 def _str(val) -> str:
     if val is None:
         return ''
-    return str(val).strip()
+    return _strip_4byte(str(val).strip())
 
 
 def _text(val) -> str:
