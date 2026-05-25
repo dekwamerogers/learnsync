@@ -8,6 +8,7 @@ Learner-level fields (name, country, payment status, etc.) repeat on every row.
 import csv
 import logging
 import re
+import unicodedata
 from datetime import date, datetime
 from io import StringIO
 
@@ -94,14 +95,45 @@ NULL_DATE = date(1970, 1, 1)
 # CSV cells that mean "no data" — treated as empty string for text fields.
 _NULL_STRINGS = frozenset(['n/a', '#n/a', 'na', 'n.a.', 'none', 'null', 'nil', '-', '--'])
 
-# MySQL's utf8 charset is only 3 bytes; 4-byte characters (emoji, mathematical
-# script letters, etc.) cause OperationalError 1366.  Strip them defensively so
-# a single unusual learner name doesn't abort the whole upload.
+# MySQL latin1 columns only hold U+0000–U+00FF.
+# mysql utf8 columns only hold U+0000–U+FFFF (3-byte max).
+# We sanitize every string at parse time so no single learner's unusual
+# profile text can abort the entire upload.
+#
+# Strategy:
+#   • _str      — strips 4-byte chars (> U+FFFF) from ALL fields
+#   • _name     — additionally strips non-letter/mark/space chars (math symbols,
+#                 emoji within BMP, box-drawing, etc.) so even latin1 columns work.
+#                 Legitimate accented letters (é, ñ, ọ, etc.) are preserved.
+
 _4BYTE_RE = re.compile(r'[\U00010000-\U0010FFFF]', re.UNICODE)
+
+# Unicode categories kept in name fields:
+#   L* = letters (Latin, Arabic, CJK, Cyrillic, …)
+#   M* = combining marks / diacritics
+#   Zs = space separator
+#   Pd = dash / hyphen
+#   apostrophe / full stop are also common in names
+_NAME_SAFE_CATS = frozenset(['Lu', 'Ll', 'Lt', 'Lm', 'Lo', 'Mn', 'Mc', 'Me', 'Zs', 'Pd'])
+_NAME_SAFE_CHARS = frozenset("'.'’")   # straight + curly apostrophe, period
 
 
 def _strip_4byte(s: str) -> str:
     return _4BYTE_RE.sub('', s)
+
+
+def _sanitize_name(s: str) -> str:
+    """Strip non-letter/mark/space chars that break latin1/utf8 columns.
+
+    Keeps all genuine Unicode letters and diacritics (including accented African
+    names like Aminé, Ọlá, Kofi).  Removes mathematical script letters (ℴ, 𝒮),
+    emoji, box-drawing characters, and other symbols.
+    """
+    s = _strip_4byte(s)
+    return ''.join(
+        c for c in s
+        if unicodedata.category(c) in _NAME_SAFE_CATS or c in _NAME_SAFE_CHARS
+    )
 
 
 def _str(val) -> str:
@@ -255,11 +287,11 @@ def row_to_dict(row: dict) -> dict:
     """
     return {
         'email':                    clean_email(get(row, 'email')),
-        'first_name':               _text(get(row, 'first_name')),
-        'last_name':                _text(get(row, 'last_name')),
-        'gender':                   _text(get(row, 'gender')),
-        'country':                  _text(get(row, 'country')),
-        'region':                   _text(get(row, 'region')),
+        'first_name':               _sanitize_name(_text(get(row, 'first_name'))),
+        'last_name':                _sanitize_name(_text(get(row, 'last_name'))),
+        'gender':                   _sanitize_name(_text(get(row, 'gender'))),
+        'country':                  _sanitize_name(_text(get(row, 'country'))),
+        'region':                   _sanitize_name(_text(get(row, 'region'))),
         'ehub_profile_url':         _str(get(row, 'ehub_profile_url')),
         'lms_profile_url':          _str(get(row, 'lms_profile_url')),
         'has_logged_into_ehub':     _bool(get(row, 'has_logged_into_ehub')),
