@@ -33,11 +33,19 @@ def _convert_to_utf8mb4(apps, schema_editor):
     if connection.vendor != 'mysql':
         return
     with connection.cursor() as cur:
-        for table in _TABLES:
-            cur.execute(
-                f'ALTER TABLE `{table}` '
-                f'CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
-            )
+        # Temporarily disable FK checks — MySQL refuses to alter the charset of
+        # a column that is referenced by a foreign key constraint.  The ALTER
+        # does not change column values or types, only the charset/collation, so
+        # it is safe to skip the FK check here; we restore it immediately after.
+        cur.execute('SET foreign_key_checks = 0')
+        try:
+            for table in _TABLES:
+                cur.execute(
+                    f'ALTER TABLE `{table}` '
+                    f'CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+                )
+        finally:
+            cur.execute('SET foreign_key_checks = 1')
 
 
 def _noop(apps, schema_editor):
