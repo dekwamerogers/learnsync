@@ -503,7 +503,7 @@
             {% for enrolment in learner.enrolments.all %}
             {% with s=enrolment.health_status %}
             <span style="border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap;{% if s == 'graduated' %}background:#dbeafe;color:#2563eb;{% elif s == 'active' %}background:#dcfce7;color:#16a34a;{% elif s == 'at_risk' %}background:#fef3c7;color:#d97706;{% elif s == 'dormant' %}background:#ede9fe;color:#7c3aed;{% else %}background:#f3f4f6;color:#6b7280;{% endif %}">
-              {% if enrolment.current_course and enrolment.current_course.code %}{{ enrolment.current_course.code }}{% else %}{{ enrolment.programme.code }}{% endif %}
+              {% if s == 'graduated' %}{{ enrolment.programme.code }}{% elif enrolment.current_course and enrolment.current_course.code %}{{ enrolment.current_course.code }}{% else %}{{ enrolment.programme.code }}{% endif %}
             </span>
             {% endwith %}
             {% empty %}
@@ -682,7 +682,7 @@
   var totalFiltered = {{ total }};
   var pageCount = document.querySelectorAll('.learner-check').length;
   // Current filter params — passed to the server so it can re-apply the same filter
-  var filterQS = {{ request.GET.urlencode|safe|default:'""' }};
+  var filterQS = "{{ request.GET.urlencode }}";
 
   window.updateBulkBar = function() {
     var checked = document.querySelectorAll('.learner-check:checked');

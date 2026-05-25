@@ -10,12 +10,13 @@
   --sp-blue:       #0452F0;
   --sp-blue-light: #e8effe;
 
-  /* Health status palette */
-  --sp-active:    #16a34a;   /* green-600 */
-  --sp-at-risk:   #d97706;   /* amber-600 */
-  --sp-dormant:   #7c3aed;   /* violet-600 */
-  --sp-graduated: #2563eb;   /* blue-600 */
-  --sp-not-started: #6b7280; /* gray-500 */
+  /* Health status palette — muted/professional */
+  --sp-active:      #15803d;   /* green-700   */
+  --sp-at-risk:     #b45309;   /* amber-700   */
+  --sp-dormant:     #4338ca;   /* indigo-700  */
+  --sp-graduated:   #1d4ed8;   /* blue-700    */
+  --sp-not-started: #6b7280;   /* gray-500    */
+  --sp-badges:      #7c3aed;   /* violet-600  */
 }
 
 body {
@@ -302,7 +303,7 @@ body {
 
 .sp-health-active      { background: #dcfce7; color: var(--sp-active); }
 .sp-health-at_risk     { background: #fef3c7; color: var(--sp-at-risk); }
-.sp-health-dormant     { background: #ede9fe; color: var(--sp-dormant); }
+.sp-health-dormant     { background: #e0e7ff; color: var(--sp-dormant); }  /* indigo-100 bg */
 .sp-health-graduated   { background: #dbeafe; color: var(--sp-graduated); }
 .sp-health-not_yet_started { background: #f3f4f6; color: var(--sp-not-started); }
 

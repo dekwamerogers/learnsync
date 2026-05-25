@@ -304,6 +304,37 @@ def home(request):
             'certs':                _d(certificates_count, prev_certs),
         }
 
+    # ── Attention-section helpers ─────────────────────────────────────────
+    critical_active_drop = False
+    active_drop_pct      = None
+    if deltas and deltas.get('active') is not None and deltas['active'] < 0:
+        prev_active = health_counts['active'] - deltas['active']   # e.g. 175 - (-228) = 403
+        if prev_active > 0:
+            active_drop_pct      = round(abs(deltas['active']) / prev_active * 100)
+            critical_active_drop = active_drop_pct >= 10           # ≥10 % drop is critical
+
+    not_started_pct = (
+        round(health_counts['not_yet_started'] / total_learners * 100)
+        if total_learners else None
+    )
+
+    prog_health_rows = [{
+        'code':       r['programme__code'],
+        'graduated':  r['graduated'],
+        'active':     r['active'],
+        'at_risk':    r['at_risk'],
+        'dormant':    r['dormant'],
+        'not_started': r['not_yet_started'],
+        'total':      (r['graduated'] + r['active'] + r['at_risk']
+                       + r['dormant'] + r['not_yet_started']),
+    } for r in _prog_rows]
+
+    low_engagement_progs = [
+        r['code'] for r in prog_health_rows
+        if r['total'] > 10 and
+           (r['active'] + r['at_risk'] + r['dormant'] + r['graduated']) < r['total'] * 0.15
+    ]
+
     # ── Weekly enrolment timeline ─────────────────────────────────────────
     _prog_colors = ['#0452F0','#0d9488','#f97316','#ec4899','#ef4444','#06b6d4','#a855f7']
     active_progs = list(

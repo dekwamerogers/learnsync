@@ -111,32 +111,32 @@
 <div class="sp-health-row">
 
   <a href="{% url 'sp_learner_list' %}?health=dormant" style="text-decoration:none;">
-    <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #7c3aed;">
-      <div style="font-size:26px;font-weight:700;color:#7c3aed;line-height:1;">{{ health_counts.dormant }}</div>
+    <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #4338ca;">
+      <div style="font-size:26px;font-weight:700;color:#4338ca;line-height:1;">{{ health_counts.dormant }}</div>
       <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Dormant</div>
       {% if deltas %}<div style="margin-top:4px;">{% include "selfpaced/_delta.html" with val=deltas.dormant positive_is_good=False %}</div>{% endif %}
     </div>
   </a>
 
   <a href="{% url 'sp_learner_list' %}?health=at_risk" style="text-decoration:none;">
-    <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #d97706;">
-      <div style="font-size:26px;font-weight:700;color:#d97706;line-height:1;">{{ health_counts.at_risk }}</div>
+    <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #b45309;">
+      <div style="font-size:26px;font-weight:700;color:#b45309;line-height:1;">{{ health_counts.at_risk }}</div>
       <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">At Risk</div>
       {% if deltas %}<div style="margin-top:4px;">{% include "selfpaced/_delta.html" with val=deltas.at_risk positive_is_good=False %}</div>{% endif %}
     </div>
   </a>
 
   <a href="{% url 'sp_learner_list' %}?health=active" style="text-decoration:none;">
-    <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #16a34a;">
-      <div style="font-size:26px;font-weight:700;color:#16a34a;line-height:1;">{{ health_counts.active }}</div>
+    <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #15803d;">
+      <div style="font-size:26px;font-weight:700;color:#15803d;line-height:1;">{{ health_counts.active }}</div>
       <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Active</div>
       {% if deltas %}<div style="margin-top:4px;">{% include "selfpaced/_delta.html" with val=deltas.active positive_is_good=True %}</div>{% endif %}
     </div>
   </a>
 
   <a href="{% url 'sp_learner_list' %}?graduated=certificate" style="text-decoration:none;">
-    <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #2563eb;">
-      <div style="font-size:26px;font-weight:700;color:#2563eb;line-height:1;">{{ certified_learner_count }}</div>
+    <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #1d4ed8;">
+      <div style="font-size:26px;font-weight:700;color:#1d4ed8;line-height:1;">{{ certified_learner_count }}</div>
       <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Graduated</div>
       {% if deltas %}<div style="margin-top:4px;">{% include "selfpaced/_delta.html" with val=deltas.graduated positive_is_good=True %}</div>{% endif %}
     </div>
@@ -180,16 +180,16 @@
         {% endif %}
         <div style="display:flex;flex-direction:column;gap:2px;margin-top:8px;padding-top:6px;border-top:1px solid #f3f4f6;">
           <div style="display:flex;justify-content:space-between;font-size:10px;">
-            <span style="color:#16a34a;font-weight:600;">Active</span><span style="color:#374151;">{{ enrolment_counts.active }}</span>
+            <span style="color:#15803d;font-weight:600;">Active</span><span style="color:#374151;">{{ enrolment_counts.active }}</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:10px;">
-            <span style="color:#d97706;font-weight:600;">At Risk</span><span style="color:#374151;">{{ enrolment_counts.at_risk }}</span>
+            <span style="color:#b45309;font-weight:600;">At Risk</span><span style="color:#374151;">{{ enrolment_counts.at_risk }}</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:10px;">
-            <span style="color:#7c3aed;font-weight:600;">Dormant</span><span style="color:#374151;">{{ enrolment_counts.dormant }}</span>
+            <span style="color:#4338ca;font-weight:600;">Dormant</span><span style="color:#374151;">{{ enrolment_counts.dormant }}</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:10px;">
-            <span style="color:#2563eb;font-weight:600;">Graduated</span><span style="color:#374151;">{{ enrolment_counts.graduated }}</span>
+            <span style="color:#1d4ed8;font-weight:600;">Graduated</span><span style="color:#374151;">{{ enrolment_counts.graduated }}</span>
           </div>
         </div>
       </div>
@@ -231,9 +231,9 @@
 
       {# ── Step 4: Retained ── #}
       <div style="display:flex;align-items:center;gap:10px;padding:5px 0;">
-        <div style="width:7px;height:7px;border-radius:50%;background:#7c3aed;flex-shrink:0;margin-left:1px;"></div>
+        <div style="width:7px;height:7px;border-radius:50%;background:#0f766e;flex-shrink:0;margin-left:1px;"></div>
         <div style="flex:1;font-size:11px;color:#6b7280;">Retained</div>
-        <div style="font-size:14px;font-weight:700;color:#7c3aed;">{{ module_retained_count }}</div>
+        <div style="font-size:14px;font-weight:700;color:#0f766e;">{{ module_retained_count }}</div>
         <div style="font-size:10px;color:#9ca3af;min-width:34px;text-align:right;">{% if retention_rate is not None %}{{ retention_rate }}%{% else %}—{% endif %}</div>
       </div>
       <div style="font-size:9px;color:#d1d5db;margin-top:6px;padding-top:6px;border-top:1px solid #f9fafb;">
@@ -247,7 +247,7 @@
   <div class="sp-card" style="padding:16px;">
     <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Graduation Rate</div>
     <div style="display:flex;align-items:baseline;gap:10px;margin-top:4px;">
-      <div style="font-size:32px;font-weight:700;color:#2563eb;line-height:1;">{% if grad_rate is not None %}{{ grad_rate }}%{% else %}—{% endif %}</div>
+      <div style="font-size:32px;font-weight:700;color:#1d4ed8;line-height:1;">{% if grad_rate is not None %}{{ grad_rate }}%{% else %}—{% endif %}</div>
       {% if deltas and grad_rate is not None %}{% include "selfpaced/_delta.html" with val=deltas.grad_rate positive_is_good=True suffix="pp" %}{% endif %}
     </div>
     <div style="font-size:11px;color:#9ca3af;margin-top:8px;">Of activated learners who have graduated</div>
@@ -259,12 +259,12 @@
       <i class="ti ti-certificate" style="font-size:11px;"></i> Certificates
     </div>
     <div style="display:flex;align-items:baseline;gap:10px;margin-top:4px;">
-      <div style="font-size:32px;font-weight:700;color:#2563eb;line-height:1;">{{ certificates_count }}</div>
+      <div style="font-size:32px;font-weight:700;color:#1d4ed8;line-height:1;">{{ certificates_count }}</div>
       {% if deltas %}{% include "selfpaced/_delta.html" with val=deltas.certs positive_is_good=True %}{% endif %}
     </div>
     <div style="font-size:11px;color:#9ca3af;margin-top:8px;">Programme graduations</div>
     <div style="margin-top:8px;padding-top:8px;border-top:1px solid #f3f4f6;display:flex;align-items:baseline;gap:8px;">
-      <span style="font-size:18px;font-weight:700;color:#7c3aed;">{{ badges_count }}</span>
+      <span style="font-size:18px;font-weight:700;color:#7c3aed;">{{ badges_count }}</span>  {# violet = badges #}
       {% if deltas %}{% include "selfpaced/_delta.html" with val=deltas.badges positive_is_good=True %}{% endif %}
       <span style="font-size:10px;color:#9ca3af;">course badges</span>
     </div>
@@ -281,11 +281,11 @@
       <canvas id="healthDonut"></canvas>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;justify-content:center;">
-      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block;"></span>Active</span>
-      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#d97706;display:inline-block;"></span>At Risk</span>
-      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#7c3aed;display:inline-block;"></span>Dormant</span>
-      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#2563eb;display:inline-block;"></span>Graduated</span>
-      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#d1d5db;display:inline-block;"></span>Not Started</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#15803d;display:inline-block;"></span>Active</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#b45309;display:inline-block;"></span>At Risk</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#4338ca;display:inline-block;"></span>Dormant</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#1d4ed8;display:inline-block;"></span>Graduated</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:3px;color:#6b7280;"><span style="width:8px;height:8px;border-radius:50%;background:#6b7280;display:inline-block;"></span>Not Started</span>
     </div>
   </div>
 
@@ -330,7 +330,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
 <script>
 (function() {
   var DL_WHITE = {
@@ -351,7 +350,7 @@
       labels: ['Active','At Risk','Dormant','Graduated','Not Started'],
       datasets: [{
         data: [{{ health_counts.active }},{{ health_counts.at_risk }},{{ health_counts.dormant }},{{ health_counts.graduated }},{{ health_counts.not_yet_started }}],
-        backgroundColor: ['#16a34a','#d97706','#7c3aed','#2563eb','#d1d5db'],
+        backgroundColor: [SP_COLORS.active, SP_COLORS.at_risk, SP_COLORS.dormant, SP_COLORS.graduated, SP_COLORS.not_yet_started],
         borderWidth: 0, hoverOffset: 4,
       }]
     },
@@ -400,11 +399,11 @@
     data: {
       labels: {{ chart_programme_labels|safe }},
       datasets: [
-        { label: 'Graduated',    data: {{ chart_graduated|safe }},        backgroundColor: '#2563eb', borderRadius: 3, borderSkipped: false },
-        { label: 'Active',       data: {{ chart_active|safe }},           backgroundColor: '#16a34a', borderRadius: 3, borderSkipped: false },
-        { label: 'At Risk',      data: {{ chart_at_risk|safe }},          backgroundColor: '#d97706', borderRadius: 3, borderSkipped: false },
-        { label: 'Dormant',      data: {{ chart_dormant|safe }},          backgroundColor: '#7c3aed', borderRadius: 3, borderSkipped: false },
-        { label: 'Not Started',  data: {{ chart_not_yet_started|safe }},  backgroundColor: '#9ca3af', borderRadius: 3, borderSkipped: false },
+        { label: 'Graduated',    data: {{ chart_graduated|safe }},        backgroundColor: SP_COLORS.graduated,       borderRadius: 3, borderSkipped: false },
+        { label: 'Active',       data: {{ chart_active|safe }},           backgroundColor: SP_COLORS.active,          borderRadius: 3, borderSkipped: false },
+        { label: 'At Risk',      data: {{ chart_at_risk|safe }},          backgroundColor: SP_COLORS.at_risk,         borderRadius: 3, borderSkipped: false },
+        { label: 'Dormant',      data: {{ chart_dormant|safe }},          backgroundColor: SP_COLORS.dormant,         borderRadius: 3, borderSkipped: false },
+        { label: 'Not Started',  data: {{ chart_not_yet_started|safe }},  backgroundColor: SP_COLORS.not_yet_started, borderRadius: 3, borderSkipped: false },
       ]
     },
     options: {

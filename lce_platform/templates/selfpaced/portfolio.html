@@ -30,7 +30,7 @@
   <a href="{% url 'sp_learner_list' %}?health=dormant&health=at_risk" style="text-decoration:none;">
     <div class="sp-card" style="padding:16px;{% if total_dormant or total_at_risk %}border-color:#fde68a;{% endif %}">
       <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Need Attention</div>
-      <div style="font-size:32px;font-weight:700;color:{% if total_dormant or total_at_risk %}#d97706{% else %}#9ca3af{% endif %};margin-top:4px;line-height:1;">{{ total_dormant|add:total_at_risk }}</div>
+      <div style="font-size:32px;font-weight:700;color:{% if total_dormant or total_at_risk %}#b45309{% else %}#9ca3af{% endif %};margin-top:4px;line-height:1;">{{ total_dormant|add:total_at_risk }}</div>
       <div style="font-size:11px;color:#9ca3af;margin-top:6px;">{{ total_dormant }} dormant · {{ total_at_risk }} at risk</div>
     </div>
   </a>
@@ -38,7 +38,7 @@
   <a href="{% url 'sp_learner_list' %}?health=active" style="text-decoration:none;">
     <div class="sp-card" style="padding:16px;">
       <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Active</div>
-      <div style="font-size:32px;font-weight:700;color:#16a34a;margin-top:4px;line-height:1;">{{ total_active }}</div>
+      <div style="font-size:32px;font-weight:700;color:#15803d;margin-top:4px;line-height:1;">{{ total_active }}</div>
       <div style="font-size:11px;color:#9ca3af;margin-top:6px;">Making progress now</div>
     </div>
   </a>
@@ -46,7 +46,7 @@
   <a href="{% url 'sp_learner_list' %}?graduated=certificate" style="text-decoration:none;">
     <div class="sp-card" style="padding:16px;">
       <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Graduated</div>
-      <div style="font-size:32px;font-weight:700;color:#2563eb;margin-top:4px;line-height:1;">{{ total_graduated }}</div>
+      <div style="font-size:32px;font-weight:700;color:#1d4ed8;margin-top:4px;line-height:1;">{{ total_graduated }}</div>
       <div style="font-size:11px;color:#9ca3af;margin-top:6px;">Programme completions</div>
     </div>
   </a>
@@ -72,11 +72,11 @@
       <tr>
         <th>Programme</th>
         <th style="text-align:right;">Learners</th>
-        <th style="text-align:right;color:#7c3aed;">Dormant</th>
-        <th style="text-align:right;color:#d97706;">At Risk</th>
-        <th style="text-align:right;color:#16a34a;">Active</th>
-        <th style="text-align:right;color:#2563eb;">Graduated</th>
-        <th style="text-align:right;color:#9ca3af;">Not Started</th>
+        <th style="text-align:right;color:#4338ca;">Dormant</th>
+        <th style="text-align:right;color:#b45309;">At Risk</th>
+        <th style="text-align:right;color:#15803d;">Active</th>
+        <th style="text-align:right;color:#1d4ed8;">Graduated</th>
+        <th style="text-align:right;color:#6b7280;">Not Started</th>
         <th style="text-align:right;">Activation</th>
         <th style="text-align:right;">Grad Rate</th>
         <th style="text-align:right;">Courses</th>
@@ -92,10 +92,10 @@
           <div style="font-size:11px;color:#9ca3af;margin-top:1px;">{{ row.programme.name }}</div>
           {% if row.total %}
           <div class="pf-health-bar" style="width:120px;">
-            {% if row.dormant %}<div style="width:{% widthratio row.dormant row.total 100 %}%;background:#7c3aed;"></div>{% endif %}
-            {% if row.at_risk %}<div style="width:{% widthratio row.at_risk row.total 100 %}%;background:#d97706;"></div>{% endif %}
-            {% if row.active %}<div style="width:{% widthratio row.active row.total 100 %}%;background:#16a34a;"></div>{% endif %}
-            {% if row.graduated %}<div style="width:{% widthratio row.graduated row.total 100 %}%;background:#2563eb;"></div>{% endif %}
+            {% if row.dormant %}<div style="width:{% widthratio row.dormant row.total 100 %}%;background:#4338ca;"></div>{% endif %}
+            {% if row.at_risk %}<div style="width:{% widthratio row.at_risk row.total 100 %}%;background:#b45309;"></div>{% endif %}
+            {% if row.active %}<div style="width:{% widthratio row.active row.total 100 %}%;background:#15803d;"></div>{% endif %}
+            {% if row.graduated %}<div style="width:{% widthratio row.graduated row.total 100 %}%;background:#1d4ed8;"></div>{% endif %}
             {% if row.not_started %}<div style="flex:1;background:#e5e7eb;"></div>{% endif %}
           </div>
           {% endif %}
@@ -107,7 +107,7 @@
           {% if row.dormant %}
           <a href="{% url 'sp_learner_list' %}?programme={{ row.programme.pk }}&health=dormant"
              onclick="event.stopPropagation();"
-             style="font-weight:600;color:#7c3aed;text-decoration:none;">{{ row.dormant }}</a>
+             style="font-weight:600;color:#4338ca;text-decoration:none;">{{ row.dormant }}</a>
           {% else %}<span style="color:#d1d5db;">—</span>{% endif %}
         </td>
 
@@ -115,7 +115,7 @@
           {% if row.at_risk %}
           <a href="{% url 'sp_learner_list' %}?programme={{ row.programme.pk }}&health=at_risk"
              onclick="event.stopPropagation();"
-             style="font-weight:600;color:#d97706;text-decoration:none;">{{ row.at_risk }}</a>
+             style="font-weight:600;color:#b45309;text-decoration:none;">{{ row.at_risk }}</a>
           {% else %}<span style="color:#d1d5db;">—</span>{% endif %}
         </td>
 
@@ -123,7 +123,7 @@
           {% if row.active %}
           <a href="{% url 'sp_learner_list' %}?programme={{ row.programme.pk }}&health=active"
              onclick="event.stopPropagation();"
-             style="font-weight:600;color:#16a34a;text-decoration:none;">{{ row.active }}</a>
+             style="font-weight:600;color:#15803d;text-decoration:none;">{{ row.active }}</a>
           {% else %}<span style="color:#d1d5db;">—</span>{% endif %}
         </td>
 

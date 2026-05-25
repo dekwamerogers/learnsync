@@ -21,6 +21,10 @@ db.sqlite3
 staticfiles/
 media/
 
+# Logs folder — track the folder via .gitkeep but ignore actual log files
+lce_platform/logs/*.log
+lce_platform/logs/*.log.*
+
 # Secrets — NEVER commit these
 lce_platform/.env
 lce_platform/.env.example

@@ -287,6 +287,21 @@
   });
 </script>
 <script src="{% static 'selfpaced/js/plugins/chartjs.min.js' %}"></script>
+<script src="{% static 'selfpaced/js/plugins/chartjs-plugin-datalabels.min.js' %}"></script>
+<script>
+Chart.register(ChartDataLabels);
+// Shared palette — reference SP_COLORS in every chart template instead of hardcoding hex values
+window.SP_COLORS = {
+  active:          '#15803d',  // green-700
+  at_risk:         '#b45309',  // amber-700
+  dormant:         '#4338ca',  // indigo-700
+  not_yet_started: '#6b7280',  // gray-500
+  graduated:       '#1d4ed8',  // blue-700
+  badges:          '#7c3aed',  // violet-600
+  single:          '#0452F0',  // ALX brand blue (single-programme)
+  multi:           '#0e7490',  // cyan-700 (multi-programme)
+};
+</script>
 <script src="{% static 'selfpaced/js/plugins/perfect-scrollbar.min.js' %}"></script>
 
 <script>

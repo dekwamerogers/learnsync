@@ -28,7 +28,7 @@
     display:inline-block; padding:2px 9px; border-radius:999px;
     font-size:11px; font-weight:600;
   }
-  .pill-green  { background:#f0fdf4; color:#16a34a; }
+  .pill-green  { background:#f0fdf4; color:#15803d; }
   .pill-blue   { background:#eff6ff; color:#1d4ed8; }
   .pill-orange { background:#fff7ed; color:#c2410c; }
   .glossary-row { display:flex; gap:14px; padding:10px 0; border-bottom:1px solid #f3f4f6; }
@@ -69,7 +69,7 @@
   <!-- ── Unpaid-excluded notice ─────────────────────────────────────────── -->
   <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;
               background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;margin-bottom:22px;">
-    <i class="ti ti-info-circle" style="font-size:16px;color:#d97706;flex-shrink:0;"></i>
+    <i class="ti ti-info-circle" style="font-size:16px;color:#b45309;flex-shrink:0;"></i>
     <p style="font-size:12px;color:#92400e;margin:0;line-height:1.5;">
       <strong>Unpaid learners excluded.</strong>
       All metrics on this page count only learners whose payment status is Compliant, Due Soon,
@@ -84,10 +84,10 @@
 
     {% include "selfpaced/_report_card.html" with label="Active Programmes" value=active_programmes icon="ti-school" color="#0452F0" desc="Programmes currently running. Prerequisite / onboarding tracks are excluded." %}
     {% include "selfpaced/_report_card.html" with label="Paid Enrolled" value=total_enrolled icon="ti-users" color="#0d9488" desc="Learners with a confirmed or pending payment enrolled in at least one programme." %}
-    {% include "selfpaced/_report_card.html" with label="Activated" value=total_activated rate=activation_rate icon="ti-player-play" color="#7c3aed" desc="Enrolled learners who have passed the first module of their programme." %}
+    {% include "selfpaced/_report_card.html" with label="Activated" value=total_activated rate=activation_rate icon="ti-player-play" color="#4338ca" desc="Enrolled learners who have passed the first module of their programme." %}
     {% include "selfpaced/_report_card.html" with label="Retained" value=total_retained rate=retention_rate icon="ti-repeat" color="#0891b2" desc="Learners who passed the first module and remain engaged — health is Active, At Risk, or Graduated." %}
-    {% include "selfpaced/_report_card.html" with label="Graduated" value=total_graduated rate=grad_rate icon="ti-award" color="#16a34a" desc="Completed all required courses and met graduation criteria." %}
-    {% include "selfpaced/_report_card.html" with label="Badges Earned" value=total_badges icon="ti-rosette" color="#f59e0b" desc="Course-completion credentials awarded. One badge per passed course — a learner can earn multiple." %}
+    {% include "selfpaced/_report_card.html" with label="Graduated" value=total_graduated rate=grad_rate icon="ti-award" color="#1d4ed8" desc="Completed all required courses and met graduation criteria." %}
+    {% include "selfpaced/_report_card.html" with label="Badges Earned" value=total_badges icon="ti-rosette" color="#7c3aed" desc="Course-completion credentials awarded. One badge per passed course — a learner can earn multiple." %}
     {% include "selfpaced/_report_card.html" with label="Active" value=health_totals.active|default:0 icon="ti-circle-check" color="#0d9488" desc="On track: submitting work, passing assignments, within all inactivity thresholds." %}
     {% include "selfpaced/_report_card.html" with label="At Risk" value=health_totals.at_risk|default:0 icon="ti-alert-triangle" color="#dc2626" desc="At least one warning flag raised. Needs attention — see the At-Risk Flags panel." %}
     {% include "selfpaced/_report_card.html" with label="Dormant" value=health_totals.dormant|default:0 icon="ti-moon" color="#6b7280" desc="No meaningful activity for an extended period. Candidates for re-engagement outreach." %}
@@ -115,9 +115,9 @@
             <th style="color:#0d9488;"><abbr title="Currently submitting work, passing assignments, and within inactivity thresholds.">Active</abbr></th>
             <th style="color:#dc2626;"><abbr title="At least one warning flag raised. See the At-Risk Flags panel for details.">At Risk</abbr></th>
             <th><abbr title="Enrolled but no meaningful activity for an extended period.">Dormant</abbr></th>
-            <th style="color:#16a34a;"><abbr title="Completed all required courses and met graduation criteria.">Graduated</abbr></th>
+            <th style="color:#1d4ed8;"><abbr title="Completed all required courses and met graduation criteria.">Graduated</abbr></th>
             <th><abbr title="Graduation Rate = Graduated ÷ Enrolled.">Grad %</abbr></th>
-            <th style="color:#f59e0b;"><abbr title="Course-completion credentials earned by learners in this programme. One per passed course.">Badges</abbr></th>
+            <th style="color:#7c3aed;"><abbr title="Course-completion credentials earned by learners in this programme. One per passed course.">Badges</abbr></th>
           </tr>
         </thead>
         <tbody>
@@ -135,9 +135,9 @@
             <td style="color:#0d9488;font-weight:600;">{{ p.active }}</td>
             <td style="color:#dc2626;font-weight:600;">{{ p.at_risk }}</td>
             <td style="color:#6b7280;">{{ p.dormant }}</td>
-            <td style="color:#16a34a;font-weight:600;">{{ p.graduated }}</td>
+            <td style="color:#1d4ed8;font-weight:600;">{{ p.graduated }}</td>
             <td><span class="pill pill-green">{{ p.grad_rate }}%</span></td>
-            <td style="color:#f59e0b;font-weight:600;">{{ p.badges }}</td>
+            <td style="color:#7c3aed;font-weight:600;">{{ p.badges }}</td>
           </tr>
           {% empty %}
           <tr><td colspan="12" style="padding:20px;text-align:center;color:#9ca3af;">No active programmes.</td></tr>
@@ -173,7 +173,7 @@
             <th style="color:#0d9488;"><abbr title="Of learners enrolled in this week, how many are currently Active (on track, within thresholds).">Active</abbr></th>
             <th style="color:#dc2626;"><abbr title="Of learners enrolled in this week, how many are currently At-Risk (at least one warning flag raised).">At Risk</abbr></th>
             <th><abbr title="Cohort-based: of learners enrolled in this week, how many have since graduated? Will never exceed Enrolled.">Graduated</abbr></th>
-            <th style="color:#f59e0b;"><abbr title="Cohort-based: total course-completion badges earned by learners in this week's cohort (at any point). One badge per passed course.">Badges</abbr></th>
+            <th style="color:#7c3aed;"><abbr title="Cohort-based: total course-completion badges earned by learners in this week's cohort (at any point). One badge per passed course.">Badges</abbr></th>
             <th><abbr title="Interventions logged this week (all learners, not just paid).">Interventions</abbr></th>
           </tr>
         </thead>
@@ -186,7 +186,7 @@
             <td style="color:#0d9488;font-weight:600;">{{ r.active }}</td>
             <td style="color:#dc2626;font-weight:600;">{{ r.at_risk }}</td>
             <td>{{ r.graduated }}</td>
-            <td style="color:#f59e0b;font-weight:600;">{{ r.badges }}</td>
+            <td style="color:#7c3aed;font-weight:600;">{{ r.badges }}</td>
             <td>{{ r.interventions }}</td>
           </tr>
           {% endfor %}
@@ -218,7 +218,7 @@
                 <th style="color:#0d9488;"><abbr title="Currently Active — cohort of this week">Active</abbr></th>
                 <th style="color:#dc2626;"><abbr title="Currently At Risk — cohort of this week">At Risk</abbr></th>
                 <th><abbr title="Cohort-based: of those enrolled this week, how many have graduated?">Graduated</abbr></th>
-                <th style="color:#f59e0b;"><abbr title="Cohort-based: total badges earned by this cohort at any point">Badges</abbr></th>
+                <th style="color:#7c3aed;"><abbr title="Cohort-based: total badges earned by this cohort at any point">Badges</abbr></th>
                 <th><abbr title="Interventions logged this week (event-based)">Interventions</abbr></th>
               </tr>
             </thead>
@@ -231,7 +231,7 @@
                 <td style="color:#0d9488;font-weight:600;">{{ w.active }}</td>
                 <td style="color:#dc2626;font-weight:600;">{{ w.at_risk }}</td>
                 <td>{{ w.graduated }}</td>
-                <td style="color:#f59e0b;font-weight:600;">{{ w.badges }}</td>
+                <td style="color:#7c3aed;font-weight:600;">{{ w.badges }}</td>
                 <td>{{ w.interventions }}</td>
               </tr>
               {% endfor %}
@@ -426,7 +426,6 @@
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 (function () {
   var labels        = [{% for r in weekly_rows %}"{{ r.label }}"{% if not forloop.last %},{% endif %}{% endfor %}];
@@ -435,7 +434,22 @@
   var active        = [{% for r in weekly_rows %}{{ r.active }}{% if not forloop.last %},{% endif %}{% endfor %}];
   var atRisk        = [{% for r in weekly_rows %}{{ r.at_risk }}{% if not forloop.last %},{% endif %}{% endfor %}];
   var graduated     = [{% for r in weekly_rows %}{{ r.graduated }}{% if not forloop.last %},{% endif %}{% endfor %}];
+  var badges        = [{% for r in weekly_rows %}{{ r.badges }}{% if not forloop.last %},{% endif %}{% endfor %}];
   var interventions = [{% for r in weekly_rows %}{{ r.interventions }}{% if not forloop.last %},{% endif %}{% endfor %}];
+
+  // Stagger label alignment per dataset to reduce vertical overlap on line charts
+  var ALIGNS = ['top', 'bottom', 'top', 'bottom', 'top', 'bottom', 'top'];
+
+  function lineDL(datasetIdx) {
+    return {
+      display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
+      color: function(ctx) { return ctx.dataset.borderColor; },
+      font: { size: 8, weight: '700', family: 'Poppins,sans-serif' },
+      anchor: 'center',
+      align: ALIGNS[datasetIdx],
+      offset: 5,
+    };
+  }
 
   new Chart(document.getElementById('weeklyChart'), {
     type: 'line',
@@ -447,69 +461,68 @@
           data: enrolled,
           borderColor: '#0d9488',
           backgroundColor: 'rgba(13,148,136,0.08)',
-          tension: 0.3,
-          fill: false,
-          pointRadius: 4,
-          pointHoverRadius: 6,
+          tension: 0.3, fill: false, pointRadius: 4, pointHoverRadius: 6,
+          datalabels: lineDL(0),
         },
         {
           label: 'Activated',
           data: activated,
-          borderColor: '#7c3aed',
-          backgroundColor: 'rgba(124,58,237,0.08)',
-          tension: 0.3,
-          fill: false,
-          pointRadius: 4,
-          pointHoverRadius: 6,
+          borderColor: SP_COLORS.dormant,
+          backgroundColor: 'rgba(67,56,202,0.08)',
+          tension: 0.3, fill: false, pointRadius: 4, pointHoverRadius: 6,
+          datalabels: lineDL(1),
         },
         {
           label: 'Active',
           data: active,
-          borderColor: '#0d9488',
-          backgroundColor: 'rgba(13,148,136,0.08)',
-          tension: 0.3,
-          fill: false,
-          pointRadius: 4,
-          pointHoverRadius: 6,
+          borderColor: SP_COLORS.active,
+          backgroundColor: 'rgba(21,128,61,0.08)',
+          tension: 0.3, fill: false, pointRadius: 4, pointHoverRadius: 6,
+          datalabels: lineDL(2),
         },
         {
           label: 'At Risk',
           data: atRisk,
-          borderColor: '#dc2626',
-          backgroundColor: 'rgba(220,38,38,0.08)',
-          tension: 0.3,
-          fill: false,
-          pointRadius: 4,
-          pointHoverRadius: 6,
+          borderColor: SP_COLORS.at_risk,
+          backgroundColor: 'rgba(180,83,9,0.08)',
+          tension: 0.3, fill: false, pointRadius: 4, pointHoverRadius: 6,
+          datalabels: lineDL(3),
         },
         {
           label: 'Graduated',
           data: graduated,
-          borderColor: '#16a34a',
-          backgroundColor: 'rgba(22,163,74,0.08)',
-          tension: 0.3,
-          fill: false,
-          pointRadius: 4,
-          pointHoverRadius: 6,
+          borderColor: SP_COLORS.graduated,
+          backgroundColor: 'rgba(29,78,216,0.06)',
+          borderDash: [4, 3],
+          tension: 0.3, fill: false, pointRadius: 4, pointHoverRadius: 6,
+          datalabels: lineDL(4),
+        },
+        {
+          label: 'Badges',
+          data: badges,
+          borderColor: SP_COLORS.badges,
+          backgroundColor: 'rgba(124,58,237,0.08)',
+          tension: 0.3, fill: false, pointRadius: 4, pointHoverRadius: 6,
+          datalabels: lineDL(5),
         },
         {
           label: 'Interventions',
           data: interventions,
-          borderColor: '#f59e0b',
+          borderColor: '#94a3b8',
           borderDash: [5, 3],
-          backgroundColor: 'rgba(245,158,11,0.08)',
-          tension: 0.3,
-          fill: false,
-          pointRadius: 4,
-          pointHoverRadius: 6,
+          backgroundColor: 'rgba(148,163,184,0.08)',
+          tension: 0.3, fill: false, pointRadius: 4, pointHoverRadius: 6,
+          datalabels: lineDL(6),
         },
       ],
     },
     options: {
       responsive: true,
+      layout: { padding: { top: 20 } },
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } },
+        datalabels: {},  // dataset-level overrides above take effect; this enables the plugin
       },
       scales: {
         x: {

@@ -87,7 +87,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
 <script>
 (function () {
   var DL_SEGMENT = {
@@ -111,13 +110,7 @@
     var globalSolo  = payload.global_solo;
     var globalMulti = payload.global_multi;
 
-    var COLORS = {
-      active:          '#16a34a',
-      at_risk:         '#d97706',
-      dormant:         '#7c3aed',
-      not_yet_started: '#9ca3af',
-      graduated:       '#2563eb',
-    };
+    var COLORS = SP_COLORS;  // use global palette
     var LABELS = {
       active: 'Active', at_risk: 'At Risk', dormant: 'Dormant',
       not_yet_started: 'Not Started', graduated: 'Graduated',
@@ -132,7 +125,7 @@
         type: 'doughnut',
         data: {
           labels: ['Single-programme', 'Multi-programme'],
-          datasets: [{ data: [globalSolo, globalMulti], backgroundColor: ['#0452F0', '#f59e0b'], borderWidth: 0 }],
+          datasets: [{ data: [globalSolo, globalMulti], backgroundColor: [SP_COLORS.single, SP_COLORS.multi], borderWidth: 0 }],
         },
         options: {
           responsive: true,
@@ -193,8 +186,8 @@
         data: {
           labels: progLabels,
           datasets: [
-            { label: 'Single-programme', data: raw.map(function (d) { return d.mix.solo  || 0; }), backgroundColor: '#0452F0', borderWidth: 0, borderRadius: 2 },
-            { label: 'Multi-programme',  data: raw.map(function (d) { return d.mix.multi || 0; }), backgroundColor: '#f59e0b', borderWidth: 0, borderRadius: 2 },
+            { label: 'Single-programme', data: raw.map(function (d) { return d.mix.solo  || 0; }), backgroundColor: SP_COLORS.single, borderWidth: 0, borderRadius: 2 },
+            { label: 'Multi-programme',  data: raw.map(function (d) { return d.mix.multi || 0; }), backgroundColor: SP_COLORS.multi,  borderWidth: 0, borderRadius: 2 },
           ],
         },
         options: {
@@ -253,10 +246,7 @@
     var activePk     = null;
     var activeHealth = 'all';
 
-    var HEALTH_COLORS = {
-      active: '#16a34a', at_risk: '#d97706', dormant: '#7c3aed',
-      not_yet_started: '#9ca3af', graduated: '#2563eb',
-    };
+    var HEALTH_COLORS = SP_COLORS;  // aliases global palette
     var HEALTH_LABELS = {
       active: 'Active', at_risk: 'At Risk', dormant: 'Dormant',
       not_yet_started: 'Not Started', graduated: 'Graduated',
@@ -272,8 +262,10 @@
     }
 
     function setHealthPill(health) {
-      var pillColor = { badges: '#f59e0b', all: '#374151', active: '#16a34a', at_risk: '#d97706',
-                        dormant: '#7c3aed', not_yet_started: '#9ca3af', graduated: '#2563eb' };
+      var pillColor = { badges: SP_COLORS.badges, all: '#374151',
+                        active: SP_COLORS.active,          at_risk: SP_COLORS.at_risk,
+                        dormant: SP_COLORS.dormant,        not_yet_started: SP_COLORS.not_yet_started,
+                        graduated: SP_COLORS.graduated };
       document.querySelectorAll('.health-pill').forEach(function (btn) {
         var active = btn.dataset.health === health;
         var col    = pillColor[btn.dataset.health] || '#374151';
@@ -304,7 +296,7 @@
         datasets = [{
           label: 'Badges acquired',
           data: prog.courses.map(function (c) { return c.badges || 0; }),
-          backgroundColor: '#f59e0b',
+          backgroundColor: SP_COLORS.badges,
           borderWidth: 0, borderRadius: 3,
         }];
       } else if (stacked) {
@@ -319,7 +311,7 @@
         }).concat([{
           label: 'Badges acquired',
           data: prog.courses.map(function (c) { return c.badges || 0; }),
-          backgroundColor: '#f59e0b',
+          backgroundColor: SP_COLORS.badges,
           borderWidth: 0, borderRadius: 2,
         }]);
       } else {

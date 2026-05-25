@@ -175,8 +175,8 @@
   </div>
   <div class="sp-card-body" {% if s == 'graduated' or s == 'not_yet_started' %}style="display:none;"{% endif %}>
 
-    <!-- Active flags — structured alert rows -->
-    {% if enrolment.active_flags %}
+    <!-- Active flags — structured alert rows (suppressed for graduated enrolments) -->
+    {% if enrolment.active_flags and s != 'graduated' %}
     <div style="margin-bottom:16px;display:flex;flex-direction:column;gap:6px;">
       {% for flag in enrolment.active_flags %}
 
