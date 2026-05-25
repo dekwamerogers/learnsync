@@ -84,6 +84,16 @@
         </span>
       </label>
 
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+        <input type="checkbox" name="is_prerequisite" id="id_is_prerequisite"
+               {% if post %}{% if post.is_prerequisite %}checked{% endif %}{% elif programme.is_prerequisite %}checked{% endif %}
+               style="width:15px;height:15px;accent-color:#7c3aed;cursor:pointer;">
+        <span>
+          <span style="font-size:13px;font-weight:500;color:#111827;">Onboarding / Prerequisite</span>
+          <span style="display:block;font-size:11px;color:#9ca3af;">Excluded from main metrics; counted in onboarding stats (e.g. WALX)</span>
+        </span>
+      </label>
+
     </div>
 
     <!-- Dates -->

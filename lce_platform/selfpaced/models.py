@@ -540,6 +540,11 @@ class IngestionJob(models.Model):
         max_length=20, choices=IngestionStatus.choices,
         default=IngestionStatus.PENDING
     )
+    # The date the CSV data was extracted from the source system.
+    # Health flags (days since activity, days since FSOL, etc.) are calculated
+    # relative to this date — NOT date.today() — so that uploading an old CSV
+    # does not make learners appear artificially dormant or at-risk.
+    data_as_of_date = models.DateField(null=True, blank=True)
     rows_processed = models.PositiveIntegerField(default=0)
     new_learners = models.PositiveIntegerField(default=0)
     updated_learners = models.PositiveIntegerField(default=0)

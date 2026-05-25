@@ -161,7 +161,11 @@ def _execute(job, content: bytes) -> None:
         Enrolment, FlagCode, FlaggedRow, Learner, PaymentStatus,
     )
 
-    upload_date = date.today()
+    # Use the date the CSV was exported from the source system (set by the user
+    # on the upload form). Falling back to today ensures old code paths still
+    # work, but uploading with the correct export date is strongly preferred so
+    # that "days since activity" flags are anchored to reality.
+    upload_date: date = job.data_as_of_date or date.today()
 
     # ------------------------------------------------------------------
     # Phase 1 — Parse
@@ -574,18 +578,33 @@ def _execute(job, content: bytes) -> None:
         Enrolment.objects.bulk_create(new_enrolment_objs, batch_size=500)
 
     # Update existing enrolments.
+    # Guards: never overwrite a later/better value with an older CSV's data.
+    #   • FSOL / activation: keep the EARLIEST known date (min of existing + CSV).
+    #   • Graduation: once graduated, always graduated — never regress.
     update_enrolment_objs = []
     for (email, prog_pk), agg in enrolment_agg.items():
         e = existing_enrolments.get((email, prog_pk))
         if e is None:
             continue
         if agg['fsol']:
-            e.first_sign_of_life_date = min(agg['fsol'])
+            csv_fsol = min(agg['fsol'])
+            e.first_sign_of_life_date = (
+                min(e.first_sign_of_life_date, csv_fsol)
+                if e.first_sign_of_life_date else csv_fsol
+            )
         if agg['act']:
-            e.activation_date = min(agg['act'])
-        e.is_graduated = agg['is_graduated']
-        e.graduation_date = agg['graduation_date']
-        e.is_graduated_on_savanna = agg['is_graduated_on_savanna']
+            csv_act = min(agg['act'])
+            e.activation_date = (
+                min(e.activation_date, csv_act)
+                if e.activation_date else csv_act
+            )
+        # Don't regress from graduated — once True it stays True.
+        if agg['is_graduated']:
+            e.is_graduated = True
+        if agg['graduation_date']:
+            e.graduation_date = agg['graduation_date']
+        if agg['is_graduated_on_savanna']:
+            e.is_graduated_on_savanna = True
         update_enrolment_objs.append(e)
 
     if update_enrolment_objs:
@@ -656,12 +675,20 @@ def _execute(job, content: bytes) -> None:
         ce_key = (enrolment.pk, course_pk)
         if ce_key in existing_ces:
             ce = existing_ces[ce_key]
-            ce.status = status
-            ce.is_passed = is_passed
-            ce.completion_date = completion_date
-            ce.last_activity_date = last_activity
+            # Don't regress from completed — an old CSV won't show the completion.
+            if status == 'completed' or ce.status != 'completed':
+                ce.status = status
+                ce.is_passed = is_passed
+                # Don't clear a completion date that's already recorded.
+                if completion_date or ce.completion_date is None:
+                    ce.completion_date = completion_date
+            # Only advance last_activity — never move it backwards with old data.
+            if last_activity and (ce.last_activity_date is None or last_activity > ce.last_activity_date):
+                ce.last_activity_date = last_activity
             ce.pass_percentage = pass_pct
-            ce.opt_in_date = opt_in
+            # Don't clear an existing opt-in date with a later upload's None.
+            if opt_in and (ce.opt_in_date is None or opt_in < ce.opt_in_date):
+                ce.opt_in_date = opt_in
             update_ce_objs.append(ce)
         else:
             new_ce_objs.append(CourseEnrolment(
@@ -1414,7 +1441,7 @@ def recompute_health(
 
     Returns a summary dict: {'updated': int, 'errors': int, 'error_detail': list}.
     """
-    from selfpaced.models import AssignmentProgress, Course, CourseEnrolment, Enrolment, EnrolmentSnapshot, FlagCode, PaymentStatus, ProgrammeThreshold
+    from selfpaced.models import AssignmentProgress, Course, CourseEnrolment, Enrolment, EnrolmentSnapshot, FlagCode, Learner, PaymentStatus, ProgrammeThreshold
 
     _rc_payment_issue_statuses = {PaymentStatus.DUE_SOON, PaymentStatus.GRACE_PERIOD, PaymentStatus.OVERDUE}
     today = date.today()
@@ -1468,6 +1495,15 @@ def recompute_health(
 
     threshold_cache: dict = {}
     errors = []
+    updated_enrolments: list = []
+
+    # Pre-fetch learner payment statuses in bulk (needed for payment flag)
+    all_learner_pks = {e.learner_id for e in enrolments}
+    learner_payment: dict = {}
+    for _chunk in _chunked(list(all_learner_pks)):
+        learner_payment.update(
+            Learner.objects.filter(email__in=_chunk).values_list('email', 'payment_status')
+        )
 
     for i, enrolment in enumerate(enrolments):
         _recompute_state['done'] = i + 1
@@ -1485,17 +1521,25 @@ def recompute_health(
                 prefetched_threshold=threshold_cache[enrolment.programme_id],
                 programme_course_count=prog_course_counts.get(enrolment.programme_id),
             )
-            if (enrolment.learner.payment_status in _rc_payment_issue_statuses
+            if (learner_payment.get(enrolment.learner_id) in _rc_payment_issue_statuses
                     and FlagCode.PAYMENT_ISSUE not in active_flags):
                 active_flags = list(active_flags) + [FlagCode.PAYMENT_ISSUE]
             enrolment.health_status = health_status
             enrolment.active_flags = active_flags
             enrolment.flag_detail = flag_detail
-            enrolment.save(update_fields=['health_status', 'active_flags', 'flag_detail'])
+            updated_enrolments.append(enrolment)
         except Exception as exc:
             logger.exception('Health recompute failed for enrolment %s: %s', enrolment.pk, exc)
             errors.append(f'{enrolment.learner_id} ({enrolment.programme.code}): {exc}')
             _recompute_state['errors'] = len(errors)
+
+    # Single bulk_update instead of one UPDATE per enrolment
+    if updated_enrolments:
+        Enrolment.objects.bulk_update(
+            updated_enrolments,
+            ['health_status', 'active_flags', 'flag_detail'],
+            batch_size=500,
+        )
 
     _update_learner_health_rollups(enrolments)
 

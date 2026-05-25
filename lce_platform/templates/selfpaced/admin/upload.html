@@ -37,6 +37,25 @@
           <p style="font-size:11px;color:#9ca3af;margin-top:4px;">CSV format only.</p>
         </div>
 
+        <div style="margin-bottom:16px;">
+          <label for="{{ form.data_as_of_date.id_for_label }}"
+                 style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;">
+            Data as of date
+            <span style="font-weight:400;color:#9ca3af;">(when was this CSV exported?)</span>
+          </label>
+          {{ form.data_as_of_date }}
+          {% if form.data_as_of_date.errors %}
+            {% for error in form.data_as_of_date.errors %}
+              <div class="sp-alert sp-alert-error" style="margin-top:8px;">{{ error }}</div>
+            {% endfor %}
+          {% endif %}
+          <p style="font-size:11px;color:#9ca3af;margin-top:4px;">
+            Health flags (days inactive, days since FSOL, etc.) are measured from this date.
+            Uploading with the correct export date prevents learners from appearing artificially
+            dormant when you upload historical CSVs. Defaults to today if left blank.
+          </p>
+        </div>
+
         {% if form.non_field_errors %}
           <div class="sp-alert sp-alert-error" style="margin-bottom:12px;">
             {% for error in form.non_field_errors %}{{ error }}{% endfor %}

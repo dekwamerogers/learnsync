@@ -57,11 +57,13 @@ def upload_csv(request):
         if form.is_valid():
             f = form.cleaned_data['file']
             content = f.read()
+            data_as_of_date = form.cleaned_data.get('data_as_of_date')
             job = IngestionJob.objects.create(
                 uploaded_by=request.user,
                 file_name=f.name,
                 file_content=content,
                 status='pending_review',
+                data_as_of_date=data_as_of_date,
             )
             try:
                 from selfpaced.engine import preview_ingestion
@@ -532,11 +534,16 @@ def recompute_health_status(request):
 
 
 def _run_enrolment_upload(job_pk: int) -> None:
-    """Background thread: process a confirmed enrolment CSV upload."""
+    """Background thread: process a confirmed enrolment CSV upload.
+
+    Optimised for large files: pre-fetches all Learner and Enrolment records
+    in two bulk SELECTs, processes rows in Python, then writes with
+    bulk_create / bulk_update — regardless of row count only ~6 DB queries.
+    """
     from django.db import close_old_connections
     close_old_connections()
     try:
-        import csv, io
+        import csv, io, re, unicodedata as _ud
         from datetime import datetime as _dt
         from selfpaced.models import (
             EnrolmentUploadJob, Enrolment, Learner, Programme, PaymentStatus,
@@ -562,7 +569,6 @@ def _run_enrolment_upload(job_pk: int) -> None:
                    in _active_countries
             ]
 
-        # Resolve saved name → programme_pk mapping stored at confirm time
         name_to_prog_pk: dict = job.review_data.get('name_to_prog_pk', {})
         prog_cache: dict[int, Programme] = {
             p.pk: p for p in Programme.objects.filter(pk__in=name_to_prog_pk.values())
@@ -577,6 +583,7 @@ def _run_enrolment_upload(job_pk: int) -> None:
             'overdue':      PaymentStatus.OVERDUE,
         }
 
+        # ── helpers ────────────────────────────────────────────────────────
         def _get(row, *keys):
             for k in keys:
                 v = (row.get(k) or '').strip()
@@ -588,13 +595,9 @@ def _run_enrolment_upload(job_pk: int) -> None:
             if not raw:
                 return None
             s = raw.strip()
-            # Strip trailing time component (e.g. "2024-01-15 00:00:00" or "2024-01-15T00:00:00")
             s = s.split('T')[0].split(' ')[0] if 'T' in s or (len(s) > 10 and s[10] == ' ') else s
-            for fmt in (
-                '%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y',
-                '%Y/%m/%d', '%d %b %Y', '%d %B %Y',
-                '%B %d, %Y', '%b %d, %Y',
-            ):
+            for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y',
+                        '%Y/%m/%d', '%d %b %Y', '%d %B %Y', '%B %d, %Y', '%b %d, %Y'):
                 try:
                     return _dt.strptime(s.strip(), fmt).date()
                 except ValueError:
@@ -604,13 +607,19 @@ def _run_enrolment_upload(job_pk: int) -> None:
         def _parse_bool(raw):
             return raw.strip().lower() in ('yes', 'true', '1') if raw else False
 
-        created = updated = skipped = 0
-        errors = []
+        _4B = re.compile(r'[\U00010000-\U0010FFFF]')
+        _NAME_CATS = frozenset(['Lu','Ll','Lt','Lm','Lo','Mn','Mc','Me','Zs','Pd'])
 
-        for i, row in enumerate(rows, 1):
+        def _name(s):
+            s = _4B.sub('', s)
+            return ''.join(c for c in s if _ud.category(c) in _NAME_CATS or c in "'.''")
+
+        # ── Phase 1: parse rows → clean dicts, no DB ───────────────────────
+        parsed = []
+        skipped = 0
+        for row in rows:
             email     = (row.get(col_email) or '').strip().lower()
             prog_name = (row.get(col_prog)  or '').strip()
-
             if not email or '@' not in email:
                 skipped += 1
                 continue
@@ -618,91 +627,130 @@ def _run_enrolment_upload(job_pk: int) -> None:
             if not prog_pk or prog_pk not in prog_cache:
                 skipped += 1
                 continue
+            pay_raw = _get(row, 'Payment status', 'Payment Status', 'payment_status')
+            parsed.append({
+                'email':           email,
+                'prog_pk':         prog_pk,
+                'enrolment_date':  _parse_date(_get(row, col_date) if col_date else ''),
+                'activation_date': _parse_date(_get(row, 'Activation date', 'Activation Date', 'activation_date')),
+                'grad_date':       _parse_date(_get(row, 'Program graduation date', 'Programme graduation date')),
+                'is_graduated':    _parse_bool(_get(row, 'Is program graduated', 'Is programme graduated')),
+                'first_name':      _name(_get(row, 'First name', 'First Name', 'first_name')),
+                'last_name':       _name(_get(row, 'Last name',  'Last Name',  'last_name')),
+                'gender':          _name(_get(row, 'Gender', 'gender')),
+                'region':          _name(_get(row, 'Regions', 'Region', 'region')),
+                'country':         _name(_get(row, 'Country of residence', 'Country', 'country')),
+                'ehub_url':        _get(row, 'eHub profile', 'eHub Profile'),
+                'lms_url':         _get(row, 'LMS profile',  'LMS Profile'),
+                'payment':         _PAYMENT_MAP.get(pay_raw.lower()) if pay_raw else None,
+            })
 
-            prog = prog_cache[prog_pk]
+        # ── Phase 2: bulk pre-fetch (2 queries) ────────────────────────────
+        all_emails   = {p['email']   for p in parsed}
+        all_prog_pks = {p['prog_pk'] for p in parsed}
 
-            enrolment_date  = _parse_date(_get(row, col_date) if col_date else '')
-            activation_date = _parse_date(_get(row, 'Activation date', 'Activation Date', 'activation_date'))
-            grad_date       = _parse_date(_get(row, 'Program graduation date', 'Programme graduation date'))
-            is_graduated    = _parse_bool(_get(row, 'Is program graduated', 'Is programme graduated'))
+        existing_learners: dict[str, Learner] = {
+            l.email: l for l in Learner.objects.filter(email__in=all_emails)
+        } if all_emails else {}
 
-            first_name = _get(row, 'First name', 'First Name', 'first_name')
-            last_name  = _get(row, 'Last name',  'Last Name',  'last_name')
-            gender     = _get(row, 'Gender',     'gender')
-            region     = _get(row, 'Regions',    'Region',     'region')
-            country    = _get(row, 'Country of residence', 'Country', 'country')
-            ehub_url   = _get(row, 'eHub profile',  'eHub Profile')
-            lms_url    = _get(row, 'LMS profile',   'LMS Profile')
-            pay_raw    = _get(row, 'Payment status', 'Payment Status', 'payment_status')
-            payment    = _PAYMENT_MAP.get(pay_raw.lower()) if pay_raw else None
+        existing_enrolments: dict[tuple, Enrolment] = {
+            (e.learner_id, e.programme_id): e
+            for e in Enrolment.objects.filter(
+                learner_id__in=all_emails,
+                programme_id__in=all_prog_pks,
+            )
+        } if all_emails else {}
 
-            try:
-                learner, new_learner = Learner.objects.get_or_create(
-                    email=email,
-                    defaults={
-                        'first_name': first_name, 'last_name': last_name,
-                        'gender': gender, 'region': region, 'country': country,
-                        'ehub_profile_url': ehub_url, 'lms_profile_url': lms_url,
-                        'payment_status': payment or PaymentStatus.UNKNOWN,
-                    },
-                )
-                if not new_learner:
-                    learner_fields = []
-                    for attr, val in [
-                        ('first_name', first_name), ('last_name', last_name),
-                        ('gender', gender), ('region', region), ('country', country),
-                        ('ehub_profile_url', ehub_url), ('lms_profile_url', lms_url),
-                    ]:
-                        if val and getattr(learner, attr) != val:
-                            setattr(learner, attr, val)
-                            learner_fields.append(attr)
-                    if payment and learner.payment_status != payment:
-                        learner.payment_status = payment
-                        learner_fields.append('payment_status')
-                    if learner_fields:
-                        learner.save(update_fields=learner_fields)
+        # ── Phase 3: build create / update lists (pure Python) ─────────────
+        learners_to_create:    list[Learner]    = []
+        learners_to_update:    list[Learner]    = []
+        learner_update_fields: set[str]         = set()
+        enrolments_to_create:  list[Enrolment]  = []
+        enrolments_to_update:  list[Enrolment]  = []
+        enrolment_update_fields: set[str]       = set()
 
-                enrolment, new_enrolment = Enrolment.objects.get_or_create(
-                    learner=learner,
-                    programme=prog,
-                    defaults={
-                        'enrolment_date':  enrolment_date,
-                        'activation_date': activation_date,
-                        'is_graduated':    is_graduated,
-                        'graduation_date': grad_date,
-                    },
-                )
-                if new_enrolment:
-                    created += 1
+        seen_emails: set[str] = set()
+        created = updated = errors_count = 0
+        errors  = []
+
+        for p in parsed:
+            email   = p['email']
+            prog_pk = p['prog_pk']
+
+            # ── Learner ──
+            if email not in seen_emails:
+                seen_emails.add(email)
+                existing = existing_learners.get(email)
+                if existing is None:
+                    learners_to_create.append(Learner(
+                        email=email,
+                        first_name=p['first_name'], last_name=p['last_name'],
+                        gender=p['gender'], region=p['region'], country=p['country'],
+                        ehub_profile_url=p['ehub_url'], lms_profile_url=p['lms_url'],
+                        payment_status=p['payment'] or PaymentStatus.UNKNOWN,
+                    ))
                 else:
-                    enrolment_fields = []
+                    changed: list[str] = []
                     for attr, val in [
-                        ('enrolment_date', enrolment_date),
-                        ('activation_date', activation_date),
-                        ('graduation_date', grad_date),
+                        ('first_name', p['first_name']), ('last_name', p['last_name']),
+                        ('gender', p['gender']),         ('region', p['region']),
+                        ('country', p['country']),
+                        ('ehub_profile_url', p['ehub_url']),
+                        ('lms_profile_url',  p['lms_url']),
                     ]:
-                        # Always overwrite with CSV value — the supplementary CSV
-                        # is the authoritative source for these dates
-                        if val and getattr(enrolment, attr) != val:
-                            setattr(enrolment, attr, val)
-                            enrolment_fields.append(attr)
-                    if is_graduated and not enrolment.is_graduated:
-                        enrolment.is_graduated = True
-                        enrolment_fields.append('is_graduated')
-                    if enrolment_fields:
-                        enrolment.save(update_fields=enrolment_fields)
-                        updated += 1
+                        if val and getattr(existing, attr) != val:
+                            setattr(existing, attr, val)
+                            changed.append(attr)
+                    if p['payment'] and existing.payment_status != p['payment']:
+                        existing.payment_status = p['payment']
+                        changed.append('payment_status')
+                    if changed:
+                        learners_to_update.append(existing)
+                        learner_update_fields.update(changed)
 
-            except Exception as exc:
-                errors.append(f'Row {i}: {exc}')
+            # ── Enrolment ──
+            key = (email, prog_pk)
+            existing_e = existing_enrolments.get(key)
+            if existing_e is None:
+                enrolments_to_create.append(Enrolment(
+                    learner_id=email, programme_id=prog_pk,
+                    enrolment_date=p['enrolment_date'],
+                    activation_date=p['activation_date'],
+                    is_graduated=p['is_graduated'],
+                    graduation_date=p['grad_date'],
+                ))
+                created += 1
+            else:
+                changed_e: list[str] = []
+                for attr, val in [
+                    ('enrolment_date',  p['enrolment_date']),
+                    ('activation_date', p['activation_date']),
+                    ('graduation_date', p['grad_date']),
+                ]:
+                    if val and getattr(existing_e, attr) != val:
+                        setattr(existing_e, attr, val)
+                        changed_e.append(attr)
+                if p['is_graduated'] and not existing_e.is_graduated:
+                    existing_e.is_graduated = True
+                    changed_e.append('is_graduated')
+                if changed_e:
+                    enrolments_to_update.append(existing_e)
+                    enrolment_update_fields.update(changed_e)
+                    updated += 1
 
-            # Flush progress to DB every 200 rows so the detail page can show it
-            if i % 200 == 0:
-                job.rows_processed = i
-                job.rows_created   = created
-                job.rows_updated   = updated
-                job.rows_skipped   = skipped
-                job.save(update_fields=['rows_processed', 'rows_created', 'rows_updated', 'rows_skipped'])
+        # ── Phase 4: bulk writes ────────────────────────────────────────────
+        if learners_to_create:
+            Learner.objects.bulk_create(learners_to_create, batch_size=500)
+        if learners_to_update and learner_update_fields:
+            Learner.objects.bulk_update(
+                learners_to_update, list(learner_update_fields), batch_size=500
+            )
+        if enrolments_to_create:
+            Enrolment.objects.bulk_create(enrolments_to_create, batch_size=500)
+        if enrolments_to_update and enrolment_update_fields:
+            Enrolment.objects.bulk_update(
+                enrolments_to_update, list(enrolment_update_fields), batch_size=500
+            )
 
         job.status         = 'complete'
         job.rows_processed = len(rows)
@@ -1220,7 +1268,12 @@ def edit_preview_course(request, pk):
 # ===========================================================================
 
 def _run_pod_import(job_pk: int) -> None:
-    """Background thread: process a confirmed pod-selection CSV upload."""
+    """Background thread: process a confirmed pod-selection CSV upload.
+
+    Optimised: all Learner, PodAssignment, Pod, and Enrolment records are
+    pre-fetched in bulk; the row loop does no DB I/O; writes use bulk_create /
+    bulk_update — total queries is ~8 regardless of file size.
+    """
     from django.db import close_old_connections
     close_old_connections()
     try:
@@ -1244,149 +1297,192 @@ def _run_pod_import(job_pk: int) -> None:
         from selfpaced.models import Programme as _Prog
         prog_cache = {p.pk: p for p in _Prog.objects.filter(pk__in=name_to_prog_pk.values())}
 
+        # ── helpers ────────────────────────────────────────────────────────
         def _parse_month(raw):
-            """Parse month strings → date(y, m, 1) or None.
-            Handles: 'June 2025', 'Jun 2025', '2025-06', 'June', 'Jun', etc.
-            When no year is present, uses the current or next year (whichever
-            keeps the target month in the future or current month).
-            """
             if not raw:
                 return None
             s = raw.strip()
             today = _date.today()
-
-            # Try with explicit year first
             for fmt in ('%B %Y', '%b %Y', '%Y-%m', '%m/%Y', '%m-%Y', '%B, %Y', '%b, %Y'):
                 try:
                     d = _dt.strptime(s, fmt)
                     return _date(d.year, d.month, 1)
                 except ValueError:
                     continue
-
-            # Month name only — infer year
             for fmt in ('%B', '%b'):
                 try:
                     d = _dt.strptime(s, fmt)
                     year = today.year
-                    # If this month has already passed this year, use next year
                     if d.month < today.month:
                         year += 1
                     return _date(year, d.month, 1)
                 except ValueError:
                     continue
-
             return None
 
         def _month_end(d):
             return _date(d.year, d.month, calendar.monthrange(d.year, d.month)[1])
 
-        created = updated = skipped = 0
-        errors = []
-        # Track skip reasons for diagnostics — keyed by reason, value = list of examples
-        _skip_reasons: dict = {}
+        # ── Phase 1: parse all rows (no DB) ────────────────────────────────
+        parsed     = []
+        skipped    = 0
+        skip_reasons: dict = {}
 
         def _skip(reason, example=''):
             nonlocal skipped
             skipped += 1
-            if reason not in _skip_reasons:
-                _skip_reasons[reason] = []
-            if example and len(_skip_reasons[reason]) < 3:
-                _skip_reasons[reason].append(example)
+            skip_reasons.setdefault(reason, [])
+            if example and len(skip_reasons[reason]) < 3:
+                skip_reasons[reason].append(example)
 
-        for i, row in enumerate(rows, 1):
+        for row in rows:
             email     = (row.get(col_email) or '').strip().lower()
             prog_name = (row.get(col_prog)  or '').strip()
-
             if not email or '@' not in email:
                 _skip('Invalid or missing email', email or '(blank)')
                 continue
-
             prog_pk = name_to_prog_pk.get(prog_name)
             if not prog_pk or prog_pk not in prog_cache:
                 _skip('Programme not mapped', prog_name or '(blank)')
                 continue
-
-            prog = prog_cache[prog_pk]
-
-            target_month_start = _parse_month(row.get(col_target, ''))
-            enrol_month_start  = _parse_month(row.get(col_enrol,  '')) if col_enrol else None
-
-            if not target_month_start:
+            target_start = _parse_month(row.get(col_target, ''))
+            if not target_start:
                 _skip('Could not parse target month', row.get(col_target, '') or '(blank)')
                 continue
+            parsed.append({
+                'email':        email,
+                'prog_pk':      prog_pk,
+                'target_date':  _month_end(target_start),
+                'enrol_start':  _parse_month(row.get(col_enrol, '')) if col_enrol else None,
+            })
 
-            target_date = _month_end(target_month_start)
+        # ── Phase 2: bulk pre-fetch ────────────────────────────────────────
+        all_emails   = {p['email']   for p in parsed}
+        all_prog_pks = {p['prog_pk'] for p in parsed}
+        all_target_dates = {(p['prog_pk'], p['target_date']) for p in parsed}
 
-            try:
-                # 1. Resolve learner
-                try:
-                    learner = Learner.objects.get(email=email)
-                except Learner.DoesNotExist:
-                    _skip('Learner not found in system', email)
-                    continue
+        # Learners (read-only lookup — skip unknowns)
+        known_learners: set[str] = set(
+            Learner.objects.filter(email__in=all_emails).values_list('email', flat=True)
+        ) if all_emails else set()
 
-                # 2. Get or create pod
-                pod_name = f'{prog.code} {target_date:%b %Y}'
-                pod, _ = Pod.objects.get_or_create(
-                    programme=prog,
-                    target_month=target_date,
-                    defaults={'name': pod_name, 'status': PodStatus.ACTIVE},
+        # Current pod assignments: (email, prog_pk) → PodAssignment
+        current_assignments: dict[tuple, PodAssignment] = {
+            (a.learner_id, a.programme_id): a
+            for a in PodAssignment.objects.filter(
+                learner_id__in=all_emails,
+                programme_id__in=all_prog_pks,
+                is_current=True,
+            ).select_related('pod')
+        } if all_emails else {}
+
+        # Existing pods: (prog_pk, target_date) → Pod
+        pod_cache: dict[tuple, Pod] = {
+            (pod.programme_id, pod.target_month): pod
+            for pod in Pod.objects.filter(
+                programme_id__in=all_prog_pks,
+                target_month__in={td for _, td in all_target_dates},
+            )
+        } if all_target_dates else {}
+
+        # Create missing pods (usually very few)
+        missing_pods = [
+            Pod(
+                programme_id=prog_pk,
+                target_month=td,
+                name=f'{prog_cache[prog_pk].code} {td:%b %Y}',
+                status=PodStatus.ACTIVE,
+            )
+            for prog_pk, td in all_target_dates
+            if (prog_pk, td) not in pod_cache and prog_pk in prog_cache
+        ]
+        if missing_pods:
+            Pod.objects.bulk_create(missing_pods, ignore_conflicts=True, batch_size=200)
+            # Re-fetch to get PKs of newly created + any that already existed
+            pod_cache = {
+                (pod.programme_id, pod.target_month): pod
+                for pod in Pod.objects.filter(
+                    programme_id__in=all_prog_pks,
+                    target_month__in={td for _, td in all_target_dates},
                 )
+            }
 
-                # 3. Pod assignment — move if already in a different pod
-                existing_qs = PodAssignment.objects.filter(
-                    learner=learner, programme=prog, is_current=True
-                )
-                existing = existing_qs.first()
+        # Enrolments for date backfill: (email, prog_pk) → Enrolment
+        enrolments_cache: dict[tuple, Enrolment] = {
+            (e.learner_id, e.programme_id): e
+            for e in Enrolment.objects.filter(
+                learner_id__in=all_emails,
+                programme_id__in=all_prog_pks,
+            )
+        } if all_emails else {}
 
-                if existing:
-                    if existing.pod_id == pod.pk:
-                        updated += 1  # already in the right pod
-                    else:
-                        # Move to new pod
-                        existing.is_current      = False
-                        existing.pod_switch_date = _date.today()
-                        existing.pod_switch_reason = 'Pod import — learner changed target month'
-                        existing.previous_pod    = existing.pod
-                        existing.save(update_fields=[
-                            'is_current', 'pod_switch_date', 'pod_switch_reason', 'previous_pod'
-                        ])
-                        PodAssignment.objects.create(
-                            learner=learner, programme=prog, pod=pod,
-                            method=PodAssignmentMethod.SELF_SELECTED, is_current=True,
-                        )
-                        updated += 1
+        # ── Phase 3: build write lists (pure Python) ───────────────────────
+        assignments_to_close:  list[PodAssignment] = []
+        assignments_to_create: list[PodAssignment] = []
+        enrolments_to_update:  list[Enrolment]     = []
+        today = _date.today()
+        created = updated = 0
+        errors  = []
+
+        for p in parsed:
+            email   = p['email']
+            prog_pk = p['prog_pk']
+
+            if email not in known_learners:
+                _skip('Learner not found in system', email)
+                continue
+
+            pod_key = (prog_pk, p['target_date'])
+            pod = pod_cache.get(pod_key)
+            if pod is None:
+                errors.append(f'{email}: pod ({prog_pk}, {p["target_date"]}) missing after create')
+                continue
+
+            existing = current_assignments.get((email, prog_pk))
+            if existing:
+                if existing.pod_id == pod.pk:
+                    updated += 1  # already correct
                 else:
-                    PodAssignment.objects.create(
-                        learner=learner, programme=prog, pod=pod,
+                    existing.is_current        = False
+                    existing.pod_switch_date   = today
+                    existing.pod_switch_reason = 'Pod import — learner changed target month'
+                    existing.previous_pod_id   = existing.pod_id
+                    assignments_to_close.append(existing)
+                    assignments_to_create.append(PodAssignment(
+                        learner_id=email, programme_id=prog_pk, pod=pod,
                         method=PodAssignmentMethod.SELF_SELECTED, is_current=True,
-                    )
-                    created += 1
+                    ))
+                    updated += 1
+            else:
+                assignments_to_create.append(PodAssignment(
+                    learner_id=email, programme_id=prog_pk, pod=pod,
+                    method=PodAssignmentMethod.SELF_SELECTED, is_current=True,
+                ))
+                created += 1
 
-                # 4. Back-fill enrolment_date from "enrol month" if missing
-                if enrol_month_start:
-                    try:
-                        enrolment = Enrolment.objects.get(learner=learner, programme=prog)
-                        if not enrolment.enrolment_date:
-                            enrolment.enrolment_date = enrol_month_start
-                            enrolment.save(update_fields=['enrolment_date'])
-                    except Enrolment.DoesNotExist:
-                        pass
+            # Back-fill enrolment_date if missing
+            if p['enrol_start']:
+                enrolment = enrolments_cache.get((email, prog_pk))
+                if enrolment and not enrolment.enrolment_date:
+                    enrolment.enrolment_date = p['enrol_start']
+                    enrolments_to_update.append(enrolment)
 
-            except Exception as exc:
-                errors.append(f'Row {i} ({email}): {exc}')
+        # ── Phase 4: bulk writes ────────────────────────────────────────────
+        if assignments_to_close:
+            PodAssignment.objects.bulk_update(
+                assignments_to_close,
+                ['is_current', 'pod_switch_date', 'pod_switch_reason', 'previous_pod_id'],
+                batch_size=500,
+            )
+        if assignments_to_create:
+            PodAssignment.objects.bulk_create(assignments_to_create, batch_size=500)
+        if enrolments_to_update:
+            Enrolment.objects.bulk_update(
+                enrolments_to_update, ['enrolment_date'], batch_size=500
+            )
 
-            # Flush progress every 100 rows
-            if i % 100 == 0:
-                job.rows_processed = i
-                job.rows_created   = created
-                job.rows_updated   = updated
-                job.rows_skipped   = skipped
-                job.save(update_fields=['rows_processed', 'rows_created', 'rows_updated', 'rows_skipped'])
-
-        # Append skip-reason summary so it's clear why rows were not assigned
-        for reason, examples in _skip_reasons.items():
-            count = skipped  # approximate; use reason count if available
+        # Append skip-reason summary
+        for reason, examples in skip_reasons.items():
             eg = ', '.join(f'"{e}"' for e in examples)
             errors.append(f'{reason} — {len(examples)} example(s): {eg}')
 

@@ -90,13 +90,14 @@ def programme_admin_edit(request, pk):
             programme.is_active = 'is_active' in request.POST
             programme.awards_credentials = 'awards_credentials' in request.POST
             programme.awards_certificate = 'awards_certificate' in request.POST
+            programme.is_prerequisite = 'is_prerequisite' in request.POST
             ehub_code = request.POST.get('ehub_code', '').strip().upper() or None
             programme.ehub_code = ehub_code
             programme.start_date = start_date
             programme.end_date = end_date
             programme.save(update_fields=[
                 'name', 'is_active', 'awards_credentials', 'awards_certificate',
-                'ehub_code', 'start_date', 'end_date',
+                'is_prerequisite', 'ehub_code', 'start_date', 'end_date',
             ])
 
             for field, val in threshold_values.items():
