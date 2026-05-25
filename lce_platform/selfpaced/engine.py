@@ -455,11 +455,13 @@ def _execute(job, content: bytes) -> None:
     for (email, _, _), rows in row_groups.items():
         latest_by_email[email] = rows[-1]
 
-    existing_emails: set[str] = set()
+    # Fetch existing learners: email → pk (needed for bulk_update below)
+    existing_email_to_pk: dict[str, int] = {}
     for _chunk in _chunked(list(all_emails)):
-        existing_emails.update(
-            Learner.objects.filter(email__in=_chunk).values_list('email', flat=True)
+        existing_email_to_pk.update(
+            Learner.objects.filter(email__in=_chunk).values_list('email', 'pk')
         )
+    existing_emails: set[str] = set(existing_email_to_pk.keys())
 
     _LEARNER_UPDATE_FIELDS = [
         'first_name', 'last_name', 'gender', 'country', 'region',
@@ -489,13 +491,18 @@ def _execute(job, content: bytes) -> None:
         for email, r in latest_by_email.items()
     ]
 
-    Learner.objects.bulk_create(
-        learner_objs,
-        update_conflicts=True,
-        update_fields=_LEARNER_UPDATE_FIELDS,
-        unique_fields=['email'],
-        batch_size=500,
-    )
+    # MariaDB / MySQL does not support bulk_create(update_conflicts=True, unique_fields=…)
+    # (that syntax is PostgreSQL-only).  Split manually instead.
+    new_objs    = [o for o in learner_objs if o.email not in existing_emails]
+    update_objs = [o for o in learner_objs if o.email     in existing_emails]
+
+    if new_objs:
+        Learner.objects.bulk_create(new_objs, batch_size=500)
+
+    if update_objs:
+        for o in update_objs:
+            o.pk = existing_email_to_pk[o.email]
+        Learner.objects.bulk_update(update_objs, _LEARNER_UPDATE_FIELDS, batch_size=500)
 
     new_learners = len(all_emails - existing_emails)
     updated_learners = len(all_emails & existing_emails)
