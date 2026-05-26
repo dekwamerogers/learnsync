@@ -689,6 +689,8 @@ def _run_enrolment_upload(job_pk: int) -> None:
                 'gender':          _name(_get(row, 'Gender', 'gender')),
                 'region':          _name(_get(row, 'Regions', 'Region', 'region')),
                 'country':         _name(_get(row, 'Country of residence', 'Country', 'country')),
+                'phone':           _get(row, 'Phone', 'Phone number', 'Phone Number', 'phone_number',
+                                        'Mobile', 'Mobile number', 'Mobile Number', 'Tel', 'Telephone'),
                 'ehub_url':        _get(row, 'eHub profile', 'eHub Profile'),
                 'lms_url':         _get(row, 'LMS profile',  'LMS Profile'),
                 'payment':         _PAYMENT_MAP.get(pay_raw.lower()) if pay_raw else None,
@@ -741,6 +743,7 @@ def _run_enrolment_upload(job_pk: int) -> None:
                         email=email,
                         first_name=p['first_name'], last_name=p['last_name'],
                         gender=p['gender'], region=p['region'], country=p['country'],
+                        phone_number=p['phone'],
                         ehub_profile_url=p['ehub_url'], lms_profile_url=p['lms_url'],
                         payment_status=p['payment'] or PaymentStatus.UNKNOWN,
                     ))
@@ -750,6 +753,7 @@ def _run_enrolment_upload(job_pk: int) -> None:
                         ('first_name', p['first_name']), ('last_name', p['last_name']),
                         ('gender', p['gender']),         ('region', p['region']),
                         ('country', p['country']),
+                        ('phone_number', p['phone']),
                         ('ehub_profile_url', p['ehub_url']),
                         ('lms_profile_url',  p['lms_url']),
                     ]:

@@ -25,21 +25,27 @@ def export_learners_csv(queryset):
     response = _csv_response(f'learners_{today:%Y%m%d}.csv')
     writer = csv.writer(response)
     writer.writerow([
-        'Email', 'First Name', 'Last Name', 'Country', 'Region',
-        'Overall Health', 'Payment Status',
-        'Programmes', 'First Seen', 'Last Updated',
+        'Email', 'First Name', 'Last Name', 'Phone', 'Country', 'Region',
+        'Overall Health', 'Programme Health',
+        'Payment Status', 'Programmes', 'First Seen', 'Last Updated',
     ])
     for learner in queryset.prefetch_related('enrolments__programme'):
-        programmes = ', '.join(
-            e.programme.code for e in learner.enrolments.all()
+        enrolments = list(learner.enrolments.all())
+        programmes = ', '.join(e.programme.code for e in enrolments)
+        # Per-programme health: "AICE:active, WALX:graduated"
+        prog_health = ', '.join(
+            f"{e.programme.code}:{e.health_status}"
+            for e in enrolments
         )
         writer.writerow([
             _sf(learner.email),
             _sf(learner.first_name),
             _sf(learner.last_name),
+            _sf(learner.phone_number),
             _sf(learner.country),
             _sf(learner.region),
             learner.overall_health_status,
+            _sf(prog_health),
             learner.payment_status,
             _sf(programmes),
             learner.first_seen_date or '',
