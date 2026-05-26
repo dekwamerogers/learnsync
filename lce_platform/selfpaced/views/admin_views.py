@@ -612,6 +612,13 @@ def _run_enrolment_upload(job_pk: int) -> None:
             ]
 
         name_to_prog_pk: dict = job.review_data.get('name_to_prog_pk', {})
+        if not name_to_prog_pk:
+            EnrolmentUploadJob.objects.filter(pk=job_pk).update(
+                status='failed',
+                errors=['No programme mappings found — go back to the review step and map '
+                        'each programme name in the CSV to a programme in LearnSync.'],
+            )
+            return
         prog_cache: dict[int, Programme] = {
             p.pk: p for p in Programme.objects.filter(pk__in=name_to_prog_pk.values())
         }
@@ -717,6 +724,7 @@ def _run_enrolment_upload(job_pk: int) -> None:
         enrolment_update_fields: set[str]       = set()
 
         seen_emails: set[str] = set()
+        seen_enrolment_keys: set[tuple] = set()   # (email, prog_pk) pairs already queued for create
         created = updated = errors_count = 0
         errors  = []
 
@@ -759,6 +767,12 @@ def _run_enrolment_upload(job_pk: int) -> None:
             key = (email, prog_pk)
             existing_e = existing_enrolments.get(key)
             if existing_e is None:
+                # Guard against duplicate (email, programme) in the CSV — the DB has a
+                # unique_together constraint and bulk_create would raise IntegrityError.
+                if key in seen_enrolment_keys:
+                    skipped += 1
+                    continue
+                seen_enrolment_keys.add(key)
                 enrolments_to_create.append(Enrolment(
                     learner_id=email, programme_id=prog_pk,
                     enrolment_date=p['enrolment_date'],
@@ -810,9 +824,11 @@ def _run_enrolment_upload(job_pk: int) -> None:
         job.rows_updated   = updated
         job.rows_skipped   = skipped
         job.errors         = errors[:50]
-        job.file_content   = b''
+        # Do NOT clear file_content here — the re-run button on the detail page
+        # re-invokes this function on the same job, so the CSV must be kept.
+        # File content is purged only when the job record itself is deleted.
         job.save(update_fields=['status', 'rows_processed', 'rows_created',
-                                'rows_updated', 'rows_skipped', 'errors', 'file_content'])
+                                'rows_updated', 'rows_skipped', 'errors'])
 
     except Exception as exc:
         from selfpaced.models import EnrolmentUploadJob
@@ -1053,6 +1069,16 @@ def enrolment_reprocess(request, pk):
     job = get_object_or_404(EnrolmentUploadJob, pk=pk)
     if job.status == 'processing':
         messages.error(request, 'Job is already processing.')
+        return redirect('sp_enrolment_detail', pk=pk)
+
+    # Guard: file content was cleared on older jobs before this bug was fixed.
+    # If the content is gone the re-run would silently process 0 rows.
+    if not job.file_content:
+        messages.error(
+            request,
+            'The original CSV file is no longer stored for this job and cannot be re-run. '
+            'Please upload the file again via "Upload Enrolment CSV".',
+        )
         return redirect('sp_enrolment_detail', pk=pk)
 
     col_date = request.POST.get('col_date', '').strip()

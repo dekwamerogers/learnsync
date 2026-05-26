@@ -306,14 +306,22 @@ def compute_enrolment_health(
     # Derive graduation from course completions in case the stored flag lags behind.
     # Require that the number of completed enrolments meets the total programme course
     # count — prevents marking graduated when only a subset of courses is uploaded.
+    # Use is_passed as well as status='completed' — prerequisite programmes (e.g. WALX)
+    # may have is_passed=True before status is flipped to 'completed' in the pipeline.
     all_enrolled_completed = bool(course_enrolments) and all(
-        ce.status == 'completed' for ce in course_enrolments
+        ce.status == 'completed' or ce.is_passed for ce in course_enrolments
     )
     meets_course_count = (
         programme_course_count is None
         or len(course_enrolments) >= programme_course_count
     )
     is_graduated = enrolment.is_graduated or (all_enrolled_completed and meets_course_count)
+
+    # A graduated enrolment should not carry warning flags — clear them so the UI
+    # doesn't show "Inactive" or "At risk" alongside a Graduated badge.
+    if is_graduated:
+        active_flags = []
+        flag_detail = {}
 
     health_status = compute_health_status(
         active_flags=active_flags,
