@@ -182,6 +182,15 @@ class Course(models.Model):
     )
     expected_duration_days = models.PositiveSmallIntegerField(null=True, blank=True)
     is_active = models.BooleanField(default=True, db_index=True)
+    is_shared_module = models.BooleanField(
+        default=False, db_index=True,
+        help_text=(
+            'True for courses whose code appears in multiple programmes '
+            '(e.g. PF-1 through PF-5). '
+            'Completions are automatically mirrored to all enrolments that '
+            'contain a course with the same code.'
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
@@ -554,6 +563,9 @@ class IngestionJob(models.Model):
     errors = models.JSONField(default=list)
     review_data = models.JSONField(default=dict, blank=True)
     progress_log = models.JSONField(default=list, blank=True)
+    # Set to True by the cancel endpoint; the background thread polls this and
+    # stops cleanly between phases, setting status → 'cancelled'.
+    cancel_requested = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-uploaded_at']
@@ -659,6 +671,7 @@ class EnrolmentUploadJob(models.Model):
     rows_skipped = models.PositiveIntegerField(default=0)
     review_data = models.JSONField(default=dict, blank=True)
     errors = models.JSONField(default=list, blank=True)
+    cancel_requested = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-uploaded_at']
@@ -702,6 +715,7 @@ class PodImportJob(models.Model):
     rows_skipped   = models.PositiveIntegerField(default=0)
     review_data    = models.JSONField(default=dict, blank=True)
     errors         = models.JSONField(default=list,  blank=True)
+    cancel_requested = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-uploaded_at']

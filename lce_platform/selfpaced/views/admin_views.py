@@ -163,6 +163,48 @@ def retry_job(request, pk):
 
 @login_required
 @require_POST
+def cancel_ingestion_job(request, pk):
+    """Request cancellation of an in-progress ingestion job.
+    Sets the cancel_requested flag; the background thread picks it up between phases."""
+    job = get_object_or_404(IngestionJob, pk=pk)
+    if job.status != 'processing':
+        messages.warning(request, f'Job #{pk} is not currently processing (status: {job.status}).')
+        return redirect('sp_job_detail', pk=pk)
+    IngestionJob.objects.filter(pk=pk).update(cancel_requested=True)
+    messages.info(request, f'Cancellation requested for job #{pk} — it will stop at the next checkpoint.')
+    return redirect('sp_job_detail', pk=pk)
+
+
+@login_required
+@require_POST
+def cancel_enrolment_job(request, pk):
+    """Request cancellation of an in-progress enrolment upload job."""
+    from selfpaced.models import EnrolmentUploadJob
+    job = get_object_or_404(EnrolmentUploadJob, pk=pk)
+    if job.status != 'processing':
+        messages.warning(request, f'Enrolment job #{pk} is not currently processing.')
+        return redirect('sp_enrolment_detail', pk=pk)
+    EnrolmentUploadJob.objects.filter(pk=pk).update(cancel_requested=True)
+    messages.info(request, f'Cancellation requested for enrolment job #{pk}.')
+    return redirect('sp_enrolment_detail', pk=pk)
+
+
+@login_required
+@require_POST
+def cancel_pod_job(request, pk):
+    """Request cancellation of an in-progress POD import job."""
+    from selfpaced.models import PodImportJob
+    job = get_object_or_404(PodImportJob, pk=pk)
+    if job.status != 'processing':
+        messages.warning(request, f'Pod import job #{pk} is not currently processing.')
+        return redirect('sp_pod_import_detail', pk=pk)
+    PodImportJob.objects.filter(pk=pk).update(cancel_requested=True)
+    messages.info(request, f'Cancellation requested for pod import job #{pk}.')
+    return redirect('sp_pod_import_detail', pk=pk)
+
+
+@login_required
+@require_POST
 def delete_job(request, pk):
     """
     Delete an ingestion job and the enrolments/learners it created.
@@ -645,6 +687,11 @@ def _run_enrolment_upload(job_pk: int) -> None:
                 'payment':         _PAYMENT_MAP.get(pay_raw.lower()) if pay_raw else None,
             })
 
+        # Cancel check after Phase 1
+        if EnrolmentUploadJob.objects.filter(pk=job_pk, cancel_requested=True).exists():
+            EnrolmentUploadJob.objects.filter(pk=job_pk).update(status='cancelled')
+            return
+
         # ── Phase 2: bulk pre-fetch (2 queries) ────────────────────────────
         all_emails   = {p['email']   for p in parsed}
         all_prog_pks = {p['prog_pk'] for p in parsed}
@@ -737,6 +784,11 @@ def _run_enrolment_upload(job_pk: int) -> None:
                     enrolments_to_update.append(existing_e)
                     enrolment_update_fields.update(changed_e)
                     updated += 1
+
+        # Cancel check before writes (last safe stopping point)
+        if EnrolmentUploadJob.objects.filter(pk=job_pk, cancel_requested=True).exists():
+            EnrolmentUploadJob.objects.filter(pk=job_pk).update(status='cancelled')
+            return
 
         # ── Phase 4: bulk writes ────────────────────────────────────────────
         if learners_to_create:
@@ -1356,6 +1408,11 @@ def _run_pod_import(job_pk: int) -> None:
                 'enrol_start':  _parse_month(row.get(col_enrol, '')) if col_enrol else None,
             })
 
+        # Cancel check after Phase 1
+        if PodImportJob.objects.filter(pk=job_pk, cancel_requested=True).exists():
+            PodImportJob.objects.filter(pk=job_pk).update(status='cancelled')
+            return
+
         # ── Phase 2: bulk pre-fetch ────────────────────────────────────────
         all_emails   = {p['email']   for p in parsed}
         all_prog_pks = {p['prog_pk'] for p in parsed}
@@ -1466,6 +1523,11 @@ def _run_pod_import(job_pk: int) -> None:
                 if enrolment and not enrolment.enrolment_date:
                     enrolment.enrolment_date = p['enrol_start']
                     enrolments_to_update.append(enrolment)
+
+        # Cancel check before writes
+        if PodImportJob.objects.filter(pk=job_pk, cancel_requested=True).exists():
+            PodImportJob.objects.filter(pk=job_pk).update(status='cancelled')
+            return
 
         # ── Phase 4: bulk writes ────────────────────────────────────────────
         if assignments_to_close:

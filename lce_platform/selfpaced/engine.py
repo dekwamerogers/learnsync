@@ -17,7 +17,7 @@ import re
 from collections import defaultdict
 from datetime import date, datetime
 
-from django.db import models, transaction
+from django.db import connection, models, transaction
 from django.db.models import Count
 
 from selfpaced.detector import detect_programme_and_course
@@ -98,6 +98,101 @@ def _chunked(iterable, size: int = 500):
         yield lst[i:i + size]
 
 
+# ---------------------------------------------------------------------------
+# Fast learner upsert — MariaDB/MySQL native INSERT … ON DUPLICATE KEY UPDATE
+# ---------------------------------------------------------------------------
+
+_LEARNER_INSERT_COLS = [
+    'email', 'first_name', 'last_name', 'gender', 'country', 'region',
+    'ehub_profile_url', 'lms_profile_url',
+    'has_logged_into_ehub', 'has_logged_into_lms', 'has_shown_up_in_course',
+    'other_programmes_count', 'other_programme_names',
+    'payment_status', 'first_seen_date',
+    # overall_health_status / phone_number are not in the CSV — use model defaults on INSERT
+    'overall_health_status', 'last_updated_date',
+]
+
+_LEARNER_UPDATE_COLS = [
+    # Everything except email (PK), first_seen_date (preserve earliest),
+    # overall_health_status (managed by health engine), phone_number (not in CSV)
+    'first_name', 'last_name', 'gender', 'country', 'region',
+    'ehub_profile_url', 'lms_profile_url',
+    'has_logged_into_ehub', 'has_logged_into_lms', 'has_shown_up_in_course',
+    'other_programmes_count', 'other_programme_names',
+    'payment_status', 'last_updated_date',
+]
+
+
+def _upsert_learners_mariadb(learner_objs, upload_date, batch_size: int = 1000) -> tuple[int, int]:
+    """
+    MariaDB-native INSERT … ON DUPLICATE KEY UPDATE for Learner records.
+
+    Eliminates the pre-fetch-PKs → split → bulk_create + bulk_update round-trip.
+    One batched INSERT handles both new inserts and updates in a single pass.
+
+    Returns (new_count, updated_count) — approximate via ROW_COUNT() heuristic:
+    MySQL/MariaDB returns ROW_COUNT()=1 for inserts, 2 for updates (when row changed).
+    """
+    if not learner_objs:
+        return 0, 0
+
+    from datetime import datetime as _dt
+
+    now = _dt.now()
+    col_list = ', '.join(f'`{c}`' for c in _LEARNER_INSERT_COLS)
+    placeholders_per_row = ', '.join(['%s'] * len(_LEARNER_INSERT_COLS))
+    update_clause = ', '.join(f'`{c}`=VALUES(`{c}`)' for c in _LEARNER_UPDATE_COLS)
+
+    total_new = 0
+    total_updated = 0
+
+    for chunk in _chunked(learner_objs, batch_size):
+        rows_sql = ', '.join(f'({placeholders_per_row})' for _ in chunk)
+        sql = (
+            f'INSERT INTO `selfpaced_learner` ({col_list}) VALUES {rows_sql} '
+            f'ON DUPLICATE KEY UPDATE {update_clause}'
+        )
+        params = []
+        for obj in chunk:
+            params.extend([
+                obj.email,
+                obj.first_name, obj.last_name, obj.gender, obj.country, obj.region,
+                obj.ehub_profile_url, obj.lms_profile_url,
+                obj.has_logged_into_ehub, obj.has_logged_into_lms, obj.has_shown_up_in_course,
+                obj.other_programmes_count, obj.other_programme_names,
+                obj.payment_status,
+                upload_date,           # first_seen_date — only applied on INSERT
+                'not_yet_started',     # overall_health_status default
+                now,                   # last_updated_date
+            ])
+        with connection.cursor() as cur:
+            cur.execute(sql, params)
+            row_count = cur.rowcount  # 1=inserted, 2=updated (changed), 0=no-op
+
+        # ROW_COUNT heuristic: each INSERT counts as 1, each UPDATE as 2
+        batch_updated = min(row_count // 2, len(chunk))
+        batch_new = len(chunk) - batch_updated
+        total_new += max(batch_new, 0)
+        total_updated += batch_updated
+
+    return total_new, total_updated
+
+
+# ---------------------------------------------------------------------------
+# Cancel-check helper — re-reads from DB so any thread can stop cleanly
+# ---------------------------------------------------------------------------
+
+def _is_cancel_requested(job_pk: int, model_cls) -> bool:
+    """Return True if the cancel flag has been set on this job in the DB."""
+    return model_cls.objects.filter(pk=job_pk, cancel_requested=True).exists()
+
+
+def _mark_cancelled(job, reason: str = 'Cancelled by user') -> None:
+    job.status = 'cancelled'
+    job.errors = list(job.errors or []) + [reason]
+    job.save(update_fields=['status', 'errors'])
+
+
 def _resolve_course_seq(ehub: str, csv_seq: int, fa_re) -> int:
     """
     Return the within-programme course sequence number.
@@ -158,7 +253,7 @@ def run_ingestion(job_id: int) -> None:
 def _execute(job, content: bytes) -> None:
     from selfpaced.models import (
         Assignment, AssignmentProgress, Course, CourseEnrolment,
-        Enrolment, FlagCode, FlaggedRow, Learner, PaymentStatus,
+        Enrolment, FlagCode, FlaggedRow, IngestionJob, Learner, PaymentStatus,
     )
 
     # Use the date the CSV was exported from the source system (set by the user
@@ -206,6 +301,11 @@ def _execute(job, content: bytes) -> None:
 
     _emit_progress(job, 1, f'Parsed {len(parsed):,} rows — {skip_count} skipped'
                    + (f' ({country_skip} unmonitored country)' if country_skip else ''))
+
+    # Cancel check after Phase 1
+    if _is_cancel_requested(job.pk, IngestionJob):
+        _mark_cancelled(job, 'Cancelled after Phase 1 (parsing)')
+        return
 
     # ------------------------------------------------------------------
     # Phase 2 — Resolve catalogue
@@ -449,6 +549,11 @@ def _execute(job, content: bytes) -> None:
         + (f' — {flagged_count} flagged' if flagged_count else ''),
     )
 
+    # Cancel check after Phase 2
+    if _is_cancel_requested(job.pk, IngestionJob):
+        _mark_cancelled(job, 'Cancelled after Phase 2 (catalogue)')
+        return
+
     # ------------------------------------------------------------------
     # Phase 3 — Bulk-upsert Learners
     # ------------------------------------------------------------------
@@ -458,21 +563,6 @@ def _execute(job, content: bytes) -> None:
     latest_by_email: dict[str, dict] = {}
     for (email, _, _), rows in row_groups.items():
         latest_by_email[email] = rows[-1]
-
-    # Fetch existing learners: email → pk (needed for bulk_update below)
-    existing_email_to_pk: dict[str, int] = {}
-    for _chunk in _chunked(list(all_emails)):
-        existing_email_to_pk.update(
-            Learner.objects.filter(email__in=_chunk).values_list('email', 'pk')
-        )
-    existing_emails: set[str] = set(existing_email_to_pk.keys())
-
-    _LEARNER_UPDATE_FIELDS = [
-        'first_name', 'last_name', 'gender', 'country', 'region',
-        'ehub_profile_url', 'lms_profile_url',
-        'has_logged_into_ehub', 'has_logged_into_lms', 'has_shown_up_in_course',
-        'other_programmes_count', 'other_programme_names', 'payment_status',
-    ]
 
     learner_objs = [
         Learner(
@@ -490,32 +580,50 @@ def _execute(job, content: bytes) -> None:
             other_programmes_count=r['other_programmes_count'],
             other_programme_names=r['other_programme_names'],
             payment_status=r['payment_status'],
-            first_seen_date=upload_date,  # excluded from update_fields → only set on INSERT
+            first_seen_date=upload_date,
         )
         for email, r in latest_by_email.items()
     ]
 
-    # MariaDB / MySQL does not support bulk_create(update_conflicts=True, unique_fields=…)
-    # (that syntax is PostgreSQL-only).  Split manually instead.
-    new_objs    = [o for o in learner_objs if o.email not in existing_emails]
-    update_objs = [o for o in learner_objs if o.email     in existing_emails]
-
-    if new_objs:
-        Learner.objects.bulk_create(new_objs, batch_size=500)
-
-    if update_objs:
-        for o in update_objs:
-            o.pk = existing_email_to_pk[o.email]
-        Learner.objects.bulk_update(update_objs, _LEARNER_UPDATE_FIELDS, batch_size=500)
-
-    new_learners = len(all_emails - existing_emails)
-    updated_learners = len(all_emails & existing_emails)
+    if connection.vendor == 'mysql':
+        # Fast path: single INSERT … ON DUPLICATE KEY UPDATE per batch.
+        # No pre-fetch of PKs needed — MariaDB handles new vs existing natively.
+        new_learners, updated_learners = _upsert_learners_mariadb(
+            learner_objs, upload_date, batch_size=1000
+        )
+    else:
+        # Fallback for SQLite (dev): split bulk_create + bulk_update.
+        _LEARNER_UPDATE_FIELDS = [
+            'first_name', 'last_name', 'gender', 'country', 'region',
+            'ehub_profile_url', 'lms_profile_url',
+            'has_logged_into_ehub', 'has_logged_into_lms', 'has_shown_up_in_course',
+            'other_programmes_count', 'other_programme_names', 'payment_status',
+        ]
+        existing_email_to_pk: dict[str, int] = {}
+        for _chunk in _chunked(list(all_emails)):
+            existing_email_to_pk.update(
+                Learner.objects.filter(email__in=_chunk).values_list('email', 'pk')
+            )
+        existing_emails: set[str] = set(existing_email_to_pk.keys())
+        new_objs    = [o for o in learner_objs if o.email not in existing_emails]
+        update_objs = [o for o in learner_objs if o.email in existing_emails]
+        if new_objs:
+            Learner.objects.bulk_create(new_objs, batch_size=500)
+        if update_objs:
+            Learner.objects.bulk_update(update_objs, _LEARNER_UPDATE_FIELDS, batch_size=500)
+        new_learners = len(new_objs)
+        updated_learners = len(update_objs)
 
     _emit_progress(
         job, 3,
         f'{new_learners:,} new learner{"s" if new_learners != 1 else ""}, '
         f'{updated_learners:,} updated',
     )
+
+    # Cancel check after Phase 3
+    if _is_cancel_requested(job.pk, IngestionJob):
+        _mark_cancelled(job, 'Cancelled after Phase 3 (learner upsert)')
+        return
 
     # ------------------------------------------------------------------
     # Phase 4 — Enrolments, CourseEnrolments, AssignmentProgress
@@ -908,6 +1016,38 @@ def _execute(job, content: bytes) -> None:
                         to_create, batch_size=500, ignore_conflicts=True,
                     )
 
+    # Cancel check after Phase 4 (enrolments written — safe stopping point)
+    if _is_cancel_requested(job.pk, IngestionJob):
+        _mark_cancelled(job, 'Cancelled after Phase 4 (enrolments & progress)')
+        return
+
+    # ------------------------------------------------------------------
+    # Phase 4e — Propagate shared-module credits (PF-1…PF-5)
+    #
+    # The eHub class name detector routes PF courses to the standalone PF
+    # programme enrolment.  This step mirrors those completions into every
+    # other programme enrolment (GD / CC / DA / DS) that contains a course
+    # with the same code, so graduation counts and health flags are correct.
+    # ------------------------------------------------------------------
+    _shared_propagated = _propagate_shared_module_credits(all_emails, upload_date)
+    if _shared_propagated:
+        logger.info(
+            'IngestionJob %d: propagated %d shared-module credit(s) across enrolments',
+            job.pk, _shared_propagated,
+        )
+        # Refresh all_ces and ces_by_enrolment so Phase 5 (health) and
+        # Phase 6 (snapshots) see the updated CourseEnrolment states.
+        all_ces = []
+        for e_chunk in _chunked(list(all_enrolment_pks)):
+            all_ces.extend(
+                CourseEnrolment.objects.filter(
+                    enrolment_id__in=e_chunk
+                ).select_related('course')
+            )
+        ces_by_enrolment = defaultdict(list)
+        for ce in all_ces:
+            ces_by_enrolment[ce.enrolment_id].append(ce)
+
     # ------------------------------------------------------------------
     # Phase 5 — Health flags
     # ------------------------------------------------------------------
@@ -1272,6 +1412,94 @@ def preview_ingestion(job_id: int) -> dict:
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _propagate_shared_module_credits(all_emails: set, upload_date) -> int:
+    """
+    Mirror shared-module completions (PF-1…PF-5) across all programme
+    enrolments for each learner in *all_emails*.
+
+    When eHub reports a PF course it uses a PF-prefixed class name, so the
+    detector resolves it to the standalone PF programme enrolment — not to the
+    learner's GD / CC / DA / DS enrolment.  This function finds those
+    completions and marks the corresponding CourseEnrolment in every other
+    programme that contains a course with the same code.
+
+    Must be called after Phase 4 (CEs written) and before Phase 5 (health),
+    so that health flags see accurate CourseEnrolment data.
+
+    Returns the number of CourseEnrolment rows updated.
+    """
+    from selfpaced.models import Course, CourseEnrolment
+
+    shared_codes = set(
+        Course.objects
+        .filter(is_shared_module=True, is_active=True)
+        .values_list('code', flat=True)
+    )
+    if not shared_codes:
+        return 0
+
+    updated_count = 0
+
+    for email_chunk in _chunked(list(all_emails)):
+        # All shared-module CEs already completed for these learners,
+        # across ALL their enrolments (not just the ones in this upload).
+        completed_rows = list(
+            CourseEnrolment.objects
+            .filter(
+                enrolment__learner_id__in=email_chunk,
+                course__code__in=shared_codes,
+                is_passed=True,
+            )
+            .values('enrolment__learner_id', 'course__code', 'completion_date')
+        )
+        if not completed_rows:
+            continue
+
+        # email → {course_code → earliest completion_date}
+        completed_map: dict = defaultdict(dict)
+        for row in completed_rows:
+            email = row['enrolment__learner_id']
+            code = row['course__code']
+            d = row['completion_date']
+            existing = completed_map[email].get(code)
+            if existing is None or (d and (existing is None or d < existing)):
+                completed_map[email][code] = d
+
+        # Incomplete shared-module CEs for the same learners where we know
+        # the course was completed elsewhere — update them.
+        target_ces = list(
+            CourseEnrolment.objects
+            .filter(
+                enrolment__learner_id__in=email_chunk,
+                course__code__in=shared_codes,
+                is_passed=False,
+            )
+            .select_related('course', 'enrolment')
+        )
+
+        to_update = []
+        for ce in target_ces:
+            email = ce.enrolment.learner_id
+            code = ce.course.code
+            if code in completed_map.get(email, {}):
+                ce.is_passed = True
+                ce.status = 'completed'
+                comp_date = completed_map[email][code]
+                if comp_date and ce.completion_date is None:
+                    ce.completion_date = comp_date
+                to_update.append(ce)
+
+        if to_update:
+            CourseEnrolment.objects.bulk_update(
+                to_update,
+                ['is_passed', 'status', 'completion_date'],
+                batch_size=500,
+            )
+            updated_count += len(to_update)
+
+    return updated_count
+
+
 def _infer_course_completions(ces_by_enrolment: dict) -> list:
     """
     Sequential programmes require completing course N before starting N+1.
@@ -1464,6 +1692,14 @@ def recompute_health(
         qs = qs.filter(pk__in=enrolment_pks)
     enrolments = list(qs)
     _recompute_state['total'] = len(enrolments)
+
+    # Propagate shared-module credits before (re)computing health flags.
+    # This backfills PF-course completions into GD/CC/DA/DS enrolments for
+    # any data ingested before this feature was added.
+    _recompute_emails = {e.learner_id for e in enrolments}
+    _rc_propagated = _propagate_shared_module_credits(_recompute_emails, today)
+    if _rc_propagated:
+        logger.info('recompute_health: propagated %d shared-module credit(s)', _rc_propagated)
 
     ces_qs = CourseEnrolment.objects.filter(enrolment__in=enrolments).select_related('course')
     ces_by_enrolment: dict = defaultdict(list)

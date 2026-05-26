@@ -137,6 +137,32 @@ def _process_csv(content):
                 'grad_courses': grad_count,
             })
 
+        # ── Pass 4: mark shared modules ─────────────────────────────────────
+        # A course code is "shared" when it appears in 2+ programmes in the
+        # full catalogue (not just this upload). This covers PF-1…PF-5, which
+        # are embedded in CC, DA, DS, and GD at different sequence positions.
+        # The engine's _propagate_shared_module_credits() step uses this flag
+        # to mirror completions across all enrolments that contain the same code.
+        from django.db.models import Count as _Count
+        shared_codes = set(
+            Course.objects
+            .values('code')
+            .annotate(prog_count=_Count('programme', distinct=True))
+            .filter(prog_count__gt=1)
+            .exclude(code='')          # ignore courses with no code set
+            .values_list('code', flat=True)
+        )
+        shared_updated = 0
+        if shared_codes:
+            shared_updated = Course.objects.filter(
+                code__in=shared_codes, is_shared_module=False
+            ).update(is_shared_module=True)
+        # Reset any codes that were previously shared but are no longer
+        # (handles catalogue restructuring where a course is moved to one programme).
+        Course.objects.exclude(code__in=shared_codes).filter(
+            is_shared_module=True
+        ).update(is_shared_module=False)
+
         # ── Pass 4: ensure standalone WALX Programme exists ───────────────
         # eHub generates separate WALX rows per learner regardless of which
         # real programme they belong to. We need a WALX Programme to receive them.
@@ -188,6 +214,8 @@ def _process_csv(content):
         'courses_created': courses_created,
         'courses_updated': courses_updated,
         'prerequisites_resolved': prerequisites_resolved,
+        'shared_modules_marked': shared_updated,
+        'shared_codes': sorted(shared_codes),
         'warnings': warnings,
         'summaries': programme_summaries,
     }

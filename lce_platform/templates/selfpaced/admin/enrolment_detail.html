@@ -6,8 +6,19 @@
 {% block content %}
 <div style="max-width:640px;">
 
-  <div style="margin-bottom:16px;">
+  <div style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
     <a href="{% url 'sp_enrolment_log' %}" onclick="spBack('{% url 'sp_enrolment_log' %}'); return false;" style="font-size:12px;color:#6b7280;text-decoration:none;">← Back</a>
+    {% if job.status == 'processing' %}
+    <form method="post" action="{% url 'sp_enrolment_cancel' job.pk %}"
+          onsubmit="return confirm('Request cancellation? The job will stop at its next checkpoint.')">
+      {% csrf_token %}
+      <button type="submit" class="sp-btn"
+              style="font-size:12px;border:1px solid #f59e0b;background:#fffbeb;color:#b45309;">
+        <i class="ti ti-player-stop" style="font-size:13px;"></i>
+        Cancel Job
+      </button>
+    </form>
+    {% endif %}
   </div>
 
   {% include "selfpaced/admin/_enrolment_status.html" %}

@@ -38,6 +38,18 @@
     </form>
     {% endif %}
 
+    {% if job.status == 'processing' %}
+    <form method="post" action="{% url 'sp_job_cancel' job.pk %}"
+          onsubmit="return confirm('Request cancellation? The job will stop at its next checkpoint — data written so far will be kept.')">
+      {% csrf_token %}
+      <button type="submit" class="sp-btn"
+              style="font-size:12px;border:1px solid #f59e0b;background:#fffbeb;color:#b45309;">
+        <i class="ti ti-player-stop" style="font-size:13px;"></i>
+        Cancel Job
+      </button>
+    </form>
+    {% endif %}
+
     {% if job.status != 'processing' and job.status != 'pending_review' %}
     <button type="button" class="sp-btn" onclick="document.getElementById('delete-modal').style.display='flex'"
             style="font-size:12px;border:1px solid #fca5a5;background:#fff;color:#dc2626;">
