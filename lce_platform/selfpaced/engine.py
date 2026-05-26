@@ -253,7 +253,7 @@ def run_ingestion(job_id: int) -> None:
 def _execute(job, content: bytes) -> None:
     from selfpaced.models import (
         Assignment, AssignmentProgress, Course, CourseEnrolment,
-        Enrolment, FlagCode, FlaggedRow, IngestionJob, Learner, PaymentStatus,
+        Enrolment, FlagCode, FlaggedRow, HealthStatus, IngestionJob, Learner, PaymentStatus,
     )
 
     # Use the date the CSV was exported from the source system (set by the user
@@ -1003,19 +1003,39 @@ def _execute(job, content: bytes) -> None:
                 for email, learner_pk in learner_pk_by_email.items():
                     if learner_pk in existing_walx:
                         e = existing_walx[learner_pk]
+                        needs_save = False
                         if not e.is_graduated:
                             e.is_graduated = True
+                            needs_save = True
+                        # Always sync health_status — a previous upload may have
+                        # left this enrolment as at_risk/dormant before graduation
+                        # was detected. Phase 5 doesn't re-score enrolments whose
+                        # programme didn't appear in this CSV, so we set it here.
+                        if e.health_status != HealthStatus.GRADUATED:
+                            e.health_status = HealthStatus.GRADUATED
+                            e.active_flags  = []
+                            e.flag_detail   = {}
+                            needs_save = True
+                        if needs_save:
                             to_update.append(e)
                     else:
                         to_create.append(Enrolment(
                             learner_id=learner_pk,
                             programme=prereq_prog,
                             is_graduated=True,
+                            health_status=HealthStatus.GRADUATED,
+                            active_flags=[],
+                            flag_detail={},
+                            has_activity_data=True,
                             created_by_job=job,
                         ))
 
                 if to_update:
-                    Enrolment.objects.bulk_update(to_update, ['is_graduated'], batch_size=500)
+                    Enrolment.objects.bulk_update(
+                        to_update,
+                        ['is_graduated', 'health_status', 'active_flags', 'flag_detail'],
+                        batch_size=500,
+                    )
                 if to_create:
                     Enrolment.objects.bulk_create(
                         to_create, batch_size=500, ignore_conflicts=True,
