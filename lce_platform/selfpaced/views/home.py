@@ -81,15 +81,12 @@ def home(request):
         'not_yet_started': _eh.get('not_yet_started', 0),
     }
 
-    # Activation and graduation rates use learner-level counts
-    not_started_count = health_counts['not_yet_started']
-    graduated_count   = health_counts['graduated']
-    activated         = total_learners - not_started_count
-    activation_rate   = round(activated / total_learners * 100) if total_learners else None
-    grad_rate         = round(graduated_count / activated * 100) if activated else None
+    # ── Graduated count for grad rate denominator ─────────────────────────
+    graduated_count = health_counts['graduated']
 
-    # Module activation: completed the first course of any substantive programme.
-    # Retention: enrolled in a 2nd+ course of any substantive programme.
+    # ── Module activation: passed the first course of any substantive programme ─
+    # ── Retention: passed Module 1 AND enrolment is still active/at_risk/graduated ─
+    # ── Graduation rate: graduated ÷ module_activated (of those who started, how many finished) ─
     _active_prog_pks = list(
         Programme.objects.filter(is_active=True, is_prerequisite=False).values_list('pk', flat=True)
     )
@@ -105,10 +102,23 @@ def home(request):
     if _min_seq:
         act_q = ret_q = None
         for prog_id, ms in _min_seq.items():
-            cond_a = Q(enrolment__programme_id=prog_id, course__sequence_number=ms,  status='completed')
-            cond_r = Q(enrolment__programme_id=prog_id, course__sequence_number__gt=ms)
+            # Activated: passed Module 1 (is_passed=True on lowest-sequence course)
+            cond_a = Q(
+                enrolment__programme_id=prog_id,
+                course__sequence_number=ms,
+                is_passed=True,
+            )
+            # Retained: passed Module 1 AND enrolment health is active/at_risk/graduated
+            # (i.e. they haven't gone dormant or not_yet_started after passing it)
+            cond_r = Q(
+                enrolment__programme_id=prog_id,
+                course__sequence_number=ms,
+                is_passed=True,
+                enrolment__health_status__in=['active', 'at_risk', 'graduated'],
+            )
             act_q = cond_a if act_q is None else act_q | cond_a
             ret_q = cond_r if ret_q is None else ret_q | cond_r
+
         module_activated_count = (
             CourseEnrolment.objects.filter(act_q)
             .exclude(enrolment__learner__payment_status='unknown')
@@ -119,8 +129,12 @@ def home(request):
             .exclude(enrolment__learner__payment_status='unknown')
             .values('enrolment__learner_id').distinct().count()
         )
+
     module_activation_rate = round(module_activated_count / total_learners * 100) if total_learners else None
     retention_rate         = round(module_retained_count / module_activated_count * 100) if module_activated_count else None
+
+    # Graduation rate: of learners who passed Module 1, how many graduated?
+    grad_rate = round(graduated_count / module_activated_count * 100) if module_activated_count else None
 
     badges_count = (
         Enrolment.objects
@@ -298,7 +312,7 @@ def home(request):
             'enrolment_at_risk':    _d(enrolment_counts['at_risk'],   prev_enrolment_health.get('at_risk', 0)),
             'enrolment_dormant':    _d(enrolment_counts['dormant'],   prev_enrolment_health.get('dormant', 0)),
             'enrolment_graduated':  _d(enrolment_counts['graduated'], prev_enrolment_health.get('graduated', 0)),
-            'activation_rate':      _d(activation_rate,  prev_activation_rate),
+            'module_activation_rate': _d(module_activation_rate, prev_activation_rate),
             'grad_rate':            _d(grad_rate,         prev_grad_rate),
             'badges':               _d(badges_count,      prev_badges),
             'certs':                _d(certificates_count, prev_certs),
@@ -384,7 +398,6 @@ def home(request):
         'health_counts':       health_counts,
         'enrolment_counts':    enrolment_counts,
         'total_learners':      total_learners,
-        'activation_rate':          activation_rate,
         'module_activation_rate':   module_activation_rate,
         'module_activated_count':   module_activated_count,
         'retention_rate':           retention_rate,

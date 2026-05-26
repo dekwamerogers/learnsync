@@ -118,9 +118,12 @@ def _build_report_data():
     for p in prog_rows:
         total = p['total']
         act   = p['activated']
-        p['grad_rate']       = round(p['graduated'] / total * 100, 1) if total else 0.0
+        # Activation rate: passed M1 ÷ enrolled
         p['activation_rate'] = round(act / total * 100, 1) if total else 0.0
+        # Retention rate: retained ÷ activated
         p['retention_rate']  = round(p['retained'] / act * 100, 1) if act else 0.0
+        # Graduation rate: graduated ÷ activated (of those who started, how many finished?)
+        p['grad_rate']       = round(p['graduated'] / act * 100, 1) if act else 0.0
 
     # Badges: passed CourseEnrolments from credential-awarding programmes (paid learners only)
     badges_by_prog = {
@@ -407,9 +410,10 @@ def _build_report_data():
         'total_learners':     total_learners,
         'unpaid_count':       unpaid_count,
         # Rates
-        'grad_rate':         round(total_graduated  / total_enrolled  * 100, 1) if total_enrolled  else 0.0,
         'activation_rate':   round(total_activated  / total_enrolled  * 100, 1) if total_enrolled  else 0.0,
         'retention_rate':    round(total_retained   / total_activated * 100, 1) if total_activated else 0.0,
+        # Graduation rate: of those who passed Module 1, how many finished?
+        'grad_rate':         round(total_graduated  / total_activated * 100, 1) if total_activated else 0.0,
         # Detail rows
         'prog_rows':          prog_rows,
         'payment_rows':       payment_rows,

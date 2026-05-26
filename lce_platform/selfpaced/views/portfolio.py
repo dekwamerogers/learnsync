@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import date as _date
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Q
+from django.db.models import Count, Min, Q
 from django.shortcuts import render
 
 from selfpaced.models import Course, CourseEnrolment, Enrolment, Programme
@@ -59,6 +59,39 @@ def portfolio(request):
         .values('course__programme_id').annotate(n=Count('id'))
     }
 
+    # Activation & retention — module-1 based (is_passed=True on lowest-sequence course)
+    _min_seq = dict(
+        Course.objects
+        .filter(is_active=True, programme_id__in=prog_pks)
+        .values('programme_id')
+        .annotate(ms=Min('sequence_number'))
+        .values_list('programme_id', 'ms')
+    )
+    activated_by_prog: dict = {}
+    retained_by_prog: dict  = {}
+    if _min_seq:
+        act_q = ret_q = None
+        for pid, ms in _min_seq.items():
+            ca = Q(enrolment__programme_id=pid, course__sequence_number=ms, is_passed=True)
+            cr = Q(
+                enrolment__programme_id=pid,
+                course__sequence_number=ms,
+                is_passed=True,
+                enrolment__health_status__in=['active', 'at_risk', 'graduated'],
+            )
+            act_q = ca if act_q is None else act_q | ca
+            ret_q = cr if ret_q is None else ret_q | cr
+        for row in (CourseEnrolment.objects.filter(act_q)
+                    .exclude(enrolment__learner__payment_status='unknown')
+                    .values('enrolment__programme_id')
+                    .annotate(n=Count('enrolment_id', distinct=True))):
+            activated_by_prog[row['enrolment__programme_id']] = row['n']
+        for row in (CourseEnrolment.objects.filter(ret_q)
+                    .exclude(enrolment__learner__payment_status='unknown')
+                    .values('enrolment__programme_id')
+                    .annotate(n=Count('enrolment_id', distinct=True))):
+            retained_by_prog[row['enrolment__programme_id']] = row['n']
+
     rows = []
     for prog in programmes:
         h = health_by_prog.get(prog.pk, {})
@@ -69,8 +102,10 @@ def portfolio(request):
         graduated = h.get('graduated', 0)
         not_started = h.get('not_yet_started', 0)
         learners = learner_count_by_prog.get(prog.pk, 0)
-        activated = learners - not_started
-        activation_rate = round(activated / learners * 100) if learners else None
+        activated = activated_by_prog.get(prog.pk, 0)
+        retained  = retained_by_prog.get(prog.pk, 0)
+        activation_rate = round(activated / total * 100) if total else None
+        retention_rate  = round(retained  / activated * 100) if activated else None
         grad_rate = round(graduated / activated * 100) if activated else None
         concern = dormant + at_risk
         rows.append({
@@ -82,7 +117,10 @@ def portfolio(request):
             'active': active,
             'graduated': graduated,
             'not_started': not_started,
+            'activated': activated,
+            'retained': retained,
             'activation_rate': activation_rate,
+            'retention_rate': retention_rate,
             'grad_rate': grad_rate,
             'concern': concern,
             'courses': course_count_by_prog.get(prog.pk, 0),

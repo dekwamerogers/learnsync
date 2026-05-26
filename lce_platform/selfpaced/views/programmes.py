@@ -76,8 +76,15 @@ def programme_list_stats(request):
     if _min_seq:
         act_q = ret_q = None
         for pid, ms in _min_seq.items():
-            ca = Q(enrolment__programme_id=pid, course__sequence_number=ms,    status='completed')
-            cr = Q(enrolment__programme_id=pid, course__sequence_number__gt=ms)
+            # Activated: passed Module 1 (is_passed=True on the lowest-sequence course)
+            ca = Q(enrolment__programme_id=pid, course__sequence_number=ms, is_passed=True)
+            # Retained: passed Module 1 AND enrolment is still active/at_risk/graduated
+            cr = Q(
+                enrolment__programme_id=pid,
+                course__sequence_number=ms,
+                is_passed=True,
+                enrolment__health_status__in=['active', 'at_risk', 'graduated'],
+            )
             act_q = ca if act_q is None else act_q | ca
             ret_q = cr if ret_q is None else ret_q | cr
         for row in (CourseEnrolment.objects.filter(act_q)
