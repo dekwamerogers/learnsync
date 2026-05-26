@@ -9,7 +9,7 @@ from django.shortcuts import render
 from django.db.models import Min
 
 from selfpaced.models import Course, CourseEnrolment, Enrolment, EnrolmentSnapshot, HealthStatus, IngestionJob, Intervention, Programme
-from selfpaced.querysets import real_learners_qs
+from selfpaced.querysets import activity_learners_qs, real_learners_qs
 from selfpaced.utils import safe_json
 
 
@@ -45,12 +45,15 @@ def _learner_health_from_snapshots(snapshot_qs):
 def home(request):
     today = date.today()
 
-    real_qs = real_learners_qs().exclude(payment_status='unknown')
-    total_learners = real_qs.count()
+    # activity_qs: learners who have appeared in at least one activity CSV — used for all metric denominators.
+    # real_qs: all non-WALX-only paid learners — used for total enrolled count (wider set).
+    real_qs     = real_learners_qs().exclude(payment_status='unknown')
+    activity_qs = activity_learners_qs().exclude(payment_status='unknown')
+    total_learners = activity_qs.count()
 
-    # Learner-level health counts — 1 GROUP BY query instead of 5 COUNTs.
+    # Learner-level health counts — from activity learners only (those in eHub activity export).
     _lh = {r['overall_health_status']: r['n']
-           for r in real_qs.values('overall_health_status').annotate(n=Count('email'))}
+           for r in activity_qs.values('overall_health_status').annotate(n=Count('email'))}
     health_counts = {
         'dormant':         _lh.get('dormant', 0),
         'at_risk':         _lh.get('at_risk', 0),
@@ -59,8 +62,19 @@ def home(request):
         'not_yet_started': _lh.get('not_yet_started', 0),
     }
 
-    # Enrolment-level counts — exclude prerequisite programmes and unpaid learners.
-    real_enrolments = Enrolment.objects.exclude(programme__is_prerequisite=True).exclude(learner__payment_status='unknown')
+    # Enrolled-but-not-yet-reached: in roster CSV but never appeared in activity CSV.
+    enrolled_not_reached = (
+        real_qs.count() - activity_qs.count()
+    )
+
+    # Enrolment-level counts — exclude prerequisite programmes, unpaid learners,
+    # and enrolments with no activity data (enrollment-only rows).
+    real_enrolments = (
+        Enrolment.objects
+        .filter(has_activity_data=True)
+        .exclude(programme__is_prerequisite=True)
+        .exclude(learner__payment_status='unknown')
+    )
 
     # Upcoming = programme has a future start_date (hasn't begun yet)
     upcoming_filter = Q(programme__start_date__isnull=False) & Q(programme__start_date__gt=today)
@@ -93,6 +107,7 @@ def home(request):
     _min_seq = dict(
         Course.objects
         .filter(is_active=True, programme_id__in=_active_prog_pks)
+        .exclude(code='WALX')   # WALX completions live on the standalone WALX enrolment, not the main programme enrolment
         .values('programme_id')
         .annotate(ms=Min('sequence_number'))
         .values_list('programme_id', 'ms')
@@ -121,11 +136,13 @@ def home(request):
 
         module_activated_count = (
             CourseEnrolment.objects.filter(act_q)
+            .filter(enrolment__has_activity_data=True)
             .exclude(enrolment__learner__payment_status='unknown')
             .values('enrolment__learner_id').distinct().count()
         )
         module_retained_count = (
             CourseEnrolment.objects.filter(ret_q)
+            .filter(enrolment__has_activity_data=True)
             .exclude(enrolment__learner__payment_status='unknown')
             .values('enrolment__learner_id').distinct().count()
         )
@@ -395,9 +412,10 @@ def home(request):
     enrol_timeline_has_data = bool(sorted_weeks)
 
     return render(request, 'selfpaced/home.html', {
-        'health_counts':       health_counts,
-        'enrolment_counts':    enrolment_counts,
-        'total_learners':      total_learners,
+        'health_counts':          health_counts,
+        'enrolment_counts':       enrolment_counts,
+        'total_learners':         total_learners,
+        'enrolled_not_reached':   enrolled_not_reached,
         'module_activation_rate':   module_activation_rate,
         'module_activated_count':   module_activated_count,
         'retention_rate':           retention_rate,

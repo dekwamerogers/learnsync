@@ -34,11 +34,11 @@ def programme_list_stats(request):
     programmes = list(_active_programmes_qs().order_by('code'))
     prog_pks = [p.pk for p in programmes]
 
-    # 1. Health breakdown — paid learners only, one GROUP BY query
+    # 1. Health breakdown — activity learners only (has_activity_data=True), paid only
     health_by_prog: dict = defaultdict(lambda: defaultdict(int))
     for row in (
         Enrolment.objects
-        .filter(programme_id__in=prog_pks)
+        .filter(programme_id__in=prog_pks, has_activity_data=True)
         .exclude(learner__payment_status='unknown')
         .values('programme_id', 'health_status')
         .annotate(n=Count('id'))
@@ -67,6 +67,7 @@ def programme_list_stats(request):
     _min_seq = dict(
         Course.objects
         .filter(is_active=True, programme_id__in=prog_pks)
+        .exclude(code='WALX')   # WALX completions live on the standalone WALX enrolment, not the main programme enrolment
         .values('programme_id')
         .annotate(ms=Min('sequence_number'))
         .values_list('programme_id', 'ms')
@@ -88,11 +89,13 @@ def programme_list_stats(request):
             act_q = ca if act_q is None else act_q | ca
             ret_q = cr if ret_q is None else ret_q | cr
         for row in (CourseEnrolment.objects.filter(act_q)
+                    .filter(enrolment__has_activity_data=True)
                     .exclude(enrolment__learner__payment_status='unknown')
                     .values('enrolment__programme_id')
                     .annotate(n=Count('enrolment_id', distinct=True))):
             activated_by_prog[row['enrolment__programme_id']] = row['n']
         for row in (CourseEnrolment.objects.filter(ret_q)
+                    .filter(enrolment__has_activity_data=True)
                     .exclude(enrolment__learner__payment_status='unknown')
                     .values('enrolment__programme_id')
                     .annotate(n=Count('enrolment_id', distinct=True))):
@@ -115,7 +118,7 @@ def programme_list_stats(request):
         prog.activation_rate = round(prog.activated_count / prog.total_enrolments * 100) if prog.total_enrolments else 0
         prog.retention_rate  = round(prog.retained_count  / prog.activated_count  * 100) if prog.activated_count  else 0
 
-    # Solo vs multi-programme learner mix — paid learners only.
+    # Solo vs multi-programme learner mix — activity learners only, paid only.
     # Prerequisite programmes (e.g. WALX) are excluded — they are onboarding
     # pathways, not substantive programmes, so a learner in WALX + COCR counts
     # as a solo learner, not a multi-programme learner.
@@ -124,6 +127,7 @@ def programme_list_stats(request):
     _learner_progs: dict = defaultdict(set)
     for learner_id, prog_pk in (
         Enrolment.objects
+        .filter(has_activity_data=True)
         .exclude(programme__is_prerequisite=True)
         .exclude(learner__payment_status='unknown')
         .values_list('learner_id', 'programme_id')
@@ -160,10 +164,10 @@ def programme_list_stats(request):
                 'graduated': prog.graduated_count - prev.get('graduated', 0),
             }
 
-    # Unique paid-learner count across all active programmes (deduplicated)
+    # Unique paid-learner count across all active programmes (activity learners only)
     unique_learner_total = (
         Enrolment.objects
-        .filter(programme_id__in=prog_pks)
+        .filter(programme_id__in=prog_pks, has_activity_data=True)
         .exclude(learner__payment_status='unknown')
         .values('learner_id')
         .distinct()
@@ -180,7 +184,7 @@ def programme_list_stats(request):
     _prog_learner_ids: dict = defaultdict(set)
     for learner_id, prog_id in (
         Enrolment.objects
-        .filter(programme_id__in=prog_pks)
+        .filter(programme_id__in=prog_pks, has_activity_data=True)
         .values_list('learner_id', 'programme_id')
     ):
         _prog_learner_ids[prog_id].add(learner_id)
@@ -200,10 +204,13 @@ def programme_detail(request, pk):
     programme = get_object_or_404(Programme, pk=pk)
     tab = request.GET.get('tab', 'overview')
 
+    # All paid enrolments — used for the learner list (staff can see enrollment-only rows).
     _paid_enrolments = Enrolment.objects.filter(programme=programme).exclude(learner__payment_status='unknown')
+    # Activity-only enrolments — used for health counts / metrics.
+    _activity_enrolments = _paid_enrolments.filter(has_activity_data=True)
 
     _raw_counts = (
-        _paid_enrolments
+        _activity_enrolments
         .values('health_status')
         .annotate(n=Count('id'))
     )
@@ -248,10 +255,10 @@ def programme_detail(request, pk):
         {'label': 'Not Started',   'color': '#9ca3af', 'count': health_counts['not_yet_started']},
     ]
 
-    # Flag breakdown — paid learners only
+    # Flag breakdown — activity enrolments only
     _flag_counts: dict = defaultdict(int)
     for row in (
-        _paid_enrolments
+        _activity_enrolments
         .filter(health_status__in=['at_risk', 'dormant'])
         .values('active_flags')
     ):
@@ -291,21 +298,22 @@ def programme_charts(request):
     programmes = list(_active_programmes_qs().order_by('code'))
     prog_pks = [p.pk for p in programmes]
 
-    # Health breakdown per programme — paid learners only
+    # Health breakdown per programme — activity enrolments only, paid only
     health_by_prog: dict = defaultdict(lambda: defaultdict(int))
     for row in (
         Enrolment.objects
-        .filter(programme_id__in=prog_pks)
+        .filter(programme_id__in=prog_pks, has_activity_data=True)
         .exclude(learner__payment_status='unknown')
         .values('programme_id', 'health_status')
         .annotate(n=Count('id'))
     ):
         health_by_prog[row['programme_id']][row['health_status']] = row['n']
 
-    # Solo vs multi-programme learner mix — paid learners only
+    # Solo vs multi-programme learner mix — activity learners only, paid only
     _learner_progs: dict = defaultdict(set)
     for learner_id, prog_pk in (
         Enrolment.objects
+        .filter(has_activity_data=True)
         .exclude(programme__is_prerequisite=True)
         .exclude(learner__payment_status='unknown')
         .values_list('learner_id', 'programme_id')
@@ -321,11 +329,11 @@ def programme_charts(request):
         for pk in pks:
             prog_mix[pk][kind] += 1
 
-    # Learner distribution by current course and health status — paid learners only
+    # Learner distribution by current course and health status — activity enrolments only, paid only
     _course_health: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
     for row in (
         Enrolment.objects
-        .filter(programme_id__in=prog_pks, current_course__isnull=False)
+        .filter(programme_id__in=prog_pks, has_activity_data=True, current_course__isnull=False)
         .exclude(learner__payment_status='unknown')
         .values('programme_id', 'current_course__sequence_number', 'current_course__full_name', 'health_status')
         .annotate(n=Count('learner_id', distinct=True))
@@ -336,11 +344,11 @@ def programme_charts(request):
         full_name = row['current_course__full_name'] or f'Course {seq}'
         _course_health[prog_id][(seq, full_name)][row['health_status']] = row['n']
 
-    # Badges acquired per course — paid learners only
+    # Badges acquired per course — activity enrolments only, paid only
     _badges_by_course: dict = defaultdict(dict)
     for row in (
         CourseEnrolment.objects
-        .filter(status='completed', course__programme_id__in=prog_pks)
+        .filter(status='completed', course__programme_id__in=prog_pks, enrolment__has_activity_data=True)
         .exclude(enrolment__learner__payment_status='unknown')
         .values('course__programme_id', 'course__sequence_number', 'course__full_name')
         .annotate(n=Count('id'))
@@ -376,7 +384,7 @@ def programme_charts(request):
     _prog_d    = Coalesce('programme__start_date', 'enrolment_date', 'activation_date', 'first_sign_of_life_date')
     _enrol_date_rows = list(
         Enrolment.objects
-        .filter(programme_id__in=prog_pks)
+        .filter(programme_id__in=prog_pks, has_activity_data=True)
         .exclude(learner__payment_status='unknown')
         .annotate(_d=Greatest(_learner_d, _prog_d))
         .exclude(_d__isnull=True)

@@ -368,6 +368,16 @@ class Enrolment(models.Model):
     is_graduated = models.BooleanField(default=False)
     graduation_date = models.DateField(null=True, blank=True)
     is_graduated_on_savanna = models.BooleanField(default=False)
+    # True once this enrolment has appeared in at least one activity CSV upload.
+    # Enrolments created from the roster/enrollment CSV only remain False until
+    # the learner shows up in the eHub activity export.
+    # All metric denominators (activation, retention, graduation rates) filter
+    # has_activity_data=True so enrollment-only learners are excluded from stats.
+    has_activity_data = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text='Set to True when this enrolment first appears in an activity CSV.',
+    )
     last_updated_date = models.DateTimeField(auto_now=True)
 
     class Meta:

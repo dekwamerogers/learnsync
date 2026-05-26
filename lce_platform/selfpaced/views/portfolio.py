@@ -19,10 +19,11 @@ def portfolio(request):
     )
     prog_pks = [p.pk for p in programmes]
 
-    # Base queryset — paid learners only (matches programme detail page)
+    # Base queryset — activity learners only (has_activity_data=True), paid only.
+    # Enrolments created from the roster CSV but never seen in an activity export are excluded.
     paid_enrolments = (
         Enrolment.objects
-        .filter(programme_id__in=prog_pks)
+        .filter(programme_id__in=prog_pks, has_activity_data=True)
         .exclude(learner__payment_status='unknown')
     )
 
@@ -63,6 +64,7 @@ def portfolio(request):
     _min_seq = dict(
         Course.objects
         .filter(is_active=True, programme_id__in=prog_pks)
+        .exclude(code='WALX')   # WALX completions live on the standalone WALX enrolment, not the main programme enrolment
         .values('programme_id')
         .annotate(ms=Min('sequence_number'))
         .values_list('programme_id', 'ms')
@@ -82,11 +84,13 @@ def portfolio(request):
             act_q = ca if act_q is None else act_q | ca
             ret_q = cr if ret_q is None else ret_q | cr
         for row in (CourseEnrolment.objects.filter(act_q)
+                    .filter(enrolment__has_activity_data=True)
                     .exclude(enrolment__learner__payment_status='unknown')
                     .values('enrolment__programme_id')
                     .annotate(n=Count('enrolment_id', distinct=True))):
             activated_by_prog[row['enrolment__programme_id']] = row['n']
         for row in (CourseEnrolment.objects.filter(ret_q)
+                    .filter(enrolment__has_activity_data=True)
                     .exclude(enrolment__learner__payment_status='unknown')
                     .values('enrolment__programme_id')
                     .annotate(n=Count('enrolment_id', distinct=True))):

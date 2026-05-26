@@ -680,6 +680,7 @@ def _execute(job, content: bytes) -> None:
             graduation_date=agg['graduation_date'],
             is_graduated_on_savanna=agg['is_graduated_on_savanna'],
             created_by_job=job,
+            has_activity_data=True,  # created directly from the activity CSV
         ))
 
     if new_enrolment_objs:
@@ -713,13 +714,17 @@ def _execute(job, content: bytes) -> None:
             e.graduation_date = agg['graduation_date']
         if agg['is_graduated_on_savanna']:
             e.is_graduated_on_savanna = True
+        # Mark as having activity data — never regress to False once seen in activity CSV.
+        if not e.has_activity_data:
+            e.has_activity_data = True
         update_enrolment_objs.append(e)
 
     if update_enrolment_objs:
         Enrolment.objects.bulk_update(
             update_enrolment_objs,
             ['first_sign_of_life_date', 'activation_date',
-             'is_graduated', 'graduation_date', 'is_graduated_on_savanna'],
+             'is_graduated', 'graduation_date', 'is_graduated_on_savanna',
+             'has_activity_data'],
             batch_size=500,
         )
 

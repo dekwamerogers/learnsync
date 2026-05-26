@@ -39,13 +39,18 @@ def analytics(request):
         _date_expr = F('first_sign_of_life_date')
 
     # ── Base querysets ────────────────────────────────────────────────────
-    learner_qs = Learner.objects.all()
+    # Only include learners/enrolments that have appeared in an activity CSV.
+    # Enrollment-only rows (has_activity_data=False) are excluded from all metrics.
+    learner_qs = Learner.objects.filter(
+        enrolments__has_activity_data=True,
+        enrolments__programme__is_prerequisite=False,
+    ).distinct()
     if country_filter:
         learner_qs = learner_qs.filter(country__in=country_filter)
 
     enrolment_qs = (
         Enrolment.objects
-        .filter(learner__in=learner_qs, programme__is_prerequisite=False)
+        .filter(learner__in=learner_qs, programme__is_prerequisite=False, has_activity_data=True)
         .filter(Q(programme__start_date__isnull=True) | Q(programme__start_date__lte=date.today()))
     )
 
@@ -80,7 +85,7 @@ def analytics(request):
             course__sequence_number=Subquery(
                 Course.objects.filter(
                     programme_id=OuterRef('enrolment__programme_id'),
-                ).order_by('sequence_number').values('sequence_number')[:1]
+                ).exclude(code='WALX').order_by('sequence_number').values('sequence_number')[:1]
             ),
         )
         .values_list('enrolment_id', flat=True)
@@ -412,7 +417,7 @@ def analytics(request):
             course__sequence_number=Subquery(
                 Course.objects.filter(
                     programme_id=OuterRef('enrolment__programme_id'),
-                ).order_by('sequence_number').values('sequence_number')[:1]
+                ).exclude(code='WALX').order_by('sequence_number').values('sequence_number')[:1]
             ),
         )
         .values('completion_date', 'enrolment__programme_id')

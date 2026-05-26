@@ -73,7 +73,7 @@ def _build_report_data():
     # activity yet and inflate "enrolled" counts misleadingly.
     base_qs = (
         Enrolment.objects
-        .filter(programme__is_prerequisite=False, programme__is_active=True)
+        .filter(programme__is_prerequisite=False, programme__is_active=True, has_activity_data=True)
         .filter(Q(programme__start_date__isnull=True) | Q(programme__start_date__lte=today))
         .exclude(learner__payment_status=PaymentStatus.UNKNOWN)
     )
@@ -88,7 +88,7 @@ def _build_report_data():
             course__sequence_number=Subquery(
                 Course.objects.filter(
                     programme_id=OuterRef('enrolment__programme_id'),
-                ).order_by('sequence_number').values('sequence_number')[:1]
+                ).exclude(code='WALX').order_by('sequence_number').values('sequence_number')[:1]
             ),
         )
         .values_list('enrolment_id', flat=True)
