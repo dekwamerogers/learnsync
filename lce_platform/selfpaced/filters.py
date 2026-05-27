@@ -62,8 +62,18 @@ class LearnerFilter(django_filters.FilterSet):
         queryset=Course.objects.filter(is_active=True)
                                .select_related('programme')
                                .order_by('programme__code', 'sequence_number'),
-        field_name='enrolments__course_enrolments__course',
+        method='filter_course',
         label='Course / Module',
+    )
+    course_status = django_filters.MultipleChoiceFilter(
+        choices=[
+            ('in_progress', 'In Progress'),
+            ('completed',   'Completed'),
+            ('not_started', 'Not Started'),
+            ('withdrawn',   'Withdrawn'),
+        ],
+        method='filter_course_status',
+        label='Course Status',
     )
     assignment = django_filters.ModelMultipleChoiceFilter(
         queryset=Assignment.objects.filter(is_active=True)
@@ -138,6 +148,36 @@ class LearnerFilter(django_filters.FilterSet):
             | Q(first_name__icontains=value)
             | Q(last_name__icontains=value)
         )
+
+    def filter_course(self, queryset, name, value):
+        """
+        Filter by course.  When course_status is also set, apply both
+        conditions in a single .filter() span so they must match the *same*
+        CourseEnrolment row — prevents the cross-join that chained .filter()
+        calls produce on multi-valued relations.
+        """
+        if not value:
+            return queryset
+        course_ids = [c.pk for c in value]
+        statuses   = [s for s in self.data.getlist('course_status') if s]
+        kwargs: dict = {'enrolments__course_enrolments__course_id__in': course_ids}
+        if statuses:
+            kwargs['enrolments__course_enrolments__status__in'] = statuses
+        return queryset.filter(**kwargs).distinct()
+
+    def filter_course_status(self, queryset, name, value):
+        """
+        Applied standalone only when no course filter is active.
+        When a course is selected, filter_course already handles the combined
+        condition — we skip here to avoid a second (independent) join.
+        """
+        if not value:
+            return queryset
+        if any(pk for pk in self.data.getlist('course') if pk):
+            return queryset  # handled by filter_course above
+        return queryset.filter(
+            enrolments__course_enrolments__status__in=value,
+        ).distinct()
 
     def filter_graduated(self, queryset, name, value):
         if value == 'badge':

@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Q
+from django.db.models import Count, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce, Greatest
 from django.shortcuts import render
 
@@ -205,16 +205,48 @@ def home(request):
     onboarded_rate  = round(onboarded_count / total_learners * 100) if total_learners else None
     onboarding_rate = round(currently_onboarding_count / total_learners * 100) if total_learners else None
 
+    # Per-programme activated enrolment IDs (passed first module of their programme)
+    _prog_activated_ids = frozenset(
+        CourseEnrolment.objects
+        .filter(
+            enrolment__in=started_enrolments,
+            is_passed=True,
+            course__sequence_number=Subquery(
+                Course.objects.filter(
+                    programme_id=OuterRef('enrolment__programme_id'),
+                ).exclude(code='WALX').order_by('sequence_number').values('sequence_number')[:1]
+            ),
+        )
+        .values_list('enrolment_id', flat=True)
+        .distinct()
+    )
+
+    # Roster-only enrolments per programme (in enrolment CSV but NOT in activity CSV)
+    _roster_only_counts = dict(
+        Enrolment.objects
+        .filter(
+            has_activity_data=False,
+            programme__is_active=True,
+            programme__is_prerequisite=False,
+        )
+        .filter(started_filter)
+        .exclude(learner__payment_status='unknown')
+        .values('programme__code')
+        .annotate(n=Count('pk'))
+        .values_list('programme__code', 'n')
+    )
+
     # Per-programme health breakdown for bar chart — paid learners, started programmes
     _prog_rows = list(
         started_enrolments
-        .values('programme__code')
+        .values('programme__id', 'programme__code')
         .annotate(
             graduated=Count('pk', filter=Q(health_status='graduated')),
             active=Count('pk', filter=Q(health_status='active')),
             at_risk=Count('pk', filter=Q(health_status='at_risk')),
             dormant=Count('pk', filter=Q(health_status='dormant')),
             not_yet_started=Count('pk', filter=Q(health_status='not_yet_started')),
+            activated=Count('pk', filter=Q(pk__in=_prog_activated_ids)),
         )
         .order_by('programme__code')
     )
@@ -349,16 +381,29 @@ def home(request):
         if total_learners else None
     )
 
-    prog_health_rows = [{
-        'code':       r['programme__code'],
-        'graduated':  r['graduated'],
-        'active':     r['active'],
-        'at_risk':    r['at_risk'],
-        'dormant':    r['dormant'],
-        'not_started': r['not_yet_started'],
-        'total':      (r['graduated'] + r['active'] + r['at_risk']
-                       + r['dormant'] + r['not_yet_started']),
-    } for r in _prog_rows]
+    prog_health_rows = []
+    for r in _prog_rows:
+        total     = r['graduated'] + r['active'] + r['at_risk'] + r['dormant'] + r['not_yet_started']
+        activated = r.get('activated', 0)
+        roster_only = _roster_only_counts.get(r['programme__code'], 0)
+        prog_health_rows.append({
+            'code':            r['programme__code'],
+            'pk':              r['programme__id'],
+            'graduated':       r['graduated'],
+            'active':          r['active'],
+            'at_risk':         r['at_risk'],
+            'dormant':         r['dormant'],
+            'not_started':     r['not_yet_started'],
+            'total':           total,
+            'activated':       activated,
+            'roster_only':     roster_only,
+            # Rates (% of activity-data enrolments)
+            'activation_rate': round(activated         / total * 100, 1) if total else 0,
+            'active_rate':     round(r['active']       / total * 100, 1) if total else 0,
+            'at_risk_rate':    round(r['at_risk']      / total * 100, 1) if total else 0,
+            'dormant_rate':    round(r['dormant']      / total * 100, 1) if total else 0,
+            'graduated_rate':  round(r['graduated']    / total * 100, 1) if total else 0,
+        })
 
     low_engagement_progs = [
         r['code'] for r in prog_health_rows
@@ -446,4 +491,5 @@ def home(request):
         'enrol_timeline_labels':     enrol_timeline_labels,
         'enrol_timeline_datasets':   enrol_timeline_datasets,
         'enrol_timeline_has_data':   enrol_timeline_has_data,
+        'prog_health_rows':          prog_health_rows,
     })

@@ -360,6 +360,8 @@ def _build_report_data():
                 w for w in (
                     {
                         'label':         f'{ws.strftime("%d %b")} – {(ws + timedelta(days=6)).strftime("%d %b")}',
+                        'week_start':    ws,
+                        'week_end':      ws + timedelta(days=6),
                         'enrolled':      _pw_enrolled[code].get(ws, 0),
                         'activated':     _pw_activated[code].get(ws, 0),
                         'active':        _pw_active[code].get(ws, 0),

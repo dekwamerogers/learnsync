@@ -160,17 +160,30 @@
 
       <!-- Left: Unique Learners -->
       <div style="flex:1;padding-right:14px;border-right:1px solid #f3f4f6;">
-        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Unique Learners</div>
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">
+          Unique Learners
+          <abbr title="Distinct people who have appeared in at least one eHub activity CSV for a non-prerequisite programme. One person = 1 learner regardless of how many programmes they are enrolled in."
+                style="font-size:10px;font-weight:400;color:#9ca3af;cursor:help;text-decoration:underline dotted #9ca3af;margin-left:3px;">?</abbr>
+        </div>
         <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px;">
           <div style="font-size:28px;font-weight:700;color:#111827;line-height:1;">{{ total_learners }}</div>
           {% if deltas %}{% include "selfpaced/_delta.html" with val=deltas.total_learners positive_is_good=True %}{% endif %}
         </div>
-        <div style="font-size:10px;color:#9ca3af;margin-top:6px;">Across all active programmes</div>
+        <div style="font-size:10px;color:#9ca3af;margin-top:4px;">In eHub activity data</div>
+        {% if enrolled_not_reached %}
+        <div style="font-size:10px;color:#d97706;margin-top:2px;">
+          + {{ enrolled_not_reached }} roster-only (not yet active)
+        </div>
+        {% endif %}
       </div>
 
       <!-- Right: Enrolments -->
       <div style="flex:1;padding-left:14px;">
-        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Enrolments</div>
+        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">
+          Enrolments
+          <abbr title="Active programme enrolments in started (non-upcoming), non-prerequisite programmes with activity data. One learner in 3 programmes = 3 enrolments. Learners in future-start programmes are counted in Unique Learners but not yet here."
+                style="font-size:10px;font-weight:400;color:#9ca3af;cursor:help;text-decoration:underline dotted #9ca3af;margin-left:3px;">?</abbr>
+        </div>
         <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px;">
           <div style="font-size:28px;font-weight:700;color:#111827;line-height:1;">{{ enrolment_counts.total }}</div>
           {% if deltas %}{% include "selfpaced/_delta.html" with val=deltas.total_enrolments positive_is_good=True %}{% endif %}
@@ -291,7 +304,7 @@
 
   <div class="sp-card" style="padding:16px;">
     <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px;">Learners by Programme</div>
-    <div style="position:relative;height:204px;">
+    <div style="position:relative;height:300px;">
       <canvas id="programmeBar"></canvas>
     </div>
   </div>
@@ -309,6 +322,98 @@
     <canvas id="flagBar"></canvas>
   </div>
 </div>
+
+<!-- ── Programme Health Breakdown Table ──────────────────────── -->
+{% if prog_health_rows %}
+<div class="sp-card" style="padding:16px;margin-top:24px;">
+  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:12px;">
+    <div>
+      <span style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;">Programme Health Breakdown</span>
+      <span style="font-size:10px;color:#9ca3af;margin-left:8px;">paid learners · started programmes · activity data only · click counts to view learners</span>
+    </div>
+    <a href="{% url 'sp_manager_report' %}" style="font-size:11px;color:#0452F0;text-decoration:none;white-space:nowrap;">Full report →</a>
+  </div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:#f9fafb;">
+          <th style="padding:7px 10px;text-align:left;font-weight:600;color:#6b7280;border-bottom:1px solid #e5e7eb;min-width:80px;">Programme</th>
+          <th style="padding:7px 10px;text-align:right;font-weight:600;color:#6b7280;border-bottom:1px solid #e5e7eb;white-space:nowrap;">
+            <abbr title="Learners seen in the eHub activity CSV for this programme." style="text-decoration:underline dotted #9ca3af;cursor:help;">In eHub</abbr>
+          </th>
+          <th style="padding:7px 10px;text-align:right;font-weight:600;color:#d97706;border-bottom:1px solid #e5e7eb;white-space:nowrap;">
+            <abbr title="Learners in the enrolment/roster CSV only — not yet seen in eHub activity. Enrolled but not yet reached." style="text-decoration:underline dotted #9ca3af;cursor:help;">Roster Only</abbr>
+          </th>
+          <th style="padding:7px 10px;text-align:right;font-weight:600;color:#6b7280;border-bottom:1px solid #e5e7eb;white-space:nowrap;">
+            <abbr title="Passed the first module. Rate = Activated ÷ In-eHub." style="text-decoration:underline dotted #9ca3af;cursor:help;">Activated</abbr>
+          </th>
+          <th style="padding:7px 10px;text-align:right;font-weight:600;color:#15803d;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Active</th>
+          <th style="padding:7px 10px;text-align:right;font-weight:600;color:#b45309;border-bottom:1px solid #e5e7eb;white-space:nowrap;">At Risk</th>
+          <th style="padding:7px 10px;text-align:right;font-weight:600;color:#6366f1;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Dormant</th>
+          <th style="padding:7px 10px;text-align:right;font-weight:600;color:#6b7280;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Not Started</th>
+          <th style="padding:7px 10px;text-align:right;font-weight:600;color:#1d4ed8;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Graduated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in prog_health_rows %}
+        <tr style="border-bottom:1px solid #f3f4f6;">
+          <td style="padding:7px 10px;font-weight:600;color:#111827;">{{ r.code }}</td>
+          {# In eHub count #}
+          <td style="padding:7px 10px;text-align:right;font-weight:700;color:#111827;">{{ r.total }}</td>
+          {# Roster Only #}
+          <td style="padding:7px 10px;text-align:right;color:{% if r.roster_only %}#d97706{% else %}#9ca3af{% endif %};">
+            {{ r.roster_only|default:"—" }}
+          </td>
+          {# Activated #}
+          <td style="padding:7px 10px;text-align:right;color:#374151;">
+            {% if r.activated %}{{ r.activated }}<span style="font-size:10px;color:#9ca3af;"> ({{ r.activation_rate }}%)</span>
+            {% else %}<span style="color:#9ca3af;">—</span>{% endif %}
+          </td>
+          {# Active #}
+          <td style="padding:7px 10px;text-align:right;">
+            {% if r.active %}
+            <a href="{% url 'sp_learner_list' %}?programme={{ r.pk }}&health=active" style="color:#15803d;font-weight:600;text-decoration:none;">
+              {{ r.active }}<span style="font-size:10px;color:#9ca3af;font-weight:400;"> ({{ r.active_rate }}%)</span>
+            </a>
+            {% else %}<span style="color:#9ca3af;">—</span>{% endif %}
+          </td>
+          {# At Risk #}
+          <td style="padding:7px 10px;text-align:right;">
+            {% if r.at_risk %}
+            <a href="{% url 'sp_learner_list' %}?programme={{ r.pk }}&health=at_risk" style="color:#b45309;font-weight:600;text-decoration:none;">
+              {{ r.at_risk }}<span style="font-size:10px;color:#9ca3af;font-weight:400;"> ({{ r.at_risk_rate }}%)</span>
+            </a>
+            {% else %}<span style="color:#9ca3af;">—</span>{% endif %}
+          </td>
+          {# Dormant #}
+          <td style="padding:7px 10px;text-align:right;">
+            {% if r.dormant %}
+            <a href="{% url 'sp_learner_list' %}?programme={{ r.pk }}&health=dormant" style="color:#6366f1;font-weight:600;text-decoration:none;">
+              {{ r.dormant }}<span style="font-size:10px;color:#9ca3af;font-weight:400;"> ({{ r.dormant_rate }}%)</span>
+            </a>
+            {% else %}<span style="color:#9ca3af;">—</span>{% endif %}
+          </td>
+          {# Not Started #}
+          <td style="padding:7px 10px;text-align:right;">
+            {% if r.not_started %}
+            <a href="{% url 'sp_learner_list' %}?programme={{ r.pk }}&health=not_yet_started" style="color:#6b7280;text-decoration:none;">{{ r.not_started }}</a>
+            {% else %}<span style="color:#9ca3af;">—</span>{% endif %}
+          </td>
+          {# Graduated #}
+          <td style="padding:7px 10px;text-align:right;">
+            {% if r.graduated %}
+            <a href="{% url 'sp_learner_list' %}?programme={{ r.pk }}&health=graduated" style="color:#1d4ed8;font-weight:600;text-decoration:none;">
+              {{ r.graduated }}<span style="font-size:10px;color:#9ca3af;font-weight:400;"> ({{ r.graduated_rate }}%)</span>
+            </a>
+            {% else %}<span style="color:#9ca3af;">—</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 
 <!-- ── Enrolments by Week ─────────────────────────────────── -->
 <div class="sp-card" style="padding:16px;margin-top:24px;">

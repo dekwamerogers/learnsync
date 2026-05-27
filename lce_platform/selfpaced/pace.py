@@ -40,9 +40,16 @@ def compute_pod_pace(pod_assignment, as_of=None):
         status=CourseStatus.COMPLETED,
     ).count()
 
+    courses_in_progress = CourseEnrolment.objects.filter(
+        enrolment=enrolment,
+        status=CourseStatus.IN_PROGRESS,
+    ).count()
+
     total_courses = (
         programme.total_courses_for_graduation
-        or programme.courses.filter(is_active=True).count()
+        # Fallback: count active, non-prerequisite courses (exclude WALX which lives
+        # on its own standalone enrolment and must not inflate the target count)
+        or programme.courses.filter(is_active=True).exclude(code='WALX').count()
     )
     courses_remaining = max(0, total_courses - courses_completed)
 
@@ -127,8 +134,12 @@ def compute_pod_pace(pod_assignment, as_of=None):
     if pace_status in (PaceStatus.BEHIND, PaceStatus.SIGNIFICANTLY_BEHIND):
         expected_by_now = (required_pace or 0) * weeks_active
         raw_behind = max(0.0, expected_by_now - courses_completed)
-        # Cap at the courses still remaining — can't be behind by more than what's left
-        courses_behind = min(raw_behind, max(0.0, float(total_courses - courses_completed)))
+        # Cap at courses NOT YET STARTED — a learner can't be "behind" on a course
+        # they have already begun.  In-progress courses are accounted for, so only
+        # courses that haven't been touched yet form the ceiling.
+        # (e.g. someone on the final course in progress → cap = 0, never "X courses behind")
+        courses_not_started = max(0.0, float(total_courses - courses_completed - courses_in_progress))
+        courses_behind = min(raw_behind, courses_not_started)
     else:
         courses_behind = 0.0
 

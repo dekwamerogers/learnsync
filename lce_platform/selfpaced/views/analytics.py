@@ -39,20 +39,33 @@ def analytics(request):
         _date_expr = F('first_sign_of_life_date')
 
     # ── Base querysets ────────────────────────────────────────────────────
-    # Only include learners/enrolments that have appeared in an activity CSV.
-    # Enrollment-only rows (has_activity_data=False) are excluded from all metrics.
-    learner_qs = Learner.objects.filter(
-        enrolments__has_activity_data=True,
-        enrolments__programme__is_prerequisite=False,
-    ).distinct()
+    # Build a clean (JOIN-free) email subquery first — using a JOIN-based
+    # learner_qs directly with .values().annotate() can inflate COUNT results
+    # because each learner appears once per matching enrolment row.
+    _activity_emails = (
+        Learner.objects
+        .filter(
+            enrolments__has_activity_data=True,
+            enrolments__programme__is_prerequisite=False,
+        )
+        .values_list('email', flat=True)
+        .distinct()
+    )
+    learner_qs = Learner.objects.filter(email__in=_activity_emails)
     if country_filter:
         learner_qs = learner_qs.filter(country__in=country_filter)
 
     enrolment_qs = (
         Enrolment.objects
-        .filter(learner__in=learner_qs, programme__is_prerequisite=False, has_activity_data=True)
+        .filter(
+            learner__email__in=_activity_emails,
+            programme__is_prerequisite=False,
+            has_activity_data=True,
+        )
         .filter(Q(programme__start_date__isnull=True) | Q(programme__start_date__lte=date.today()))
     )
+    if country_filter:
+        enrolment_qs = enrolment_qs.filter(learner__country__in=country_filter)
 
     # Date filter via a separate annotated subquery so enrolment_qs stays
     # annotation-free — annotating the base queryset would add _eff_date to every
@@ -71,6 +84,8 @@ def analytics(request):
 
     if programme_filter:
         enrolment_qs = enrolment_qs.filter(programme_id__in=programme_filter)
+        # Also narrow learner_qs so health donut reflects the programme filter
+        learner_qs = learner_qs.filter(email__in=enrolment_qs.values('learner_id'))
     if health_filter:
         enrolment_qs = enrolment_qs.filter(health_status__in=health_filter)
 
@@ -275,19 +290,31 @@ def analytics(request):
 
     cohort_data = []
     for week_start in sorted(_cohort_weeks.keys()):
-        h = _cohort_weeks[week_start]
-        week_end = week_start + timedelta(days=6)
+        h           = _cohort_weeks[week_start]
+        week_end    = week_start + timedelta(days=6)
+        total       = sum(h.values())
+        activated   = _activated_by_week.get(week_start, 0)
+        active      = h.get('active', 0)
+        at_risk     = h.get('at_risk', 0)
+        dormant     = h.get('dormant', 0)
+        graduated   = h.get('graduated', 0)
+        not_started = h.get('not_yet_started', 0)
         cohort_data.append({
-            'label':       f'{week_start.strftime("%d %b")} – {week_end.strftime("%d %b")}',
-            'week_start':  week_start.isoformat(),
-            'week_end':    week_end.isoformat(),
-            'total':       sum(h.values()),
-            'activated':   _activated_by_week.get(week_start, 0),
-            'active':      h.get('active', 0),
-            'at_risk':     h.get('at_risk', 0),
-            'dormant':     h.get('dormant', 0),
-            'graduated':   h.get('graduated', 0),
-            'not_started': h.get('not_yet_started', 0),
+            'label':           f'{week_start.strftime("%d %b")} – {week_end.strftime("%d %b")}',
+            'week_start':      week_start.isoformat(),
+            'week_end':        week_end.isoformat(),
+            'total':           total,
+            'activated':       activated,
+            'active':          active,
+            'at_risk':         at_risk,
+            'dormant':         dormant,
+            'graduated':       graduated,
+            'not_started':     not_started,
+            'activation_rate': round(activated / total * 100, 1) if total else 0,
+            'active_rate':     round(active    / total * 100, 1) if total else 0,
+            'at_risk_rate':    round(at_risk   / total * 100, 1) if total else 0,
+            'dormant_rate':    round(dormant   / total * 100, 1) if total else 0,
+            'graduated_rate':  round(graduated / total * 100, 1) if total else 0,
         })
 
     # ── Progression over time ─────────────────────────────────────────────

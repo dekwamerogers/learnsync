@@ -209,7 +209,7 @@
 
   <div class="sp-card" style="padding:16px;">
     <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px;">Enrolments by Programme</div>
-    <div style="position:relative;height:220px;"><canvas id="analyticsProgBar"></canvas></div>
+    <div style="position:relative;height:320px;"><canvas id="analyticsProgBar"></canvas></div>
   </div>
 
 </div>
@@ -243,14 +243,14 @@
 
     <div>
       <div style="font-size:10px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">All enrolments incl. not started</div>
-      <div style="position:relative;height:240px;">
+      <div style="position:relative;height:360px;">
         <canvas id="cohortBar"></canvas>
       </div>
     </div>
 
     <div>
       <div style="font-size:10px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Started learners only (excl. not started)</div>
-      <div style="position:relative;height:240px;">
+      <div style="position:relative;height:360px;">
         <canvas id="cohortBarStarted"></canvas>
       </div>
     </div>
@@ -264,34 +264,86 @@
         <tr>
           <th>Week</th>
           <th style="text-align:right;">Total</th>
-          <th style="text-align:right;color:#4338ca;"><abbr title="Passed the first module of their programme">Activated</abbr></th>
-          <th style="text-align:right;color:#15803d;">Active</th>
-          <th style="text-align:right;color:#b45309;">At Risk</th>
-          <th style="text-align:right;color:#4338ca;">Dormant</th>
-          <th style="text-align:right;color:#6b7280;">Not Started</th>
-          <th style="text-align:right;color:#1d4ed8;">Graduated</th>
+          <th style="text-align:right;color:#f97316;"><abbr title="Passed the first module of their programme — click to view">Activated</abbr></th>
+          <th style="text-align:right;color:#15803d;"><abbr title="Click to filter learner list to this cohort + Active">Active</abbr></th>
+          <th style="text-align:right;color:#b45309;"><abbr title="Click to filter learner list to this cohort + At Risk">At Risk</abbr></th>
+          <th style="text-align:right;color:#6366f1;"><abbr title="Click to filter learner list to this cohort + Dormant">Dormant</abbr></th>
+          <th style="text-align:right;color:#6b7280;"><abbr title="Click to filter learner list to this cohort + Not Started">Not Started</abbr></th>
+          <th style="text-align:right;color:#1d4ed8;"><abbr title="Click to filter learner list to this cohort + Graduated">Graduated</abbr></th>
         </tr>
       </thead>
       <tbody>
         {% for row in cohort_rows %}
-        {% with url=row.week_start|add:"&enrol_to="|add:row.week_end %}
-        <tr style="cursor:pointer;" onclick="window.location='{% url 'sp_learner_list' %}?enrol_from={{ row.week_start }}&enrol_to={{ row.week_end }}&cohort_basis={{ cohort_type }}'">
+        <tr>
+          {# Week label → whole cohort #}
           <td style="font-size:12px;font-weight:600;color:#374151;white-space:nowrap;">
             <a href="{% url 'sp_learner_list' %}?enrol_from={{ row.week_start }}&enrol_to={{ row.week_end }}&cohort_basis={{ cohort_type }}"
                style="color:inherit;text-decoration:none;">{{ row.label }}</a>
           </td>
-          <td style="text-align:right;font-weight:700;">{{ row.total }}</td>
-          <td style="text-align:right;color:#4338ca;font-weight:{% if row.activated %}600{% else %}400{% endif %};">
-            {{ row.activated|default:"—" }}
-            {% if row.total and row.activated %}<span style="font-size:10px;color:#9ca3af;font-weight:400;"> ({% widthratio row.activated row.total 100 %}%)</span>{% endif %}
+          {# Total — link to whole cohort #}
+          <td style="text-align:right;font-weight:700;">
+            <a href="{% url 'sp_learner_list' %}?enrol_from={{ row.week_start }}&enrol_to={{ row.week_end }}&cohort_basis={{ cohort_type }}"
+               style="color:inherit;text-decoration:none;">{{ row.total }}</a>
           </td>
-          <td style="text-align:right;color:#15803d;font-weight:{% if row.active %}600{% else %}400{% endif %};">{{ row.active|default:"—" }}</td>
-          <td style="text-align:right;color:#b45309;font-weight:{% if row.at_risk %}600{% else %}400{% endif %};">{{ row.at_risk|default:"—" }}</td>
-          <td style="text-align:right;color:#4338ca;font-weight:{% if row.dormant %}600{% else %}400{% endif %};">{{ row.dormant|default:"—" }}</td>
-          <td style="text-align:right;color:#6b7280;">{{ row.not_started|default:"—" }}</td>
-          <td style="text-align:right;color:#1d4ed8;font-weight:{% if row.graduated %}600{% else %}400{% endif %};">{{ row.graduated|default:"—" }}</td>
+          {# Activated #}
+          <td style="text-align:right;color:#f97316;font-weight:{% if row.activated %}600{% else %}400{% endif %};">
+            {% if row.activated %}
+            <span title="{{ row.activation_rate }}% activation rate">
+              {{ row.activated }}
+              <span style="font-size:10px;color:#9ca3af;font-weight:400;">({{ row.activation_rate }}%)</span>
+            </span>
+            {% else %}—{% endif %}
+          </td>
+          {# Active — clickable with health filter #}
+          <td style="text-align:right;color:#15803d;font-weight:{% if row.active %}600{% else %}400{% endif %};">
+            {% if row.active %}
+            <a href="{% url 'sp_learner_list' %}?enrol_from={{ row.week_start }}&enrol_to={{ row.week_end }}&cohort_basis={{ cohort_type }}&health=active"
+               style="color:inherit;text-decoration:none;" title="View {{ row.active }} active learners from this cohort">
+              {{ row.active }}
+              <span style="font-size:10px;color:#9ca3af;font-weight:400;">({{ row.active_rate }}%)</span>
+            </a>
+            {% else %}—{% endif %}
+          </td>
+          {# At Risk #}
+          <td style="text-align:right;color:#b45309;font-weight:{% if row.at_risk %}600{% else %}400{% endif %};">
+            {% if row.at_risk %}
+            <a href="{% url 'sp_learner_list' %}?enrol_from={{ row.week_start }}&enrol_to={{ row.week_end }}&cohort_basis={{ cohort_type }}&health=at_risk"
+               style="color:inherit;text-decoration:none;" title="View {{ row.at_risk }} at-risk learners from this cohort">
+              {{ row.at_risk }}
+              <span style="font-size:10px;color:#9ca3af;font-weight:400;">({{ row.at_risk_rate }}%)</span>
+            </a>
+            {% else %}—{% endif %}
+          </td>
+          {# Dormant #}
+          <td style="text-align:right;color:#6366f1;font-weight:{% if row.dormant %}600{% else %}400{% endif %};">
+            {% if row.dormant %}
+            <a href="{% url 'sp_learner_list' %}?enrol_from={{ row.week_start }}&enrol_to={{ row.week_end }}&cohort_basis={{ cohort_type }}&health=dormant"
+               style="color:inherit;text-decoration:none;" title="View {{ row.dormant }} dormant learners from this cohort">
+              {{ row.dormant }}
+              <span style="font-size:10px;color:#9ca3af;font-weight:400;">({{ row.dormant_rate }}%)</span>
+            </a>
+            {% else %}—{% endif %}
+          </td>
+          {# Not Started #}
+          <td style="text-align:right;color:#6b7280;">
+            {% if row.not_started %}
+            <a href="{% url 'sp_learner_list' %}?enrol_from={{ row.week_start }}&enrol_to={{ row.week_end }}&cohort_basis={{ cohort_type }}&health=not_yet_started"
+               style="color:inherit;text-decoration:none;" title="View {{ row.not_started }} not-started learners from this cohort">
+              {{ row.not_started }}
+            </a>
+            {% else %}—{% endif %}
+          </td>
+          {# Graduated #}
+          <td style="text-align:right;color:#1d4ed8;font-weight:{% if row.graduated %}600{% else %}400{% endif %};">
+            {% if row.graduated %}
+            <a href="{% url 'sp_learner_list' %}?enrol_from={{ row.week_start }}&enrol_to={{ row.week_end }}&cohort_basis={{ cohort_type }}&health=graduated"
+               style="color:inherit;text-decoration:none;" title="View {{ row.graduated }} graduated learners from this cohort">
+              {{ row.graduated }}
+              <span style="font-size:10px;color:#9ca3af;font-weight:400;">({{ row.graduated_rate }}%)</span>
+            </a>
+            {% else %}—{% endif %}
+          </td>
         </tr>
-        {% endwith %}
         {% endfor %}
       </tbody>
     </table>
@@ -380,7 +432,7 @@
     <button class="ac-health-pill" data-health="badges"          style="font-size:10px;font-weight:600;border-radius:20px;padding:2px 10px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:inherit;line-height:1.5;">Badges</button>
   </div>
   <div id="ac-no-course-msg" style="display:none;height:160px;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;">No course data for this programme</div>
-  <div style="position:relative;height:300px;"><canvas id="analyticsCourseBar"></canvas></div>
+  <div style="position:relative;height:420px;"><canvas id="analyticsCourseBar"></canvas></div>
 </div>
 
 <!-- ══ PROGRESSION OVER TIME ══════════════════════════════════════════ -->

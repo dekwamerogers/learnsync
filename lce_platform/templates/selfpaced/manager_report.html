@@ -180,11 +180,24 @@
         <tbody>
           {% for r in weekly_rows %}
           <tr>
-            <td style="text-align:left;color:#6b7280;font-weight:400;">{{ r.label }}</td>
+            <td style="text-align:left;font-weight:500;color:#374151;">
+              <a href="{% url 'sp_learner_list' %}?enrol_from={{ r.week_start|date:'Y-m-d' }}&enrol_to={{ r.week_end|date:'Y-m-d' }}&cohort_basis=effective"
+                 style="color:inherit;text-decoration:none;" title="View all learners in this cohort">{{ r.label }}</a>
+            </td>
             <td>{{ r.enrolled }}</td>
             <td>{{ r.activated }}</td>
-            <td style="color:#0d9488;font-weight:600;">{{ r.active }}</td>
-            <td style="color:#dc2626;font-weight:600;">{{ r.at_risk }}</td>
+            <td style="color:#0d9488;font-weight:600;">
+              {% if r.active %}
+              <a href="{% url 'sp_learner_list' %}?enrol_from={{ r.week_start|date:'Y-m-d' }}&enrol_to={{ r.week_end|date:'Y-m-d' }}&cohort_basis=effective&health=active"
+                 style="color:inherit;text-decoration:none;" title="View active learners in this cohort">{{ r.active }}</a>
+              {% else %}{{ r.active }}{% endif %}
+            </td>
+            <td style="color:#dc2626;font-weight:600;">
+              {% if r.at_risk %}
+              <a href="{% url 'sp_learner_list' %}?enrol_from={{ r.week_start|date:'Y-m-d' }}&enrol_to={{ r.week_end|date:'Y-m-d' }}&cohort_basis=effective&health=at_risk"
+                 style="color:inherit;text-decoration:none;" title="View at-risk learners in this cohort">{{ r.at_risk }}</a>
+              {% else %}{{ r.at_risk }}{% endif %}
+            </td>
             <td>{{ r.graduated }}</td>
             <td style="color:#7c3aed;font-weight:600;">{{ r.badges }}</td>
             <td>{{ r.interventions }}</td>
@@ -225,11 +238,24 @@
             <tbody>
               {% for w in p.weeks %}
               <tr>
-                <td style="text-align:left;color:#6b7280;font-weight:400;">{{ w.label }}</td>
+                <td style="text-align:left;color:#6b7280;font-weight:400;">
+                  <a href="{% url 'sp_learner_list' %}?enrol_from={{ w.week_start|date:'Y-m-d' }}&enrol_to={{ w.week_end|date:'Y-m-d' }}&cohort_basis=effective&programme={{ p.code }}"
+                     style="color:inherit;text-decoration:none;" title="View learners in this cohort">{{ w.label }}</a>
+                </td>
                 <td>{{ w.enrolled }}</td>
                 <td>{{ w.activated }}</td>
-                <td style="color:#0d9488;font-weight:600;">{{ w.active }}</td>
-                <td style="color:#dc2626;font-weight:600;">{{ w.at_risk }}</td>
+                <td style="color:#0d9488;font-weight:600;">
+                  {% if w.active %}
+                  <a href="{% url 'sp_learner_list' %}?enrol_from={{ w.week_start|date:'Y-m-d' }}&enrol_to={{ w.week_end|date:'Y-m-d' }}&cohort_basis=effective&programme={{ p.code }}&health=active"
+                     style="color:inherit;text-decoration:none;">{{ w.active }}</a>
+                  {% else %}{{ w.active }}{% endif %}
+                </td>
+                <td style="color:#dc2626;font-weight:600;">
+                  {% if w.at_risk %}
+                  <a href="{% url 'sp_learner_list' %}?enrol_from={{ w.week_start|date:'Y-m-d' }}&enrol_to={{ w.week_end|date:'Y-m-d' }}&cohort_basis=effective&programme={{ p.code }}&health=at_risk"
+                     style="color:inherit;text-decoration:none;">{{ w.at_risk }}</a>
+                  {% else %}{{ w.at_risk }}{% endif %}
+                </td>
                 <td>{{ w.graduated }}</td>
                 <td style="color:#7c3aed;font-weight:600;">{{ w.badges }}</td>
                 <td>{{ w.interventions }}</td>

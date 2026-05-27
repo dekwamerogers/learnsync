@@ -150,6 +150,26 @@
     </div>
   </div>
 
+  <!-- Course Status -->
+  <div class="ms-wrap" title="Course status (pairs with Course filter above)">
+    <button type="button" class="fi-btn {% if filter.form.course_status.value %}fi-active{% endif %}" onclick="msDrop(this)">
+      <i class="ti ti-list-check"></i>
+      {% if filter.form.course_status.value %}<span class="fi-badge">{{ filter.form.course_status.value|length }}</span>{% endif %}
+    </button>
+    <div class="ms-menu">
+      <div class="ms-panel-title">Course status</div>
+      <div style="padding:4px 12px 6px;font-size:10px;color:#9ca3af;line-height:1.4;">
+        Combine with Course filter to show only learners at this stage in that course.
+      </div>
+      {% for val, label in filter.form.course_status.field.choices %}
+      <label class="ms-item">
+        <input type="checkbox" name="course_status" value="{{ val }}"
+               {% if val in filter.form.course_status.value %}checked{% endif %}>{{ label }}
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
   <!-- Assignment -->
   <div class="ms-wrap" title="Assignment">
     <button type="button" class="fi-btn {% if filter.form.assignment.value %}fi-active{% endif %}" onclick="msDrop(this)">
@@ -329,8 +349,8 @@
 </script>
 
 <!-- Active filter chips -->
-{% with hv=filter.form.health.value pv=filter.form.programme.value fv=filter.form.flag.value qv=filter.form.q.value|default:'' sv=filter.form.since.value gv=filter.form.graduated.value fuv=request.GET.follow_up %}
-{% if hv or pv or fv or qv or sv or gv or fuv or enrol_from or enrol_to %}
+{% with hv=filter.form.health.value pv=filter.form.programme.value fv=filter.form.flag.value qv=filter.form.q.value|default:'' sv=filter.form.since.value gv=filter.form.graduated.value fuv=request.GET.follow_up cosv=filter.form.course_status.value %}
+{% if hv or pv or fv or qv or sv or gv or fuv or enrol_from or enrol_to or cosv %}
 <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center;">
   <span style="font-size:11px;color:#9ca3af;font-weight:600;">Filtered:</span>
 
@@ -356,6 +376,15 @@
   <a href="?{{ request.GET|qparams_except:'flag,page' }}{% for other in fv %}{% if other != val %}&flag={{ other }}{% endif %}{% endfor %}"
      style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#fff7ed;color:#ea580c;text-decoration:none;border:1px solid #fed7aa;">
     {% if val == 'inactive' %}Inactive{% elif val == 'never_activated' %}Never Activated{% elif val == 'stuck_on_assignment' %}Stuck{% elif val == 'low_pass_rate' %}Low Pass Rate{% elif val == 'stalled_between_courses' %}Stalled{% elif val == 'stalled_progression' %}No Onward Progress{% elif val == 'payment_issue' %}Payment Issue{% else %}{{ val }}{% endif %}
+    <i class="ti ti-x" style="font-size:9px;"></i>
+  </a>
+  {% endfor %}
+
+  {% for val in cosv %}
+  <a href="?{{ request.GET|qparams_except:'course_status,page' }}{% for other in cosv %}{% if other != val %}&course_status={{ other }}{% endif %}{% endfor %}"
+     style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#f0fdfa;color:#0d9488;text-decoration:none;border:1px solid #99f6e4;">
+    <i class="ti ti-list-check" style="font-size:9px;"></i>
+    {% if val == 'in_progress' %}In Progress{% elif val == 'completed' %}Completed{% elif val == 'not_started' %}Not Started{% elif val == 'withdrawn' %}Withdrawn{% else %}{{ val }}{% endif %}
     <i class="ti ti-x" style="font-size:9px;"></i>
   </a>
   {% endfor %}
@@ -580,7 +609,7 @@
   <div style="padding:48px;text-align:center;color:#9ca3af;">
     <i class="ti ti-users-off" style="font-size:32px;display:block;margin-bottom:8px;"></i>
     <div style="font-size:13px;">No learners found.</div>
-    {% if request.GET.q or request.GET.programme or request.GET.health or request.GET.payment or request.GET.country or request.GET.course or request.GET.assignment or request.GET.graduated %}
+    {% if request.GET.q or request.GET.programme or request.GET.health or request.GET.payment or request.GET.country or request.GET.course or request.GET.course_status or request.GET.assignment or request.GET.graduated %}
       <a href="{% url 'sp_learner_list' %}" style="font-size:12px;color:#0452F0;text-decoration:none;margin-top:8px;display:inline-block;">Clear filters</a>
     {% endif %}
   </div>
