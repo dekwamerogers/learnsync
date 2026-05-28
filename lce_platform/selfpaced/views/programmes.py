@@ -115,8 +115,9 @@ def programme_list_stats(request):
         prog.badges_count = badge_count_by_prog.get(prog.pk, 0)
         prog.activated_count = activated_by_prog.get(prog.pk, 0)
         prog.retained_count  = retained_by_prog.get(prog.pk, 0)
-        prog.activation_rate = round(prog.activated_count / prog.total_enrolments * 100) if prog.total_enrolments else 0
-        prog.retention_rate  = round(prog.retained_count  / prog.activated_count  * 100) if prog.activated_count  else 0
+        prog.activation_rate       = round(prog.activated_count  / prog.total_enrolments * 100) if prog.total_enrolments else 0
+        prog.retention_rate        = round(prog.retained_count   / prog.activated_count  * 100) if prog.activated_count  else 0
+        prog.grad_rate_activated   = round(prog.graduated_count  / prog.activated_count  * 100) if prog.activated_count  else 0
 
     # Solo vs multi-programme learner mix — activity learners only, paid only.
     # Prerequisite programmes (e.g. WALX) are excluded — they are onboarding

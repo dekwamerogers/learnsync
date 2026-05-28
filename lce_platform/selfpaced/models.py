@@ -786,6 +786,10 @@ class PodAssignment(models.Model):
     )
     courses_behind = models.FloatField(null=True, blank=True)
     projected_completion_date = models.DateField(null=True, blank=True)
+    # Inter-completion velocity: (completions - 1) / weeks(first_completion, last_completion).
+    # Measures how fast the learner moves *between* courses during active learning,
+    # independent of current dormancy. None when fewer than 2 courses completed.
+    learning_velocity = models.FloatField(null=True, blank=True)
     last_computed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:

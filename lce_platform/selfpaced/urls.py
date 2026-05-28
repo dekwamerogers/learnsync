@@ -64,4 +64,9 @@ urlpatterns = [
     path('admin/pod-import/<int:pk>/status/', admin_views.pod_import_status_fragment, name='sp_pod_import_status'),
     path('admin/pod-import/<int:pk>/cancel/', admin_views.cancel_pod_job, name='sp_pod_import_cancel'),
     path('admin/pod-import/<int:pk>/rerun/', admin_views.pod_import_rerun, name='sp_pod_import_rerun'),
+    # User management
+    path('admin/users/', admin_views.user_list, name='sp_user_list'),
+    path('admin/users/create/', admin_views.user_create, name='sp_user_create'),
+    path('admin/users/<int:pk>/edit/', admin_views.user_edit, name='sp_user_edit'),
+    path('admin/users/<int:pk>/toggle-active/', admin_views.user_toggle_active, name='sp_user_toggle_active'),
 ]

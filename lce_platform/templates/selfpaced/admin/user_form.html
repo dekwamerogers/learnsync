@@ -1,0 +1,210 @@
+{% extends "selfpaced/base.html" %}
+
+{% block title %}{% if action == 'create' %}Add User{% else %}Edit User{% endif %} — LearnSync{% endblock %}
+{% block page_title %}{% if action == 'create' %}Add User{% else %}Edit User{% endif %}{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+
+<!-- Back link -->
+<div style="margin-bottom:20px;">
+  <a href="{% url 'sp_user_list' %}" style="font-size:12px;color:#6b7280;text-decoration:none;">
+    ← Back to Users
+  </a>
+</div>
+
+<div style="max-width:560px;">
+
+  <div class="sp-card">
+    <div class="sp-card-header">
+      {% if action == 'create' %}
+        <i class="ti ti-user-plus" style="font-size:15px;color:#0452F0;margin-right:6px;"></i>
+        Create New User
+      {% else %}
+        <i class="ti ti-user-edit" style="font-size:15px;color:#0452F0;margin-right:6px;"></i>
+        Edit — {{ target.username }}
+      {% endif %}
+    </div>
+    <div class="sp-card-body">
+
+      <form method="post">
+        {% csrf_token %}
+
+        {# ── Account details ── #}
+        <div style="margin-bottom:22px;">
+          <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px;">
+            Account Details
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px;">
+                First Name
+              </label>
+              <input type="text" name="first_name"
+                     value="{{ data.first_name|default:'' }}"
+                     placeholder="e.g. Kwame"
+                     style="width:100%;padding:8px 10px;border:1px solid {% if errors.first_name %}#fca5a5{% else %}#e5e7eb{% endif %};border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px;">
+                Last Name
+              </label>
+              <input type="text" name="last_name"
+                     value="{{ data.last_name|default:'' }}"
+                     placeholder="e.g. Rogers"
+                     style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;">
+            </div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px;">
+              Username <span style="color:#dc2626;">*</span>
+            </label>
+            <input type="text" name="username" required
+                   value="{{ data.username|default:'' }}"
+                   placeholder="e.g. kwame.rogers"
+                   autocomplete="off"
+                   style="width:100%;padding:8px 10px;border:1px solid {% if errors.username %}#fca5a5{% else %}#e5e7eb{% endif %};border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;">
+            {% if errors.username %}
+            <div style="font-size:11px;color:#dc2626;margin-top:4px;">{{ errors.username }}</div>
+            {% endif %}
+          </div>
+
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px;">
+              Email Address
+            </label>
+            <input type="email" name="email"
+                   value="{{ data.email|default:'' }}"
+                   placeholder="e.g. kwame@example.com"
+                   style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;">
+          </div>
+        </div>
+
+        {# ── Password ── #}
+        <div style="margin-bottom:22px;padding-top:18px;border-top:1px solid #f3f4f6;">
+          <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">
+            Password
+          </div>
+          {% if action == 'edit' %}
+          <div style="font-size:11px;color:#9ca3af;margin-bottom:14px;">
+            Leave blank to keep the current password.
+          </div>
+          {% else %}
+          <div style="font-size:11px;color:#9ca3af;margin-bottom:14px;">
+            Must be at least 8 characters.
+          </div>
+          {% endif %}
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px;">
+                Password {% if action == 'create' %}<span style="color:#dc2626;">*</span>{% endif %}
+              </label>
+              <input type="password" name="password"
+                     autocomplete="new-password"
+                     placeholder="{% if action == 'edit' %}Leave blank to keep{% else %}Min. 8 characters{% endif %}"
+                     style="width:100%;padding:8px 10px;border:1px solid {% if errors.password %}#fca5a5{% else %}#e5e7eb{% endif %};border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;">
+              {% if errors.password %}
+              <div style="font-size:11px;color:#dc2626;margin-top:4px;">{{ errors.password }}</div>
+              {% endif %}
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px;">
+                Confirm Password
+              </label>
+              <input type="password" name="password2"
+                     autocomplete="new-password"
+                     placeholder="Repeat password"
+                     style="width:100%;padding:8px 10px;border:1px solid {% if errors.password2 %}#fca5a5{% else %}#e5e7eb{% endif %};border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;">
+              {% if errors.password2 %}
+              <div style="font-size:11px;color:#dc2626;margin-top:4px;">{{ errors.password2 }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        {# ── Permissions ── #}
+        <div style="margin-bottom:24px;padding-top:18px;border-top:1px solid #f3f4f6;">
+          <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px;">
+            Permissions
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;">
+
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+              <input type="checkbox" name="is_staff"
+                     {% if data.is_staff == 'on' or data.is_staff == True %}checked{% endif %}
+                     style="margin-top:2px;width:15px;height:15px;cursor:pointer;flex-shrink:0;">
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#111827;">Staff</div>
+                <div style="font-size:11px;color:#9ca3af;">Can log in to LearnSync and access all platform features.</div>
+              </div>
+            </label>
+
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:{% if request.user.is_superuser %}pointer{% else %}not-allowed{% endif %};">
+              <input type="checkbox" name="is_superuser"
+                     {% if data.is_superuser == 'on' or data.is_superuser == True %}checked{% endif %}
+                     {% if not request.user.is_superuser %}disabled{% endif %}
+                     style="margin-top:2px;width:15px;height:15px;cursor:inherit;flex-shrink:0;">
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#111827;">
+                  Superuser
+                  {% if not request.user.is_superuser %}
+                  <span style="font-size:10px;color:#9ca3af;font-weight:400;margin-left:4px;">(only superusers can grant this)</span>
+                  {% endif %}
+                </div>
+                <div style="font-size:11px;color:#9ca3af;">Full admin access: can manage users, override settings, and access all admin areas.</div>
+              </div>
+            </label>
+
+            {% if action == 'edit' %}
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:{% if target.pk != request.user.pk %}pointer{% else %}not-allowed{% endif %};">
+              <input type="checkbox" name="is_active"
+                     {% if data.is_active == 'on' or data.is_active == True %}checked{% endif %}
+                     {% if target.pk == request.user.pk %}disabled{% endif %}
+                     style="margin-top:2px;width:15px;height:15px;cursor:inherit;flex-shrink:0;">
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#111827;">
+                  Active
+                  {% if target.pk == request.user.pk %}
+                  <span style="font-size:10px;color:#9ca3af;font-weight:400;margin-left:4px;">(cannot deactivate your own account)</span>
+                  {% endif %}
+                </div>
+                <div style="font-size:11px;color:#9ca3af;">Inactive accounts cannot log in.</div>
+              </div>
+            </label>
+            {% else %}
+            {# New users are active by default — hidden field #}
+            <input type="hidden" name="is_active" value="on">
+            {% endif %}
+
+          </div>
+
+          {% if errors.is_superuser %}
+          <div style="font-size:11px;color:#dc2626;margin-top:8px;">{{ errors.is_superuser }}</div>
+          {% endif %}
+          {% if errors.is_active %}
+          <div style="font-size:11px;color:#dc2626;margin-top:8px;">{{ errors.is_active }}</div>
+          {% endif %}
+        </div>
+
+        {# ── Actions ── #}
+        <div style="display:flex;gap:10px;align-items:center;">
+          <button type="submit" class="sp-btn sp-btn-primary" style="font-size:13px;">
+            <i class="ti ti-{% if action == 'create' %}user-plus{% else %}device-floppy{% endif %}" style="font-size:14px;"></i>
+            {% if action == 'create' %}Create User{% else %}Save Changes{% endif %}
+          </button>
+          <a href="{% url 'sp_user_list' %}" class="sp-btn" style="font-size:13px;border:1px solid #e5e7eb;">
+            Cancel
+          </a>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

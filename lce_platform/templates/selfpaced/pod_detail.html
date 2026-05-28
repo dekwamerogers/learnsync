@@ -90,7 +90,7 @@
 </div>
 
 <!-- Learners table -->
-<div class="sp-card" style="overflow-x:auto;">
+<div class="sp-card sp-table-wrap">
   <div class="sp-card-header" style="display:flex;align-items:center;justify-content:space-between;">
     <span>Learners <span style="font-size:11px;font-weight:400;color:#9ca3af;">{{ pace_counts.total }} assigned</span></span>
     <button type="button" onclick="document.getElementById('assign-form').style.display=document.getElementById('assign-form').style.display==='none'?'flex':'none'"
@@ -132,7 +132,12 @@
         <th>Pace Status</th>
         <th>Completed</th>
         <th>Current Course</th>
-        <th>Current Pace</th>
+        <th>
+          <abbr title="Current pace: completions ÷ weeks since first eHub activity. Includes any recent dormancy — falls if learner has been idle." style="text-decoration:underline dotted #9ca3af;cursor:help;">Current Pace</abbr>
+        </th>
+        <th>
+          <abbr title="Learning velocity: inter-completion rate between first and last course completion. Shows how fast this learner moves when actively studying — not affected by dormancy gaps before or after. Only available with 2+ completions." style="text-decoration:underline dotted #9ca3af;cursor:help;">Velocity</abbr>
+        </th>
         <th>Required Pace</th>
         <th>Courses Behind</th>
         <th>Projected Completion</th>
@@ -187,6 +192,23 @@
         </td>
         <td style="font-size:12px;color:#374151;">
           {{ pa.current_pace|humanpace }}
+        </td>
+        <td style="font-size:12px;">
+          {% if pa.learning_velocity is not None %}
+            {# Highlight when velocity is materially higher than current pace — learner is capable but idle #}
+            {% if pa.current_pace and pa.learning_velocity > pa.current_pace|add:"0" %}
+              <span style="color:#7c3aed;font-weight:600;"
+                    title="Active learning pace ({{ pa.learning_velocity|humanpace }}) is higher than overall pace — learner may have been dormant recently">
+                {{ pa.learning_velocity|humanpace }}
+                <i class="ti ti-arrow-up" style="font-size:10px;vertical-align:middle;"></i>
+              </span>
+            {% else %}
+              <span style="color:#374151;">{{ pa.learning_velocity|humanpace }}</span>
+            {% endif %}
+          {% else %}
+            <span style="color:#d1d5db;font-size:11px;"
+                  title="Need 2+ completed courses to compute velocity">—</span>
+          {% endif %}
         </td>
         <td style="font-size:12px;color:#374151;">
           {% if pa.required_pace is not None %}

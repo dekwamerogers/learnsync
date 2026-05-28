@@ -22,42 +22,55 @@
 
 {% if programmes %}
 
-<div class="sp-card">
+<div class="sp-card sp-table-wrap">
   <table class="sp-table" id="programmes-table">
     <thead>
       <tr>
-        <th>Code</th>
-        <th>Name</th>
+        {# — Identity — #}
+        <th class="sp-sticky-1">Code</th>
+        <th class="sp-sticky-2">Name</th>
+        {# — Volume — #}
         <th>Enrolments</th>
-        <th style="white-space:nowrap;" title="Learners taking only this programme vs multiple programmes">Excl. / Multi</th>
-        <th>Active</th>
+        <th title="Learners taking only this programme vs multiple programmes">Excl. / Multi</th>
+        {# — Journey (separator) — #}
+        <th class="sp-col-sep" title="Completed WALX onboarding">
+          <i class="ti ti-door-enter" style="font-size:12px;color:#9ca3af;"></i> Onboarded
+        </th>
+        <th title="Completed first module of this programme">
+          <i class="ti ti-rocket" style="font-size:12px;color:#9ca3af;"></i> Activated
+        </th>
+        <th title="Activated and still progressing (module 2+)">
+          <i class="ti ti-repeat" style="font-size:12px;color:#9ca3af;"></i> Retained
+        </th>
+        <th title="Completed the full programme (rate = Graduated ÷ Activated)">Graduated</th>
+        <th title="Certificates of completion issued">
+          <i class="ti ti-certificate" style="font-size:12px;color:#9ca3af;"></i> Certs
+        </th>
+        <th title="Total course badges earned">
+          <i class="ti ti-rosette" style="font-size:12px;color:#9ca3af;"></i> Badges
+        </th>
+        {# — Current health (separator) — #}
+        <th class="sp-col-sep">Active</th>
         <th>At Risk</th>
         <th>Dormant</th>
         <th title="Enrolled but no activity recorded yet">Not Started</th>
-        <th>Graduated</th>
-        <th title="Completed WALX onboarding"><i class="ti ti-door-enter" style="font-size:12px;color:#9ca3af;"></i> Onboarded</th>
-        <th title="Completed first module of this programme"><i class="ti ti-rocket" style="font-size:12px;color:#9ca3af;"></i> Activated</th>
-        <th title="Progressed to module 2 or beyond"><i class="ti ti-repeat" style="font-size:12px;color:#9ca3af;"></i> Retained</th>
-        <th><i class="ti ti-rosette" style="font-size:12px;color:#9ca3af;" title="Total course completions (badges earned)"></i> Badges</th>
-        <th><i class="ti ti-certificate" style="font-size:12px;color:#9ca3af;" title="Learners who graduated the programme"></i> Certs</th>
-        <th>Courses</th>
         <th></th>
       </tr>
     </thead>
     <tbody hx-get="{% url 'sp_programme_list_stats' %}"
            hx-trigger="load"
            hx-swap="outerHTML">
-      {# Skeleton rows — names known immediately, stats shimmer until HTMX resolves #}
+      {# Skeleton rows — Code/Name render immediately; stats shimmer until HTMX resolves #}
       {% for programme in programmes %}
       <tr>
-        <td>
+        <td class="sp-sticky-1">
           <span style="font-size:12px;font-weight:700;background:#f3f4f6;border-radius:4px;padding:2px 8px;color:#374151;">
             {{ programme.code }}
           </span>
         </td>
-        <td style="font-weight:500;color:#111827;">{{ programme.name }}</td>
-        {% for _ in "11111111111111" %}
-        <td><span class="sp-skel" style="height:13px;width:{% cycle '32' '28' '24' '24' '24' '24' '24' '24' '24' '24' '24' '20' '20' '18' %}px;">&nbsp;</span></td>
+        <td class="sp-sticky-2" style="font-weight:500;color:#111827;">{{ programme.name }}</td>
+        {% for _ in "1111111111111" %}
+        <td><span class="sp-skel" style="height:13px;width:{% cycle '32' '28' '24' '24' '24' '24' '20' '20' '24' '24' '24' '24' '20' %}px;">&nbsp;</span></td>
         {% endfor %}
       </tr>
       {% endfor %}

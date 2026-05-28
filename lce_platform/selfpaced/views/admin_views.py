@@ -1793,3 +1793,171 @@ def pod_import_log(request):
     from selfpaced.models import PodImportJob
     jobs = PodImportJob.objects.select_related('uploaded_by').all()
     return render(request, 'selfpaced/admin/pod_import_log.html', {'jobs': jobs})
+
+
+# ── User management ──────────────────────────────────────────────────────────
+
+def _require_staff(request):
+    """Return an HttpResponse redirect if the requesting user is not staff."""
+    if not request.user.is_staff:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden('Staff access required.')
+    return None
+
+
+@login_required
+def user_list(request):
+    """List all platform users."""
+    guard = _require_staff(request)
+    if guard:
+        return guard
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    users = User.objects.order_by('-is_superuser', '-is_staff', 'username')
+    return render(request, 'selfpaced/admin/user_list.html', {'users': users})
+
+
+@login_required
+def user_create(request):
+    """Create a new platform user."""
+    guard = _require_staff(request)
+    if guard:
+        return guard
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    errors = {}
+    data = {}
+
+    if request.method == 'POST':
+        data = request.POST
+        username   = data.get('username', '').strip()
+        email      = data.get('email', '').strip()
+        first_name = data.get('first_name', '').strip()
+        last_name  = data.get('last_name', '').strip()
+        password   = data.get('password', '')
+        password2  = data.get('password2', '')
+        is_staff   = data.get('is_staff') == 'on'
+        is_super   = data.get('is_superuser') == 'on'
+
+        if not username:
+            errors['username'] = 'Username is required.'
+        elif User.objects.filter(username=username).exists():
+            errors['username'] = 'A user with this username already exists.'
+        if not password:
+            errors['password'] = 'Password is required.'
+        elif len(password) < 8:
+            errors['password'] = 'Password must be at least 8 characters.'
+        elif password != password2:
+            errors['password2'] = 'Passwords do not match.'
+        # Only a superuser may create another superuser
+        if is_super and not request.user.is_superuser:
+            errors['is_superuser'] = 'Only superusers can grant superuser status.'
+
+        if not errors:
+            user = User.objects.create_user(
+                username=username, email=email,
+                first_name=first_name, last_name=last_name,
+                password=password,
+                is_staff=is_staff, is_superuser=is_super,
+            )
+            messages.success(request, f'User "{user.username}" created successfully.')
+            return redirect('sp_user_list')
+
+    return render(request, 'selfpaced/admin/user_form.html', {
+        'action': 'create',
+        'data': data,
+        'errors': errors,
+    })
+
+
+@login_required
+def user_edit(request, pk):
+    """Edit an existing platform user."""
+    guard = _require_staff(request)
+    if guard:
+        return guard
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    target = get_object_or_404(User, pk=pk)
+
+    errors = {}
+    data = {
+        'username': target.username,
+        'email': target.email,
+        'first_name': target.first_name,
+        'last_name': target.last_name,
+        'is_staff': target.is_staff,
+        'is_superuser': target.is_superuser,
+        'is_active': target.is_active,
+    }
+
+    if request.method == 'POST':
+        data = request.POST
+        username   = data.get('username', '').strip()
+        email      = data.get('email', '').strip()
+        first_name = data.get('first_name', '').strip()
+        last_name  = data.get('last_name', '').strip()
+        password   = data.get('password', '').strip()
+        password2  = data.get('password2', '').strip()
+        is_staff   = data.get('is_staff') == 'on'
+        is_super   = data.get('is_superuser') == 'on'
+        is_active  = data.get('is_active') == 'on'
+
+        if not username:
+            errors['username'] = 'Username is required.'
+        elif User.objects.filter(username=username).exclude(pk=pk).exists():
+            errors['username'] = 'A user with this username already exists.'
+        if password:
+            if len(password) < 8:
+                errors['password'] = 'Password must be at least 8 characters.'
+            elif password != password2:
+                errors['password2'] = 'Passwords do not match.'
+        # Only a superuser may grant superuser status
+        if is_super and not request.user.is_superuser:
+            errors['is_superuser'] = 'Only superusers can grant superuser status.'
+        # Prevent self-deactivation
+        if target.pk == request.user.pk and not is_active:
+            errors['is_active'] = 'You cannot deactivate your own account.'
+
+        if not errors:
+            target.username   = username
+            target.email      = email
+            target.first_name = first_name
+            target.last_name  = last_name
+            target.is_staff   = is_staff
+            target.is_active  = is_active
+            if request.user.is_superuser:
+                target.is_superuser = is_super
+            if password:
+                target.set_password(password)
+            target.save()
+            messages.success(request, f'User "{target.username}" updated successfully.')
+            return redirect('sp_user_list')
+
+    return render(request, 'selfpaced/admin/user_form.html', {
+        'action': 'edit',
+        'target': target,
+        'data': data,
+        'errors': errors,
+    })
+
+
+@login_required
+@require_POST
+def user_toggle_active(request, pk):
+    """Activate or deactivate a user account."""
+    guard = _require_staff(request)
+    if guard:
+        return guard
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    target = get_object_or_404(User, pk=pk)
+    if target.pk == request.user.pk:
+        messages.error(request, 'You cannot deactivate your own account.')
+    else:
+        target.is_active = not target.is_active
+        target.save(update_fields=['is_active'])
+        state = 'activated' if target.is_active else 'deactivated'
+        messages.success(request, f'User "{target.username}" {state}.')
+    return redirect('sp_user_list')

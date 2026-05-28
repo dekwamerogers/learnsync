@@ -1,0 +1,116 @@
+{% extends "selfpaced/base.html" %}
+
+{% block title %}Users — LearnSync{% endblock %}
+{% block page_title %}Users{% endblock %}
+{% block nav_admin %}active{% endblock %}
+
+{% block content %}
+
+<!-- Messages -->
+{% if messages %}
+{% for msg in messages %}
+<div style="margin-bottom:12px;padding:10px 16px;border-radius:7px;font-size:13px;
+  {% if msg.tags == 'success' %}background:#f0fdf4;border:1px solid #bbf7d0;color:#16a34a;
+  {% elif msg.tags == 'error' %}background:#fef2f2;border:1px solid #fecaca;color:#dc2626;
+  {% else %}background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;{% endif %}">
+  {{ msg }}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Header -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div style="font-size:16px;font-weight:700;color:#111827;">Platform Users</div>
+    <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Staff accounts that can access LearnSync</div>
+  </div>
+  <a href="{% url 'sp_user_create' %}" class="sp-btn sp-btn-primary" style="font-size:13px;">
+    <i class="ti ti-user-plus" style="font-size:14px;"></i>
+    Add User
+  </a>
+</div>
+
+<div class="sp-card sp-table-wrap">
+  <table class="sp-table">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th>Last Login</th>
+        <th>Date Joined</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr style="{% if not u.is_active %}opacity:.55;{% endif %}">
+        <td>
+          <div style="font-weight:600;color:#111827;font-size:13px;">
+            {{ u.get_full_name|default:u.username }}
+            {% if u.pk == request.user.pk %}
+            <span style="font-size:10px;background:#eff6ff;color:#1d4ed8;border-radius:9999px;padding:1px 6px;margin-left:4px;font-weight:600;">You</span>
+            {% endif %}
+          </div>
+          <div style="font-size:11px;color:#9ca3af;">{{ u.username }}</div>
+        </td>
+        <td style="font-size:12px;color:#374151;">{{ u.email|default:"—" }}</td>
+        <td>
+          {% if u.is_superuser %}
+            <span style="font-size:11px;background:#fef3c7;color:#d97706;border-radius:9999px;padding:2px 8px;font-weight:600;">Superuser</span>
+          {% elif u.is_staff %}
+            <span style="font-size:11px;background:#eff6ff;color:#1d4ed8;border-radius:9999px;padding:2px 8px;font-weight:600;">Staff</span>
+          {% else %}
+            <span style="font-size:11px;color:#9ca3af;">Standard</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if u.is_active %}
+            <span style="font-size:11px;background:#f0fdf4;color:#16a34a;border-radius:9999px;padding:2px 8px;font-weight:600;">Active</span>
+          {% else %}
+            <span style="font-size:11px;background:#f9fafb;color:#9ca3af;border-radius:9999px;padding:2px 8px;font-weight:600;">Inactive</span>
+          {% endif %}
+        </td>
+        <td style="font-size:11px;color:#6b7280;white-space:nowrap;">
+          {{ u.last_login|date:"d M Y H:i"|default:"Never" }}
+        </td>
+        <td style="font-size:11px;color:#6b7280;white-space:nowrap;">
+          {{ u.date_joined|date:"d M Y" }}
+        </td>
+        <td style="white-space:nowrap;">
+          <a href="{% url 'sp_user_edit' u.pk %}"
+             style="font-size:12px;color:#0452F0;text-decoration:none;font-weight:500;margin-right:12px;">
+            Edit
+          </a>
+          {% if u.pk != request.user.pk %}
+          <form method="post" action="{% url 'sp_user_toggle_active' u.pk %}"
+                style="display:inline;"
+                onsubmit="return confirm('{% if u.is_active %}Deactivate{% else %}Activate{% endif %} {{ u.username }}?')">
+            {% csrf_token %}
+            <button type="submit"
+                    style="background:none;border:none;cursor:pointer;font-size:12px;padding:0;
+                           color:{% if u.is_active %}#d97706{% else %}#16a34a{% endif %};font-family:inherit;font-weight:500;">
+              {% if u.is_active %}Deactivate{% else %}Activate{% endif %}
+            </button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" style="text-align:center;padding:40px;color:#9ca3af;font-size:13px;">
+          No users found.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div style="margin-top:12px;font-size:11px;color:#9ca3af;">
+  {{ users|length }} user{{ users|length|pluralize }} total.
+  Only staff and superuser accounts can log in to LearnSync.
+</div>
+
+{% endblock %}

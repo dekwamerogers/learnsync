@@ -47,10 +47,15 @@ def compute_pod_pace(pod_assignment, as_of=None):
     except Enrolment.DoesNotExist:
         return
 
-    courses_completed = CourseEnrolment.objects.filter(
-        enrolment=enrolment,
-        status=CourseStatus.COMPLETED,
-    ).count()
+    # Fetch all completed course enrolments in one query — needed for both
+    # counts and learning velocity (which requires individual completion dates).
+    completed_ces = list(
+        CourseEnrolment.objects
+        .filter(enrolment=enrolment, status=CourseStatus.COMPLETED)
+        .values_list('completion_date', flat=True)
+        .order_by('completion_date')
+    )
+    courses_completed = len(completed_ces)
 
     courses_in_progress = CourseEnrolment.objects.filter(
         enrolment=enrolment,
@@ -75,26 +80,22 @@ def compute_pod_pace(pod_assignment, as_of=None):
     # making them appear Behind when they are in fact on track.
     courses_remaining_effective = max(0, total_courses - courses_completed - courses_in_progress)
 
-    # Effective start date — when the learner's pace clock should begin:
+    # Effective start date — when the learner's pace clock should begin.
     #
-    # If enrolment_date is on or after programme.start_date, the learner joined
-    # mid-programme and their clock starts from enrolment_date.
+    # We always prefer first_sign_of_life_date (FSOL): the date the learner
+    # first appeared in eHub for this programme.  This is more accurate than
+    # enrolment_date because a learner may be enrolled weeks before they
+    # actually begin, and penalising them for that administrative lag distorts
+    # their pace downward.
     #
-    # If enrolment_date is before programme.start_date (enrolled early), they
-    # couldn't do anything yet, so use first_sign_of_life_date (actual first
-    # engagement with this programme's courses) as the learner-side date,
-    # falling back to the pod assignment date, then the enrolment_date itself.
-    #
-    # Either way, floor to programme.start_date so pre-launch enrolees aren't
-    # penalised for days before the programme existed.
+    # Falls back to enrolment_date (if FSOL is absent), then assignment_date.
+    # Floored to programme.start_date so pre-launch enrolees aren't penalised
+    # for days before the programme existed.
     prog_start     = programme.start_date
     enrolment_date = enrolment.enrolment_date
     fsol           = enrolment.first_sign_of_life_date
 
-    if enrolment_date and (prog_start is None or enrolment_date >= prog_start):
-        learner_date = enrolment_date
-    else:
-        learner_date = fsol or enrolment_date or pod_assignment.assignment_date
+    learner_date = fsol or enrolment_date or pod_assignment.assignment_date
 
     if not learner_date and not prog_start:
         return  # no date reference at all — skip
@@ -179,15 +180,41 @@ def compute_pod_pace(pod_assignment, as_of=None):
     else:
         courses_behind = 0.0
 
+    # ── Learning velocity (inter-completion rate) ─────────────────────────
+    # Uses individual course completion_date values collected earlier.
+    # Requires 2+ completions with known dates; the window is
+    # first_completion → last_completion, measuring the rhythm between courses
+    # independently of current dormancy or pre-engagement idle time.
+    #
+    # Formula: (completions - 1) / weeks(first_completion, last_completion)
+    # Why (n-1): with n completions there are (n-1) inter-completion intervals.
+    #
+    # Example: completed AICE-1 on 1 Jan, AICE-2 on 15 Jan, AICE-3 on 5 Feb
+    #   → window = 35 days = 5 weeks, intervals = 2
+    #   → learning_velocity = 2 / 5 = 0.4 c/week
+    #
+    # This tells coaches: "when actively learning, this person moves at X c/week"
+    # — distinct from current_pace which includes idle stretches since FSOL.
+    learning_velocity = None
+    dated_completions = [d for d in completed_ces if d is not None]
+    if len(dated_completions) >= 2:
+        first_c = dated_completions[0]
+        last_c  = dated_completions[-1]
+        span_weeks = (last_c - first_c).days / 7
+        if span_weeks > 0:
+            learning_velocity = (len(dated_completions) - 1) / span_weeks
+
     pod_assignment.current_pace = current_pace
     pod_assignment.required_pace = required_pace
     pod_assignment.pace_status = pace_status
     pod_assignment.courses_behind = round(courses_behind, 2)
     pod_assignment.projected_completion_date = projected
+    pod_assignment.learning_velocity = round(learning_velocity, 3) if learning_velocity is not None else None
     pod_assignment.last_computed_at = timezone.now()
     pod_assignment.save(update_fields=[
         'current_pace', 'required_pace', 'pace_status',
-        'courses_behind', 'projected_completion_date', 'last_computed_at',
+        'courses_behind', 'projected_completion_date', 'learning_velocity',
+        'last_computed_at',
     ])
 
 

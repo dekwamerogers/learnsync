@@ -2,12 +2,14 @@
 <tbody>
   {% for programme in programmes %}
   <tr>
-    <td>
+
+    {# ── Identity ─────────────────────────────────────────── #}
+    <td class="sp-sticky-1">
       <span style="font-size:12px;font-weight:700;background:#f3f4f6;border-radius:4px;padding:2px 8px;color:#374151;">
         {{ programme.code }}
       </span>
     </td>
-    <td style="font-weight:500;color:#111827;">
+    <td class="sp-sticky-2" style="font-weight:500;color:#111827;">
       {{ programme.name }}
       {% with ds=programme.date_status %}
       {% if ds == 'upcoming' %}
@@ -17,6 +19,7 @@
       {% endwith %}
     </td>
 
+    {# ── Volume ───────────────────────────────────────────── #}
     {% with d=prog_deltas|get_item:programme.pk %}
     <td style="font-weight:600;color:#111827;">
       {{ programme.total_enrolments }}
@@ -35,9 +38,58 @@
       {% else %}<span style="color:#9ca3af;">—</span>{% endif %}
     </td>
     {% endwith %}
+    {% endwith %}
 
-    {# ── Enrolment-health columns (default view) ── #}
-    <td class="col-enrolment">
+    {# ── Learner Journey (sep) ────────────────────────────── #}
+    {# Onboarded — WALX completion #}
+    <td class="sp-col-sep">
+      {% if programme.onboarded_count %}
+        <span style="color:#0d9488;font-weight:600;">{{ programme.onboarded_count }}</span>
+      {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+    </td>
+
+    {# Activated — passed module 1, rate = activated ÷ enrolments #}
+    <td title="Activation rate: {{ programme.activation_rate }}%">
+      {% if programme.activated_count %}
+        <span style="font-weight:600;color:#0452F0;">{{ programme.activated_count }}</span>
+        <span style="font-size:10px;color:#9ca3af;margin-left:2px;">{{ programme.activation_rate }}%</span>
+      {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+    </td>
+
+    {# Retained — module 2+, rate = retained ÷ activated #}
+    <td title="Retention rate: {{ programme.retention_rate }}%">
+      {% if programme.retained_count %}
+        <span style="font-weight:600;color:#0d9488;">{{ programme.retained_count }}</span>
+        <span style="font-size:10px;color:#9ca3af;margin-left:2px;">{{ programme.retention_rate }}%</span>
+      {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+    </td>
+
+    {# Graduated — rate = graduated ÷ activated #}
+    <td title="Graduation rate (from activated): {{ programme.grad_rate_activated }}%">
+      {% if programme.graduated_count %}
+        <span style="font-weight:600;color:#2563eb;">{{ programme.graduated_count }}</span>
+        <span style="font-size:10px;color:#9ca3af;margin-left:2px;">{{ programme.grad_rate_activated }}%</span>
+      {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+    </td>
+
+    {# Certs — certificates issued #}
+    <td style="text-align:center;">
+      {% if programme.awards_certificate %}
+        {% if programme.certificates_count %}<span style="font-size:13px;font-weight:600;color:#2563eb;">{{ programme.certificates_count }}</span>
+        {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+      {% else %}<span style="color:#e5e7eb;font-size:11px;" title="{{ programme.code }} does not award certificates">—</span>{% endif %}
+    </td>
+
+    {# Badges — course badges earned #}
+    <td style="text-align:center;">
+      {% if programme.awards_credentials %}
+        {% if programme.badges_count %}<span style="font-size:13px;font-weight:600;color:#7c3aed;">{{ programme.badges_count }}</span>
+        {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
+      {% else %}<span style="color:#e5e7eb;font-size:11px;" title="{{ programme.code }} does not award badges">—</span>{% endif %}
+    </td>
+
+    {# ── Current health (sep) ─────────────────────────────── #}
+    <td class="sp-col-sep col-enrolment">
       {% if programme.active_count %}<span style="color:#16a34a;font-weight:600;">{{ programme.active_count }}</span>{% else %}<span style="color:#9ca3af;">0</span>{% endif %}
     </td>
     <td class="col-enrolment">
@@ -49,60 +101,25 @@
     <td class="col-enrolment">
       {% if programme.not_yet_started_count %}<span style="color:#6b7280;font-weight:600;">{{ programme.not_yet_started_count }}</span>{% else %}<span style="color:#9ca3af;">0</span>{% endif %}
     </td>
-    <td class="col-enrolment">
-      {% if programme.graduated_count %}<span style="color:#2563eb;font-weight:600;">{{ programme.graduated_count }}</span>{% else %}<span style="color:#9ca3af;">0</span>{% endif %}
-    </td>
-    {% endwith %}
 
-    <td>
-      {% if programme.onboarded_count %}
-        <span style="color:#0d9488;font-weight:600;">{{ programme.onboarded_count }}</span>
-      {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
-    </td>
-
-    <td style="text-align:center;" title="Activation rate: {{ programme.activation_rate }}%">
-      {% if programme.activated_count %}
-        <span style="font-weight:600;color:#0452F0;">{{ programme.activated_count }}</span>
-        <span style="font-size:10px;color:#9ca3af;margin-left:2px;">{{ programme.activation_rate }}%</span>
-      {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
-    </td>
-    <td style="text-align:center;" title="Retention rate: {{ programme.retention_rate }}%">
-      {% if programme.retained_count %}
-        <span style="font-weight:600;color:#0d9488;">{{ programme.retained_count }}</span>
-        <span style="font-size:10px;color:#9ca3af;margin-left:2px;">{{ programme.retention_rate }}%</span>
-      {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
-    </td>
-
-    <td style="text-align:center;">
-      {% if programme.awards_credentials %}
-        {% if programme.badges_count %}<span style="font-size:13px;font-weight:600;color:#7c3aed;">{{ programme.badges_count }}</span>
-        {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
-      {% else %}<span style="color:#e5e7eb;font-size:11px;" title="{{ programme.code }} does not award badges">—</span>{% endif %}
-    </td>
-    <td style="text-align:center;">
-      {% if programme.awards_certificate %}
-        {% if programme.certificates_count %}<span style="font-size:13px;font-weight:600;color:#2563eb;">{{ programme.certificates_count }}</span>
-        {% else %}<span style="color:#9ca3af;">0</span>{% endif %}
-      {% else %}<span style="color:#e5e7eb;font-size:11px;" title="{{ programme.code }} does not award certificates">—</span>{% endif %}
-    </td>
-    <td style="color:#6b7280;">{{ programme.course_count }}</td>
     <td>
       <a href="{% url 'sp_programme_detail' programme.pk %}"
          style="font-size:12px;color:#0452F0;text-decoration:none;font-weight:500;white-space:nowrap;">
         View →
       </a>
     </td>
+
   </tr>
   {% endfor %}
 
-  {# Footer: unique learner count across all programmes (multi-programme learners counted once) #}
+  {# Footer: unique learner count across all programmes #}
   {% if programmes %}
   <tr style="background:#f9fafb;border-top:2px solid #e5e7eb;">
-    <td colspan="3" style="padding:8px 12px;">
+    <td class="sp-sticky-1" colspan="2" style="padding:8px 12px;background:#f9fafb;">
       <span style="font-size:11px;font-weight:700;color:#374151;">{{ unique_learner_total }}</span>
       <span style="font-size:11px;color:#9ca3af;margin-left:4px;">unique learner{{ unique_learner_total|pluralize }} across {{ programmes|length }} programme{{ programmes|length|pluralize }}</span>
     </td>
-    <td colspan="14" style="font-size:11px;color:#9ca3af;padding:8px 12px;">
+    <td colspan="13" style="font-size:11px;color:#9ca3af;padding:8px 12px;">
       Multi-programme learners appear in each programme row but are counted once in the unique total.
     </td>
   </tr>

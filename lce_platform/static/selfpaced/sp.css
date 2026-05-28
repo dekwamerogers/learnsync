@@ -422,6 +422,40 @@ body {
 .sp-table tbody tr:hover { background: #f9fafb; }
 .sp-table tbody tr:last-child td { border-bottom: none; }
 
+/* ── Horizontally-scrollable table wrapper (120–150% zoom support) ───────── */
+.sp-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+/* Headers never wrap — keeps row height consistent at any zoom level */
+.sp-table-wrap .sp-table th { white-space: nowrap; }
+
+/* Sticky first two columns — Code & Name stay visible while scrolling */
+.sp-table .sp-sticky-1,
+.sp-table .sp-sticky-2 {
+  position: sticky;
+  z-index: 2;
+  background: #fff;
+}
+.sp-table .sp-sticky-1 { left: 0; }
+.sp-table .sp-sticky-2 { left: 84px; } /* ≈ Code column width incl. padding */
+.sp-table thead .sp-sticky-1,
+.sp-table thead .sp-sticky-2 {
+  z-index: 3;
+}
+/* Carry hover background into sticky cells */
+.sp-table tbody tr:hover .sp-sticky-1,
+.sp-table tbody tr:hover .sp-sticky-2 { background: #f9fafb; }
+/* Footer row is explicitly #f9fafb — match it */
+.sp-table tbody tr[style*="background:#f9fafb"] .sp-sticky-1,
+.sp-table tbody tr[style*="background:#f9fafb"] .sp-sticky-2 { background: #f9fafb; }
+
+/* Column-group visual separator */
+.sp-table th.sp-col-sep,
+.sp-table td.sp-col-sep {
+  border-left: 2px solid #e5e7eb;
+}
+
 /* --- Messages --------------------------------------------- */
 .sp-messages {
   padding: 0 24px;
