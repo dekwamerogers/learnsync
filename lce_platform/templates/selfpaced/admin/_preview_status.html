@@ -1,0 +1,8 @@
+{% comment %}
+HTMX polling fragment — swapped every 2 s while preview is running.
+The outer #preview-loader div has hx-get / hx-trigger="every 2s" set on it.
+{% endcomment %}
+<div style="text-align:center;padding:16px 0;">
+  <div style="display:inline-block;width:18px;height:18px;border:2px solid #e5e7eb;border-top-color:#0452F0;border-radius:50%;animation:sp-spin .7s linear infinite;vertical-align:middle;margin-right:8px;"></div>
+  <span style="font-size:13px;color:#6b7280;">Analysing CSV — this usually takes 10–30 seconds…</span>
+</div>

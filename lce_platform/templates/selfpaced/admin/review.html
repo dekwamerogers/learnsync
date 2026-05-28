@@ -8,6 +8,44 @@
 {% block content %}
 <div style="max-width:860px;">
 
+{% if previewing %}
+{# ── Preview still running — show spinner, poll every 2s ─────────────────── #}
+<style>
+@keyframes sp-spin { to { transform: rotate(360deg); } }
+</style>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <div style="font-size:13px;color:#6b7280;">Job #{{ job.pk }}</div>
+      <div style="font-size:18px;font-weight:700;color:#111827;margin-top:2px;">{{ job.file_name }}</div>
+      <div style="font-size:12px;color:#9ca3af;margin-top:2px;">
+        Uploaded {{ job.uploaded_at|date:"d M Y H:i" }} by {{ job.uploaded_by.get_full_name|default:"—" }}
+      </div>
+    </div>
+    <span class="sp-badge-health" style="background:#fef3c7;color:#d97706;font-size:11px;padding:4px 10px;border-radius:9999px;font-weight:600;">
+      Analysing…
+    </span>
+  </div>
+
+  <div class="sp-card" style="padding:48px 24px;text-align:center;">
+    <div style="display:inline-block;width:36px;height:36px;border:3px solid #e5e7eb;border-top-color:#0452F0;border-radius:50%;animation:sp-spin .8s linear infinite;margin-bottom:16px;"></div>
+    <div style="font-size:15px;font-weight:600;color:#111827;margin-bottom:6px;">Analysing your CSV</div>
+    <div style="font-size:13px;color:#9ca3af;margin-bottom:24px;">
+      Matching rows to learners and programmes — usually takes 10–30 seconds for large files.
+    </div>
+    {# HTMX polls every 2s; HX-Redirect fires when preview finishes #}
+    <div id="preview-loader"
+         hx-get="{% url 'sp_preview_poll' job.pk %}"
+         hx-trigger="load, every 2s"
+         hx-target="#preview-loader"
+         hx-swap="outerHTML">
+      {% include "selfpaced/admin/_preview_status.html" %}
+    </div>
+  </div>
+
+{% else %}
+{# ── Preview complete — show full review UI ──────────────────────────────── #}
+
   <!-- Header -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
     <div>
@@ -395,6 +433,7 @@
     </div>
   </div>
 
+{% endif %}{# end previewing / pending_review split #}
 </div>
 
 <script>

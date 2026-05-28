@@ -28,6 +28,27 @@ def _run_ingestion_thread(job_pk: int) -> None:
         close_old_connections()
 
 
+def _run_preview_thread(job_pk: int) -> None:
+    """Run preview_ingestion in a background thread so the upload response is instant."""
+    from django.db import close_old_connections
+    from selfpaced.engine import preview_ingestion
+    close_old_connections()
+    try:
+        preview_ingestion(job_pk)
+        # preview_ingestion sets status → 'pending_review' or 'failed' itself.
+    except Exception as exc:
+        # Failsafe: if the engine crashes before saving, mark it failed.
+        try:
+            IngestionJob.objects.filter(pk=job_pk, status='previewing').update(
+                status='failed',
+                errors=[str(exc)],
+            )
+        except Exception:
+            pass
+    finally:
+        close_old_connections()
+
+
 @login_required
 def admin_home(request):
     from selfpaced.models import Programme
@@ -46,7 +67,7 @@ def admin_home(request):
 def upload_csv(request):
     if request.method == 'POST':
         # Guard: reject if a job is already running to prevent accidental spam.
-        if IngestionJob.objects.filter(status__in=['pending_review', 'processing']).exists():
+        if IngestionJob.objects.filter(status__in=['previewing', 'pending_review', 'processing']).exists():
             messages.warning(
                 request,
                 'An ingestion job is already pending review or in progress. '
@@ -62,19 +83,11 @@ def upload_csv(request):
                 uploaded_by=request.user,
                 file_name=f.name,
                 file_content=content,
-                status='pending_review',
+                status='previewing',   # preview runs in background
                 data_as_of_date=data_as_of_date,
             )
-            try:
-                from selfpaced.engine import preview_ingestion
-                preview_ingestion(job.pk)
-            except Exception as exc:
-                logger.exception('Preview for job %d failed', job.pk)
-                job.status = 'failed'
-                job.errors = [str(exc)]
-                job.save(update_fields=['status', 'errors'])
-                messages.error(request, f'Could not parse file: {exc}')
-                return redirect('sp_job_detail', pk=job.pk)
+            t = threading.Thread(target=_run_preview_thread, args=(job.pk,), daemon=True)
+            t.start()
             return redirect('sp_job_review', pk=job.pk)
     else:
         form = CSVUploadForm()
@@ -85,6 +98,13 @@ def upload_csv(request):
 def review_job(request, pk):
     """Show a dry-run preview and let the admin confirm or cancel the upload."""
     job = get_object_or_404(IngestionJob, pk=pk)
+    if job.status == 'previewing':
+        # Preview is still running in the background — render a loading page
+        # that HTMX polls until it transitions to pending_review.
+        return render(request, 'selfpaced/admin/review.html', {
+            'job': job,
+            'previewing': True,
+        })
     if job.status != 'pending_review':
         return redirect('sp_job_detail', pk=pk)
 
@@ -383,6 +403,25 @@ def job_progress_fragment(request, pk):
         'pipeline': pipeline,
         'pipeline_pct': pct,
     })
+
+
+@login_required
+def preview_poll_fragment(request, pk):
+    """HTMX polling fragment — called every ~2s while preview is running.
+
+    - Still previewing  → return the spinner fragment (HTMX swaps it in-place;
+                          the trigger fires again in 2 s).
+    - Preview done      → HX-Redirect to the full review page.
+    - Failed/other      → HX-Redirect to the job detail page.
+    """
+    from django.urls import reverse
+    job = get_object_or_404(IngestionJob, pk=pk)
+    if job.status == 'previewing':
+        return render(request, 'selfpaced/admin/_preview_status.html', {'job': job})
+    if job.status == 'pending_review':
+        return HttpResponse('', headers={'HX-Redirect': reverse('sp_job_review', args=[pk])})
+    # Failed, cancelled, or anything else — go to job detail
+    return HttpResponse('', headers={'HX-Redirect': reverse('sp_job_detail', args=[pk])})
 
 
 @login_required

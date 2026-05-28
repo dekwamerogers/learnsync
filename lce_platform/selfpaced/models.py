@@ -62,6 +62,7 @@ class InterventionOutcome(models.TextChoices):
 
 class IngestionStatus(models.TextChoices):
     PENDING = 'pending', 'Pending'
+    PREVIEWING = 'previewing', 'Previewing'   # preview running in background
     PENDING_REVIEW = 'pending_review', 'Pending Review'
     PROCESSING = 'processing', 'Processing'
     COMPLETE = 'complete', 'Complete'

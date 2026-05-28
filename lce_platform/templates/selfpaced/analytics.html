@@ -529,8 +529,23 @@
     labels: { font: { size: 10, family: 'Poppins, sans-serif' }, boxWidth: 10, padding: 8 },
     position: 'bottom',
   };
+  // Shared datalabels display gate for stacked-bar charts that may have line overlays.
+  // Rules:
+  //   1. Never label line-type datasets (Activated trend line, etc.)
+  //   2. Skip zero values
+  //   3. Only render when the bar segment is at least 14px tall — prevents
+  //      illegible labels crammed into tiny slivers.
+  function dlDisplay(ctx) {
+    if ((ctx.chart.config.data.datasets[ctx.datasetIndex] || {}).type === 'line') return false;
+    var val = ctx.dataset.data[ctx.dataIndex];
+    if (!val) return false;
+    try {
+      var bar = ctx.chart.getDatasetMeta(ctx.datasetIndex).data[ctx.dataIndex];
+      return bar ? Math.abs(bar.height) >= 14 : val >= 5;
+    } catch (_) { return val >= 5; }
+  }
   var DL_SEG = {
-    display: function (ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
+    display: dlDisplay,
     color: '#fff', font: { size: 9, weight: '600' }, anchor: 'center', align: 'center', clamp: true,
   };
 
@@ -624,6 +639,7 @@
             borderColor: SP_COLORS.dormant, backgroundColor: 'transparent',
             borderWidth: 2, pointRadius: 4, pointBackgroundColor: SP_COLORS.dormant,
             tension: 0.2, order: 0,
+            datalabels: { display: false },
           },
         ],
       },
@@ -847,7 +863,7 @@
           },
           plugins: {
             legend: stacked ? LEGEND_OPTS : { display: false },
-            datalabels: stacked ? DL_SEG : { display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; }, color: '#374151', font: { size: 10, weight: '600' }, anchor: 'end', align: 'end', offset: 0 },
+            datalabels: stacked ? DL_SEG : { display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] >= 1; }, color: '#374151', font: { size: 10, weight: '600' }, anchor: 'end', align: 'end', offset: 0 },
           },
           animation: { duration: 300 },
         },
@@ -882,7 +898,7 @@
             { label: 'Dormant',     data: D.cohortData.map(function(r){return r.dormant;}),     backgroundColor: SP_COLORS.dormant,         borderWidth:0, borderRadius:2 },
             { label: 'Not Started', data: D.cohortData.map(function(r){return r.not_started;}), backgroundColor: SP_COLORS.not_yet_started, borderWidth:0, borderRadius:2 },
             { label: 'Graduated',   data: D.cohortData.map(function(r){return r.graduated;}),   backgroundColor: SP_COLORS.graduated,       borderWidth:0, borderRadius:2 },
-            { type: 'line', label: 'Activated', data: D.cohortData.map(function(r){return r.activated;}), borderColor: '#f97316', backgroundColor: 'transparent', borderWidth:2, pointRadius:3, pointBackgroundColor:'#f97316', tension:0.2, order:0 },
+            { type: 'line', label: 'Activated', data: D.cohortData.map(function(r){return r.activated;}), borderColor: '#f97316', backgroundColor: 'transparent', borderWidth:2, pointRadius:3, pointBackgroundColor:'#f97316', tension:0.2, order:0, datalabels: { display: false } },
           ],
         },
         options: {
@@ -893,11 +909,7 @@
           },
           plugins: {
             legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 10, family: 'Poppins,sans-serif' } } },
-            datalabels: {
-              display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
-              color: '#fff', font: { size: 9, weight: '600', family: 'Poppins,sans-serif' },
-              anchor: 'center', align: 'center', clamp: true,
-            },
+            datalabels: { display: dlDisplay, color: '#fff', font: { size: 9, weight: '600', family: 'Poppins,sans-serif' }, anchor: 'center', align: 'center', clamp: true },
             tooltip: {
               mode: 'index', intersect: false,
               callbacks: {
@@ -936,7 +948,7 @@
             { label: 'At Risk',   data: D.cohortData.map(function(r){return r.at_risk;}),   backgroundColor: SP_COLORS.at_risk,   borderWidth:0, borderRadius:2 },
             { label: 'Dormant',   data: D.cohortData.map(function(r){return r.dormant;}),   backgroundColor: SP_COLORS.dormant,   borderWidth:0, borderRadius:2 },
             { label: 'Graduated', data: D.cohortData.map(function(r){return r.graduated;}), backgroundColor: SP_COLORS.graduated, borderWidth:0, borderRadius:2 },
-            { type: 'line', label: 'Activated', data: D.cohortData.map(function(r){return r.activated;}), borderColor: '#f97316', backgroundColor: 'transparent', borderWidth:2, pointRadius:3, pointBackgroundColor:'#f97316', tension:0.2, order:0 },
+            { type: 'line', label: 'Activated', data: D.cohortData.map(function(r){return r.activated;}), borderColor: '#f97316', backgroundColor: 'transparent', borderWidth:2, pointRadius:3, pointBackgroundColor:'#f97316', tension:0.2, order:0, datalabels: { display: false } },
           ],
         },
         options: {
@@ -947,11 +959,7 @@
           },
           plugins: {
             legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 10, family: 'Poppins,sans-serif' } } },
-            datalabels: {
-              display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
-              color: '#fff', font: { size: 9, weight: '600', family: 'Poppins,sans-serif' },
-              anchor: 'center', align: 'center', clamp: true,
-            },
+            datalabels: { display: dlDisplay, color: '#fff', font: { size: 9, weight: '600', family: 'Poppins,sans-serif' }, anchor: 'center', align: 'center', clamp: true },
             tooltip: {
               mode: 'index', intersect: false,
               callbacks: {

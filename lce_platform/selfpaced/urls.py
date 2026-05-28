@@ -33,6 +33,7 @@ urlpatterns = [
     path('admin/ingestion/', admin_views.ingestion_log, name='sp_ingestion_log'),
     path('admin/ingestion/<int:pk>/', admin_views.ingestion_job_detail, name='sp_job_detail'),
     path('admin/ingestion/<int:pk>/progress/', admin_views.job_progress_fragment, name='sp_job_progress'),
+    path('admin/ingestion/<int:pk>/preview-poll/', admin_views.preview_poll_fragment, name='sp_preview_poll'),
     path('admin/ingestion/<int:pk>/retry/', admin_views.retry_job, name='sp_job_retry'),
     path('admin/ingestion/<int:pk>/review/', admin_views.review_job, name='sp_job_review'),
     path('admin/ingestion/<int:pk>/cancel/', admin_views.cancel_ingestion_job, name='sp_job_cancel'),
