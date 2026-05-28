@@ -13,9 +13,21 @@ def compute_pod_pace(pod_assignment, as_of=None):
     for self-paced programmes where courses take 1-3 weeks each.
 
     current_pace   = courses_completed / weeks_active
-    required_pace  = courses_remaining / weeks_remaining
+    required_pace  = courses_remaining_effective / weeks_remaining
     pace_status    = comparison of current vs required (ratio-based)
     courses_behind = how many courses behind the expected trajectory
+
+    Key design: two flavours of "courses remaining" are used:
+
+        courses_remaining_total     = total - completed
+            Used ONLY for the COMPLETED check (all courses done → graduated).
+
+        courses_remaining_effective = total - completed - in_progress
+            Used for required_pace, projected completion, and courses_behind.
+            In-progress courses are treated as "already in flight" — the learner
+            is actively working on them, so they don't add to the future burden.
+            This prevents a learner on their last course from appearing Behind,
+            and gives more accurate projections for those near the finish line.
     """
     from selfpaced.models import (
         CourseEnrolment,
@@ -51,7 +63,17 @@ def compute_pod_pace(pod_assignment, as_of=None):
         # on its own standalone enrolment and must not inflate the target count)
         or programme.courses.filter(is_active=True).exclude(code='WALX').count()
     )
-    courses_remaining = max(0, total_courses - courses_completed)
+
+    # courses_remaining_total: used only for the COMPLETED check (all courses done).
+    courses_remaining_total = max(0, total_courses - courses_completed)
+
+    # courses_remaining_effective: used for pace, projection, and courses_behind.
+    # Subtracts in-progress courses because they are already being worked on —
+    # they should not inflate the required pace or push the projected date outward.
+    # Example: 3 completed, 1 in-progress (AICE-4), total=6 → effective=2 (AICE-5, 6).
+    # Without this, the learner's required pace would include AICE-4 as if untouched,
+    # making them appear Behind when they are in fact on track.
+    courses_remaining_effective = max(0, total_courses - courses_completed - courses_in_progress)
 
     # Effective start date — when the learner's pace clock should begin:
     #
@@ -90,18 +112,29 @@ def compute_pod_pace(pod_assignment, as_of=None):
 
     current_pace = courses_completed / weeks_active  # c/week
 
-    if courses_remaining == 0:
+    # Required pace: how fast must the learner go to finish the REMAINING (unstarted) courses
+    # by the pod target month?  Uses courses_remaining_effective so in-progress courses
+    # don't inflate the target — they're already being worked on.
+    if courses_remaining_total == 0:
         required_pace = 0.0
     elif weeks_remaining > 0:
-        required_pace = courses_remaining / weeks_remaining  # c/week
+        required_pace = courses_remaining_effective / weeks_remaining  # c/week
     else:
-        required_pace = None  # past target date
+        required_pace = None  # past target date — any outstanding work is overdue
 
-    # Projected completion date
-    if courses_remaining == 0:
+    # Projected completion date — also based on effective remaining so in-progress
+    # courses don't artificially extend the projection.
+    # Edge case: if effective remaining = 0 but total > 0 (on the very last course),
+    # project a half-course of work to signal "nearly done" rather than "today".
+    if courses_remaining_total == 0:
         projected = today
     elif current_pace > 0:
-        projected = today + timedelta(weeks=courses_remaining / current_pace)
+        remaining_for_projection = (
+            courses_remaining_effective
+            if courses_remaining_effective > 0
+            else 0.5 * courses_in_progress   # last course(s) in progress — assume ~halfway done
+        )
+        projected = today + timedelta(weeks=remaining_for_projection / current_pace)
     else:
         projected = None
 
@@ -109,17 +142,22 @@ def compute_pod_pace(pod_assignment, as_of=None):
     threshold = ProgrammeThreshold.for_programme(programme)
     behind_pct = threshold.get('pod_behind_threshold_pct')
 
-    if courses_remaining == 0:
+    if courses_remaining_total == 0:
+        # All courses completed — graduated.
         pace_status = PaceStatus.COMPLETED
     elif required_pace is None:
-        # Past the target date and still not done
+        # Past the target date and still not done.
         pace_status = PaceStatus.SIGNIFICANTLY_BEHIND
     elif current_pace == 0:
-        # Grace period: don't penalise new learners who haven't finished a course yet
+        # No courses completed yet.
+        # Grace period: don't penalise new learners who haven't finished a course yet.
         if days_active <= GRACE_DAYS:
             pace_status = PaceStatus.ON_TRACK
         else:
             pace_status = PaceStatus.SIGNIFICANTLY_BEHIND
+    elif required_pace == 0.0:
+        # All remaining courses are in-progress (effective = 0) — finishing up.
+        pace_status = PaceStatus.AHEAD
     else:
         ratio = current_pace / required_pace
         if ratio > 1.05:
@@ -135,11 +173,9 @@ def compute_pod_pace(pod_assignment, as_of=None):
         expected_by_now = (required_pace or 0) * weeks_active
         raw_behind = max(0.0, expected_by_now - courses_completed)
         # Cap at courses NOT YET STARTED — a learner can't be "behind" on a course
-        # they have already begun.  In-progress courses are accounted for, so only
-        # courses that haven't been touched yet form the ceiling.
-        # (e.g. someone on the final course in progress → cap = 0, never "X courses behind")
-        courses_not_started = max(0.0, float(total_courses - courses_completed - courses_in_progress))
-        courses_behind = min(raw_behind, courses_not_started)
+        # they have already begun.  courses_remaining_effective equals courses_not_started
+        # so reuse it directly as the cap.
+        courses_behind = min(raw_behind, float(courses_remaining_effective))
     else:
         courses_behind = 0.0
 

@@ -5,6 +5,14 @@
 **Date:** May 2026
 **Classification:** Confidential
 
+> **Changelog — v1.1 → v1.2 (May 2026)**
+> **Section 5 (Enrolment model):** Added `has_activity_data` boolean field — distinguishes eHub activity-CSV enrolments (True) from roster-only enrolment-CSV records (False). Used to split "In eHub" vs "Roster Only" counts on the home dashboard.
+> **Section 11 (Home dashboard):** Added Programme Health Breakdown table — per-programme row showing Roster Only vs In eHub split, Activated/Active/At Risk/Dormant/Graduated rates, all status counts as clickable links to filtered learner list.
+> **Section 11 (Analytics):** Cohort table expanded — each status cell now shows count + rate (e.g. "12 (40%)") and is a clickable link to the learner list filtered by cohort date range + health status.
+> **Section 11 (Manager Report):** Weekly breakdown — week label cell and Active/At Risk cells are now clickable links to the learner list with cohort + health filters.
+> **Section 14 (Pod System):** `courses_behind` capping logic updated — capped at courses NOT YET STARTED (total_courses − completed − in_progress). A learner on the last in-progress course now shows 0 courses behind instead of an inflated number. WALX excluded from the fallback total_courses count.
+> **Section 13 (Concurrency):** Documented that activity CSV (IngestionJob) and enrolment CSV (EnrolmentUploadJob) can run simultaneously — they use separate job-type guards and don't block each other. Best practice: run enrolment CSV first.
+
 > **Changelog — v1.0 → v1.1 (May 2026)**
 > Added Analytics page and Manager Report page to Section 11. Updated Section 5 (Programme fields — start_date, end_date, is_prerequisite; upcoming exclusion rule; PaymentStatus.UNKNOWN). Updated Section 6 (Activated metric definition now based on first-module completion; Retained metric added; health rollup status labels aligned to implementation). Added Section 11a — Metric Definitions Reference. No structural changes to core data model or snapshot system.
 

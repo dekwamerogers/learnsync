@@ -326,6 +326,39 @@ body {
   border-radius: 10px;
   border: 1px solid #e5e7eb;
   overflow: hidden;
+  position: relative;   /* needed for absolutely-positioned fullscreen button */
+}
+
+/* ── Fullscreen chart button (injected automatically into chart cards) ─── */
+.sp-fs-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  width: 26px;
+  height: 26px;
+  background: rgba(249,250,251,0.92);
+  border: 1px solid #e5e7eb;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 0;
+  line-height: 1;
+  transition: background .12s, color .12s, border-color .12s;
+  font-family: inherit;
+}
+.sp-fs-btn:hover { background: #0452F0; border-color: #0452F0; color: #fff; }
+
+/* When a chart card is occupying the fullscreen viewport */
+.sp-card-fs {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: auto !important;
+  padding: 24px !important;
+  border-radius: 0 !important;
 }
 
 .sp-card-header {

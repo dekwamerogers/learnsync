@@ -1,6 +1,6 @@
 # LearnSync — Technical Handoff Document
 
-**Version:** 1.1  
+**Version:** 1.2  
 **Generated:** May 2026  
 **Status:** Current  
 **Classification:** Internal
@@ -98,7 +98,7 @@ LDP/
 │   │   │   └── help.py        # Help page
 │   │   ├── templatetags/
 │   │   │   └── sp_filters.py  # Custom template filters
-│   │   └── migrations/        # 16 migrations
+│   │   └── migrations/        # 26 migrations
 │   └── templates/
 │       ├── base.html          # Root base
 │       ├── selfpaced/base.html # App base (nav sidebar)
@@ -201,9 +201,10 @@ Open `http://127.0.0.1:8000/`. All routes are under the `selfpaced` app with pre
 **Purpose:** Daily briefing — what needs attention right now.
 
 **Key metrics displayed:**
-- Total paid learners, with delta vs previous upload
+- Total paid learners with delta vs previous upload; "Unique Learners" counts individuals with eHub activity data (tooltip explains it may be higher than enrolment count because it includes learners in upcoming/future programmes)
 - Health breakdown: Active, At-Risk, Dormant, Graduated, Not Started (learner-level, delta badges)
-- Enrolment-level health breakdown
+- Enrolment-level health breakdown; "Enrolments" tile tooltip explains one learner in N programmes = N enrolments
+- Roster-only (not yet in eHub) count alongside enrolment total
 - Activation rate, module activation rate, retention rate, graduation rate
 - Badge count, certificate count
 - Onboarding funnel (enrolled in prerequisite, completed prerequisite)
@@ -211,8 +212,11 @@ Open `http://127.0.0.1:8000/`. All routes are under the `selfpaced` app with pre
 - Pending follow-ups count, new learners this week
 - Data freshness indicator (last upload date, staleness warning if > 7 days)
 
+**Programme Health Breakdown table** (between charts and Enrolments by Week):
+Per-programme rows with columns: Programme code | In eHub (total with activity data) | Roster Only (enrolment CSV only, no activity) | Activated (%) | Active (%) | At Risk (%) | Dormant (%) | Not Started | Graduated (%). Each status count is a clickable link to the learner list pre-filtered to that programme + health status (`?programme=<pk>&health=<status>`). Uses PKs not codes because `LearnerFilter.programme` is a `ModelMultipleChoiceFilter`.
+
 **Charts:**
-- Stacked bar chart: health distribution per programme (Chart.js)
+- Stacked bar chart: health distribution per programme (Chart.js, 300px height)
 - Bar chart: at-risk flag counts (Chart.js)
 - Stacked bar chart: weekly enrolment timeline per programme (Chart.js)
 
@@ -294,7 +298,7 @@ Open `http://127.0.0.1:8000/`. All routes are under the `selfpaced` app with pre
 7. **Cohort bar charts** (two: total + active/at-risk/dormant/graduated) — learners by enrolment week cohort
 8. **Progression time series** (four charts): Daily active learners per programme, cumulative, plus course completions and first-module activations
 
-**Cohort table:** 13 columns including week label, total, activated, active, at-risk, dormant, graduated, not started.
+**Cohort table:** Columns: week label, total, activated, activation_rate, active + active_rate, at_risk + at_risk_rate, dormant + dormant_rate, graduated + graduated_rate, not_started. Every status count cell is a clickable `<a>` link to the learner list pre-filtered by cohort date range + health status (`?enrol_from=DATE&enrol_to=DATE&cohort_basis=TYPE&health=STATUS`). Rates are shown as `N (X%)` inline.
 
 **Key ORM patterns:**
 - `_activated_ids` frozenset: `CourseEnrolment.is_passed=True` for the lowest `sequence_number` course in each programme
@@ -352,10 +356,17 @@ base_qs = (
 
 **Pod pace statuses:** On Track, Behind, Significantly Behind, Ahead, Completed.
 
-**Pace calculation (per learner per programme):**
-- Current pace = `courses_completed / days_since_fsol`
-- Required pace = `courses_remaining / days_until_pod_target`
-- Status derived from comparison + configured threshold
+**Pace calculation (per learner per programme)** — computed by `selfpaced/pace.py → compute_pod_pace()`:
+
+- `courses_completed` = CourseEnrolments with `status=COMPLETED` for this enrolment
+- `courses_in_progress` = CourseEnrolments with `status=IN_PROGRESS`
+- `total_courses` = `programme.total_courses_for_graduation` (falls back to `courses.filter(is_active=True).exclude(code='WALX').count()`)
+- `courses_remaining` = `max(0, total_courses − courses_completed)`
+- `current_pace` = `courses_completed / weeks_active` (c/week)
+- `required_pace` = `courses_remaining / weeks_remaining` (c/week; `None` if past target date)
+- `ratio` = `current_pace / required_pace` → drives pace status (Ahead >1.05 · On Track ≥(1−threshold) · Behind ≥0.6 · Significantly Behind <0.6)
+- `courses_behind` = `min(expected_by_now − courses_completed, courses_not_yet_started)` where `courses_not_yet_started = total_courses − courses_completed − courses_in_progress`. **This cap means a learner on the last in-progress course always shows 0 courses behind**, never an inflated number.
+- `projected_completion` = `today + (courses_remaining / current_pace)` weeks
 
 ---
 
@@ -519,7 +530,7 @@ Key fields: `course` (FK), `name`, `type` (milestone / test / other), `sequence_
 #### `Enrolment`
 One row per learner per programme. Primary health record.
 
-Key fields: `learner` (FK), `programme` (FK), `enrolment_date`, `first_sign_of_life_date`, `activation_date` (stored but NOT used for the Activated metric — live first-module query is used instead), `current_course` (FK to Course), `health_status`, `active_flags` (JSONField: list of flag code strings), `is_graduated`, `graduation_date`.
+Key fields: `learner` (FK), `programme` (FK), `enrolment_date`, `first_sign_of_life_date`, `activation_date` (stored but NOT used for the Activated metric — live first-module query is used instead), `current_course` (FK to Course), `health_status`, `active_flags` (JSONField: list of flag code strings), `is_graduated`, `graduation_date`, `has_activity_data` (bool — `True` if this enrolment came from an activity CSV upload; `False` for roster-only enrolments from the enrolment CSV. Used to split "In eHub" vs "Roster Only" counts on the home dashboard).
 
 #### `CourseEnrolment`
 One row per learner per course within a programme.
@@ -689,10 +700,11 @@ Sections in order:
 ### Background Jobs (no external queue)
 All three job types run in `threading.Thread(daemon=True)` — in-process threads, no Celery/RQ. This is simple and adequate for the current team size but means:
 - A server restart kills any running job (auto-reset to `failed` on next startup)
-- Only one job can run efficiently at a time (no parallelism)
 - Long uploads block the thread pool if the server is under concurrent load
 
 If volume grows, migrate to Celery + Redis.
+
+**Cross-job-type concurrency:** `IngestionJob` (activity CSV) and `EnrolmentUploadJob` (enrolment CSV) use **separate guards** — each type only blocks a second job of its own type. They can run simultaneously in different threads. In practice this is safe because activity-CSV learners (`has_activity_data=True`) and enrolment-CSV learners (roster-only, `has_activity_data=False`) are almost always different populations. The only risk: if the same learner appears in both files simultaneously, whichever job finishes last wins on shared Learner/Enrolment fields, and health computed by the ingestion job may not see the roster-only enrolment if the enrolment job hasn't finished yet. **Best practice: run the enrolment CSV first, then the activity CSV.**
 
 ### Activation Metric vs `activation_date` Field
 `Enrolment.activation_date` is a stored field set during ingestion. It reflects the old definition of activation (which was different). The **current** Activated metric is computed live from `CourseEnrolment.is_passed=True` for the first-module course. The stored `activation_date` field is still shown on the Learner Detail Excel sheet for historical reference but is NOT used for any metric calculation.

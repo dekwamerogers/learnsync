@@ -359,5 +359,94 @@ document.getElementById('sp-global-search').addEventListener('keydown', function
 
 {% block extra_js %}{% endblock %}
 
+<script>
+// ── Chart fullscreen utility ──────────────────────────────────────────────
+// Auto-detects any .sp-card or .rpt-card containing a <canvas> and injects
+// a fullscreen toggle button. The Fullscreen API is used to expand the card
+// to the full viewport; Chart.js instances are resized on enter/exit.
+(function () {
+  var CARD_SEL = '.sp-card, .rpt-card';
+
+  function enterFs(card) {
+    var fn = card.requestFullscreen || card.webkitRequestFullscreen || card.mozRequestFullScreen;
+    if (fn) fn.call(card);
+  }
+  function exitFs() {
+    var fn = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen;
+    if (fn) fn.call(document);
+  }
+  window.spFsChart = function (card) {
+    document.fullscreenElement ? exitFs() : enterFs(card);
+  };
+
+  function addFsBtn(card) {
+    if (card.querySelector('.sp-fs-btn')) return;
+    card.style.position = 'relative'; // ensure rpt-card and inline-styled cards work too
+    var btn = document.createElement('button');
+    btn.className = 'sp-fs-btn';
+    btn.type = 'button';
+    btn.title = 'View fullscreen  ·  Esc to exit';
+    btn.innerHTML = '<i class="ti ti-arrows-maximize" style="font-size:13px;pointer-events:none;"></i>';
+    btn.addEventListener('click', function (e) { e.stopPropagation(); window.spFsChart(card); });
+    card.appendChild(btn);
+  }
+
+  function scanChartCards() {
+    document.querySelectorAll(CARD_SEL).forEach(function (card) {
+      if (card.querySelector('canvas')) addFsBtn(card);
+    });
+  }
+
+  // Initial scan after DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', scanChartCards);
+  } else {
+    scanChartCards();
+  }
+  // Re-scan after any HTMX swap (lazy-loaded chart sections, analytics partial, etc.)
+  document.addEventListener('htmx:afterSettle', scanChartCards);
+
+  // Handle enter / exit fullscreen
+  document.addEventListener('fullscreenchange', function () {
+    var fsEl = document.fullscreenElement;
+    if (fsEl) {
+      // ── Entering fullscreen ────────────────────────────────
+      fsEl.classList.add('sp-card-fs');
+      // Stretch every canvas wrapper to fill the available height
+      fsEl.querySelectorAll('[style*="height"]').forEach(function (wrap) {
+        if (wrap.querySelector('canvas') && wrap._origH === undefined) {
+          wrap._origH = wrap.style.height;
+          wrap.style.height = 'calc(100vh - 80px)';
+        }
+      });
+      // Swap icon to "minimise"
+      var ic = fsEl.querySelector('.sp-fs-btn i');
+      if (ic) ic.className = 'ti ti-arrows-minimize';
+    } else {
+      // ── Exiting fullscreen ─────────────────────────────────
+      document.querySelectorAll('.sp-card-fs').forEach(function (c) {
+        c.classList.remove('sp-card-fs');
+        c.querySelectorAll('[style*="height"]').forEach(function (wrap) {
+          if (wrap._origH !== undefined) {
+            wrap.style.height = wrap._origH;
+            delete wrap._origH;
+          }
+        });
+        var ic = c.querySelector('.sp-fs-btn i');
+        if (ic) ic.className = 'ti ti-arrows-maximize';
+      });
+    }
+    // Resize all Chart.js instances so they fill their new container
+    if (window.Chart) {
+      setTimeout(function () {
+        Object.values(Chart.instances || {}).forEach(function (ch) {
+          try { ch.resize(); } catch (_) {}
+        });
+      }, 80);
+    }
+  });
+})();
+</script>
+
 </body>
 </html>

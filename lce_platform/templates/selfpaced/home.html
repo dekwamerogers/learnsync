@@ -114,7 +114,6 @@
     <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #4338ca;">
       <div style="font-size:26px;font-weight:700;color:#4338ca;line-height:1;">{{ health_counts.dormant }}</div>
       <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Dormant</div>
-      {% if deltas %}<div style="margin-top:4px;">{% include "selfpaced/_delta.html" with val=deltas.dormant positive_is_good=False %}</div>{% endif %}
     </div>
   </a>
 
@@ -122,7 +121,6 @@
     <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #b45309;">
       <div style="font-size:26px;font-weight:700;color:#b45309;line-height:1;">{{ health_counts.at_risk }}</div>
       <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">At Risk</div>
-      {% if deltas %}<div style="margin-top:4px;">{% include "selfpaced/_delta.html" with val=deltas.at_risk positive_is_good=False %}</div>{% endif %}
     </div>
   </a>
 
@@ -130,7 +128,6 @@
     <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #15803d;">
       <div style="font-size:26px;font-weight:700;color:#15803d;line-height:1;">{{ health_counts.active }}</div>
       <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Active</div>
-      {% if deltas %}<div style="margin-top:4px;">{% include "selfpaced/_delta.html" with val=deltas.active positive_is_good=True %}</div>{% endif %}
     </div>
   </a>
 
@@ -138,7 +135,6 @@
     <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #1d4ed8;">
       <div style="font-size:26px;font-weight:700;color:#1d4ed8;line-height:1;">{{ certified_learner_count }}</div>
       <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Graduated</div>
-      {% if deltas %}<div style="margin-top:4px;">{% include "selfpaced/_delta.html" with val=deltas.graduated positive_is_good=True %}</div>{% endif %}
     </div>
   </a>
 
@@ -167,7 +163,6 @@
         </div>
         <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px;">
           <div style="font-size:28px;font-weight:700;color:#111827;line-height:1;">{{ total_learners }}</div>
-          {% if deltas %}{% include "selfpaced/_delta.html" with val=deltas.total_learners positive_is_good=True %}{% endif %}
         </div>
         <div style="font-size:10px;color:#9ca3af;margin-top:4px;">In eHub activity data</div>
         {% if enrolled_not_reached %}
@@ -186,7 +181,6 @@
         </div>
         <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px;">
           <div style="font-size:28px;font-weight:700;color:#111827;line-height:1;">{{ enrolment_counts.total }}</div>
-          {% if deltas %}{% include "selfpaced/_delta.html" with val=deltas.total_enrolments positive_is_good=True %}{% endif %}
         </div>
         {% if upcoming_enrolment_count %}
         <div style="font-size:10px;color:#9ca3af;margin-top:2px;">+ {{ upcoming_enrolment_count }} upcoming</div>
@@ -261,7 +255,6 @@
     <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Graduation Rate</div>
     <div style="display:flex;align-items:baseline;gap:10px;margin-top:4px;">
       <div style="font-size:32px;font-weight:700;color:#1d4ed8;line-height:1;">{% if grad_rate is not None %}{{ grad_rate }}%{% else %}—{% endif %}</div>
-      {% if deltas and grad_rate is not None %}{% include "selfpaced/_delta.html" with val=deltas.grad_rate positive_is_good=True suffix="pp" %}{% endif %}
     </div>
     <div style="font-size:11px;color:#9ca3af;margin-top:8px;">Of activated learners who have graduated</div>
   </div>
@@ -273,12 +266,10 @@
     </div>
     <div style="display:flex;align-items:baseline;gap:10px;margin-top:4px;">
       <div style="font-size:32px;font-weight:700;color:#1d4ed8;line-height:1;">{{ certificates_count }}</div>
-      {% if deltas %}{% include "selfpaced/_delta.html" with val=deltas.certs positive_is_good=True %}{% endif %}
     </div>
     <div style="font-size:11px;color:#9ca3af;margin-top:8px;">Programme graduations</div>
     <div style="margin-top:8px;padding-top:8px;border-top:1px solid #f3f4f6;display:flex;align-items:baseline;gap:8px;">
-      <span style="font-size:18px;font-weight:700;color:#7c3aed;">{{ badges_count }}</span>  {# violet = badges #}
-      {% if deltas %}{% include "selfpaced/_delta.html" with val=deltas.badges positive_is_good=True %}{% endif %}
+      <span style="font-size:18px;font-weight:700;color:#7c3aed;">{{ badges_count }}</span>
       <span style="font-size:10px;color:#9ca3af;">course badges</span>
     </div>
   </div>

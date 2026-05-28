@@ -20,7 +20,6 @@
     {% with d=prog_deltas|get_item:programme.pk %}
     <td style="font-weight:600;color:#111827;">
       {{ programme.total_enrolments }}
-      {% if d %}{% include "selfpaced/_delta.html" with val=d.total positive_is_good=True %}{% endif %}
     </td>
 
     {% with mix=prog_mix|get_item:programme.pk %}
@@ -40,22 +39,18 @@
     {# ── Enrolment-health columns (default view) ── #}
     <td class="col-enrolment">
       {% if programme.active_count %}<span style="color:#16a34a;font-weight:600;">{{ programme.active_count }}</span>{% else %}<span style="color:#9ca3af;">0</span>{% endif %}
-      {% if d %}{% include "selfpaced/_delta.html" with val=d.active positive_is_good=True %}{% endif %}
     </td>
     <td class="col-enrolment">
       {% if programme.at_risk_count %}<span style="color:#d97706;font-weight:600;">{{ programme.at_risk_count }}</span>{% else %}<span style="color:#9ca3af;">0</span>{% endif %}
-      {% if d %}{% include "selfpaced/_delta.html" with val=d.at_risk positive_is_good=False %}{% endif %}
     </td>
     <td class="col-enrolment">
       {% if programme.dormant_count %}<span style="color:#7c3aed;font-weight:600;">{{ programme.dormant_count }}</span>{% else %}<span style="color:#9ca3af;">0</span>{% endif %}
-      {% if d %}{% include "selfpaced/_delta.html" with val=d.dormant positive_is_good=False %}{% endif %}
     </td>
     <td class="col-enrolment">
       {% if programme.not_yet_started_count %}<span style="color:#6b7280;font-weight:600;">{{ programme.not_yet_started_count }}</span>{% else %}<span style="color:#9ca3af;">0</span>{% endif %}
     </td>
     <td class="col-enrolment">
       {% if programme.graduated_count %}<span style="color:#2563eb;font-weight:600;">{{ programme.graduated_count }}</span>{% else %}<span style="color:#9ca3af;">0</span>{% endif %}
-      {% if d %}{% include "selfpaced/_delta.html" with val=d.graduated positive_is_good=True %}{% endif %}
     </td>
     {% endwith %}
 
