@@ -254,12 +254,12 @@ class ProgrammeIdentifierRegistry(models.Model):
 # ---------------------------------------------------------------------------
 
 THRESHOLD_DEFAULTS = {
-    'activation_threshold_days': 3,
-    'inactivity_threshold_days': 7,
-    'dormancy_threshold_days': 14,
-    'stuck_assignment_threshold_days': 5,
-    'pass_rate_threshold_pct': 70,
-    'inter_course_threshold_days': 5,
+    'activation_threshold_days': 14,
+    'inactivity_threshold_days': 14,
+    'dormancy_threshold_days': 21,
+    'stuck_assignment_threshold_days': 14,
+    'pass_rate_threshold_pct': 50,
+    'inter_course_threshold_days': 14,
     'upload_warning_threshold_days': 7,
     'pod_auto_assign_threshold_days': 14,
     'pod_behind_threshold_pct': 20,

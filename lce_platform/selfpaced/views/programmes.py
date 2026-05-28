@@ -182,10 +182,13 @@ def programme_list_stats(request):
             is_graduated=True,
         ).values_list('learner_id', flat=True)
     )
+    # NOTE: must use the same payment filter as health_by_prog so that
+    # onboarded_count is always a subset of total_enrolments.
     _prog_learner_ids: dict = defaultdict(set)
     for learner_id, prog_id in (
         Enrolment.objects
         .filter(programme_id__in=prog_pks, has_activity_data=True)
+        .exclude(learner__payment_status='unknown')
         .values_list('learner_id', 'programme_id')
     ):
         _prog_learner_ids[prog_id].add(learner_id)

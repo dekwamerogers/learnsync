@@ -244,11 +244,21 @@ def compute_enrolment_health(
     # FSOL: use explicit date, then activity dates, then any submission/pass evidence.
     # Prerequisite programme CSVs often omit date columns — the evidence fallback prevents
     # learners with passed assignments from showing as "Not Started".
+    #
+    # Also treat CourseEnrolment.is_passed=True as FSOL evidence.
+    # This covers cases where a batch import sets CourseEnrolment.is_passed without
+    # creating AssignmentProgress records — e.g. the enrolment CSV marks a learner as
+    # having passed a course, but the activity CSV hasn't been uploaded yet for that
+    # programme. Without this check, the health engine sees no AssignmentProgress and
+    # classifies the learner as "Not Started" even though they've completed a course.
     effective_fsol = enrolment.first_sign_of_life_date or last_activity
     has_activity_evidence = any(
         p.is_accessed or p.is_submitted or p.is_passed for p in all_progress
     )
-    has_fsol = bool(effective_fsol) or has_activity_evidence
+    has_ce_completion = any(
+        ce.status == 'completed' or ce.is_passed for ce in course_enrolments
+    )
+    has_fsol = bool(effective_fsol) or has_activity_evidence or has_ce_completion
     days_since_fsol = (upload_date - effective_fsol).days if effective_fsol else None
 
     active_flags = []
