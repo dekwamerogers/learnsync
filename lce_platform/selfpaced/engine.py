@@ -315,16 +315,16 @@ def _execute(job, content: bytes) -> None:
     #     Use first non-blank course name seen for that eHub as the hint.
     #     Uses all_parsed so new courses/programmes from unmonitored-country
     #     rows are still detected and created.
+    #     bulk_detect replaces per-name detect_programme_and_course calls,
+    #     reducing N*5 DB queries to ~5 total queries.
     ehub_course_hint: dict[str, str] = {}
     for r in all_parsed:
         ehub = r['ehub_class_name']
         if ehub and ehub not in ehub_course_hint:
             ehub_course_hint[ehub] = _clean_course_name(r['course_name'] or '')
 
-    ehub_resolution: dict[str, tuple] = {}   # ehub -> (programme, course | None)
-    for ehub, hint in ehub_course_hint.items():
-        prog, course = detect_programme_and_course(ehub, hint)
-        ehub_resolution[ehub] = (prog, course)
+    from selfpaced.detector import bulk_detect as _bulk_detect
+    ehub_resolution: dict[str, tuple] = _bulk_detect(ehub_course_hint)
 
     # Load course overrides set by the admin on the review screen.
     # Format: {'PROG_CODE|seq': target_course_pk, ...}
@@ -1277,16 +1277,15 @@ def preview_ingestion(job_id: int) -> dict:
             cross_enrolled.setdefault(name, set()).add(r['email'])
 
     # Detect once per unique eHub class name (may auto-create Programmes).
+    # bulk_detect resolves all class names with ~5 queries instead of N*5.
     ehub_course_hint: dict[str, str] = {}
     for r in parsed:
         ehub = r['ehub_class_name']
         if ehub and ehub not in ehub_course_hint:
             ehub_course_hint[ehub] = _clean_course_name(r['course_name'] or '')
 
-    ehub_resolution: dict[str, tuple] = {}
-    for ehub, hint in ehub_course_hint.items():
-        prog, course = detect_programme_and_course(ehub, hint)
-        ehub_resolution[ehub] = (prog, course)
+    from selfpaced.detector import bulk_detect as _bulk_detect
+    ehub_resolution: dict[str, tuple] = _bulk_detect(ehub_course_hint)
 
     # Collect needed (prog, seq) → name and count rows per programme.
     needed: dict[tuple, str] = {}     # (prog_pk, seq) -> name
@@ -1686,7 +1685,9 @@ def recompute_health(
 ) -> dict:
     """
     Recompute health flags for all (or a filtered subset of) enrolments using
-    today's date and current threshold configuration.
+    the most recent upload's data_as_of_date as the reference point — the same
+    anchor the original ingestion used.  Falls back to date.today() only when
+    no completed job exists or none has a data_as_of_date set.
 
     Filters (mutually exclusive, programme_code takes priority):
       programme_code — recompute only enrolments in this programme
@@ -1694,17 +1695,33 @@ def recompute_health(
 
     Returns a summary dict: {'updated': int, 'errors': int, 'error_detail': list}.
     """
-    from selfpaced.models import AssignmentProgress, Course, CourseEnrolment, Enrolment, EnrolmentSnapshot, FlagCode, Learner, PaymentStatus, ProgrammeThreshold
+    from selfpaced.models import AssignmentProgress, Course, CourseEnrolment, Enrolment, EnrolmentSnapshot, FlagCode, IngestionJob, Learner, PaymentStatus, ProgrammeThreshold
 
     _rc_payment_issue_statuses = {PaymentStatus.DUE_SOON, PaymentStatus.GRACE_PERIOD, PaymentStatus.OVERDUE}
-    today = date.today()
+
+    # Use the most recent completed job's data_as_of_date as the reference so
+    # "days since last activity" is anchored to the same point as ingestion.
+    # Using date.today() would make every learner dormant/at-risk whenever the
+    # recompute runs days or weeks after the last upload.
+    _last_job = (
+        IngestionJob.objects
+        .filter(status='complete')
+        .order_by('-uploaded_at')
+        .values('data_as_of_date', 'uploaded_at')
+        .first()
+    )
+    if _last_job and _last_job['data_as_of_date']:
+        today = _last_job['data_as_of_date']
+    elif _last_job and _last_job['uploaded_at']:
+        today = _last_job['uploaded_at'].date()
+    else:
+        today = date.today()
 
     _recompute_state['running'] = True
     _recompute_state['total'] = 0
     _recompute_state['done'] = 0
     _recompute_state['errors'] = 0
-    if not _recompute_state.get('started_at'):
-        _recompute_state['started_at'] = datetime.now().strftime('%H:%M:%S')
+    _recompute_state['started_at'] = datetime.now().strftime('%H:%M:%S')
     _recompute_state['finished_at'] = None
 
     qs = Enrolment.objects.select_related('learner', 'programme').all()
@@ -1726,7 +1743,7 @@ def recompute_health(
     if _rc_propagated:
         logger.info('recompute_health: propagated %d shared-module credit(s)', _rc_propagated)
 
-    ces_qs = CourseEnrolment.objects.filter(enrolment__in=enrolments).select_related('course')
+    ces_qs = CourseEnrolment.objects.filter(enrolment__in=enrolments).select_related('course', 'enrolment')
     ces_by_enrolment: dict = defaultdict(list)
     for ce in ces_qs:
         ces_by_enrolment[ce.enrolment_id].append(ce)
@@ -1766,6 +1783,13 @@ def recompute_health(
             Learner.objects.filter(email__in=_chunk).values_list('email', 'payment_status')
         )
 
+    # Pre-build learner → active enrolment PKs map to avoid N+1 queries in
+    # flag_stalled_progression (same pattern used in the ingestion path).
+    learner_active_enrolment_pks: dict = defaultdict(set)
+    for ce in ces_qs:
+        if ce.status in ('in_progress', 'completed'):
+            learner_active_enrolment_pks[ce.enrolment.learner_id].add(ce.enrolment_id)
+
     for i, enrolment in enumerate(enrolments):
         _recompute_state['done'] = i + 1
         ces = ces_by_enrolment.get(enrolment.pk, [])
@@ -1781,6 +1805,7 @@ def recompute_health(
                 prefetched_all_progress=aps,
                 prefetched_threshold=threshold_cache[enrolment.programme_id],
                 programme_course_count=prog_course_counts.get(enrolment.programme_id),
+                learner_active_enrolment_pks=learner_active_enrolment_pks,
             )
             if (learner_payment.get(enrolment.learner_id) in _rc_payment_issue_statuses
                     and FlagCode.PAYMENT_ISSUE not in active_flags):

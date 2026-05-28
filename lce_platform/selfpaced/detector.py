@@ -136,3 +136,167 @@ def detect_programme_and_course(ehub_class_name: str, course_name: str):
         ehub_class_name, course_name,
     )
     return None, None
+
+
+def bulk_detect(ehub_course_hints: dict[str, str]) -> dict[str, tuple]:
+    """
+    Batch-resolve a {ehub_class_name: course_name_hint} dict to
+    {ehub_class_name: (Programme, Course | None)}.
+
+    Uses 4 bulk queries instead of up to 5 per class name, so it scales
+    to large CSVs without N+1 slowdowns:
+      1. Bulk registry lookup for all ehub_class_names
+      2. Bulk Programme lookup for unmatched codes
+      3. Bulk Course lookup for resolved (programme_id, seq) pairs
+      4. Bulk registry insert for newly-matched pairs
+      5. Full registry scan for course_name_prefix entries (once only)
+
+    Auto-creates Programme records for brand-new programme codes (same as
+    detect_programme_and_course does one-by-one).
+    """
+    from selfpaced.models import Course, Programme, ProgrammeIdentifierRegistry
+
+    if not ehub_course_hints:
+        return {}
+
+    results: dict[str, tuple] = {}
+    unresolved: set[str] = set(ehub_course_hints.keys())
+
+    # ── Step 1: bulk exact registry match ───────────────────────────────
+    registry_map: dict[str, tuple] = {
+        entry.raw_pattern: (entry.programme, entry.course)
+        for entry in ProgrammeIdentifierRegistry.objects.filter(
+            pattern_type='ehub_class_name',
+            raw_pattern__in=unresolved,
+        ).select_related('programme', 'course')
+    }
+    for ehub, pair in registry_map.items():
+        results[ehub] = pair
+    unresolved -= set(registry_map.keys())
+
+    if not unresolved:
+        return results
+
+    # ── Step 2: parse unresolved → programme codes and bulk-fetch Programmes ─
+    # Format A: PROGRAMME_CODE-SEQ_anything
+    # Format B: PROGRAMME_CODE_anything
+    parsed_codes: dict[str, tuple] = {}   # ehub -> (code, seq | None)
+    for ehub in unresolved:
+        m_a = _EHUB_PATTERN.match(ehub.strip())
+        if m_a:
+            parsed_codes[ehub] = (m_a.group(1).upper(), int(m_a.group(2)))
+            continue
+        m_b = _EHUB_PREFIX_PATTERN.match(ehub.strip())
+        if m_b:
+            parsed_codes[ehub] = (m_b.group(1).upper(), None)
+
+    # All codes are already upper-cased from the regex parse above.
+    # prog_by_code keys are normalised to uppercase throughout.
+    needed_codes = {code for code, _ in parsed_codes.values()}
+    prog_by_code: dict[str, object] = {}  # uppercase code -> Programme
+    if needed_codes:
+        # Primary lookup by Programme.code (case-sensitive — codes are stored uppercase)
+        for p in Programme.objects.filter(code__in=needed_codes):
+            prog_by_code[p.code.upper()] = p
+        # Fallback 1: case-insensitive code lookup (handles 'AiCE' → 'AICE' etc.)
+        missing = needed_codes - set(prog_by_code.keys())
+        if missing:
+            for p in Programme.objects.filter(
+                code__iregex=r'^(' + '|'.join(re.escape(c) for c in missing) + r')$'
+            ):
+                prog_by_code[p.code.upper()] = p
+        # Fallback 2: match against Programme.ehub_code column
+        still_missing = needed_codes - set(prog_by_code.keys())
+        if still_missing:
+            for p in Programme.objects.filter(
+                ehub_code__iregex=r'^(' + '|'.join(re.escape(c) for c in still_missing) + r')$'
+            ):
+                # Store under the CSV code so lookups below find the right key.
+                for csv_code in still_missing:
+                    if p.ehub_code and p.ehub_code.upper() == csv_code:
+                        prog_by_code[csv_code] = p
+
+    # Auto-create programmes for brand-new codes (code not in DB at all)
+    for ehub, (code, seq) in parsed_codes.items():
+        if code not in prog_by_code:
+            prog = Programme.objects.create(
+                code=code, name=code, is_active=True,
+            )
+            prog_by_code[code] = prog
+            logger.info('Auto-created Programme %s from eHub class name %r', code, ehub)
+
+    # ── Step 3: bulk Course lookup for Format-A entries ─────────────────
+    format_a: dict[str, tuple] = {
+        ehub: (parsed_codes[ehub][0], parsed_codes[ehub][1])
+        for ehub in unresolved
+        if ehub in parsed_codes and parsed_codes[ehub][1] is not None
+    }
+    if format_a:
+        pairs = {
+            (prog_by_code[code].pk, seq)
+            for code, seq in format_a.values()
+            if code in prog_by_code
+        }
+        course_map: dict[tuple, object] = {
+            (c.programme_id, c.sequence_number): c
+            for c in Course.objects.filter(
+                programme_id__in={p for p, _ in pairs},
+                sequence_number__in={s for _, s in pairs},
+                is_active=True,
+            )
+        }
+    else:
+        course_map = {}
+
+    # ── Step 4: assign Format-A and Format-B results; queue registry inserts ─
+    to_register: list = []
+    for ehub in list(unresolved):
+        if ehub not in parsed_codes:
+            continue
+        code, seq = parsed_codes[ehub]
+        prog = prog_by_code.get(code)
+        if prog is None:
+            continue
+        if seq is not None:
+            # Format A
+            course = course_map.get((prog.pk, seq))
+            results[ehub] = (prog, course)
+            if course:
+                to_register.append(ProgrammeIdentifierRegistry(
+                    raw_pattern=ehub.strip(),
+                    pattern_type='ehub_class_name',
+                    programme=prog,
+                    course=course,
+                ))
+        else:
+            # Format B — caller resolves course via sequence column
+            results[ehub] = (prog, None)
+        unresolved.discard(ehub)
+
+    # Bulk-register newly matched Format-A pairs (ignore duplicates)
+    if to_register:
+        ProgrammeIdentifierRegistry.objects.bulk_create(
+            to_register, ignore_conflicts=True, batch_size=500,
+        )
+
+    # ── Step 5: course-name prefix lookup for anything still unresolved ──
+    if unresolved:
+        prefix_entries = list(
+            ProgrammeIdentifierRegistry.objects.filter(
+                pattern_type='course_name_prefix'
+            ).select_related('programme', 'course')
+        )
+        for ehub in list(unresolved):
+            hint = ehub_course_hints.get(ehub, '')
+            for entry in prefix_entries:
+                if hint.startswith(entry.raw_pattern):
+                    results[ehub] = (entry.programme, entry.course)
+                    unresolved.discard(ehub)
+                    break
+
+    # Anything still unresolved → (None, None)
+    for ehub in unresolved:
+        logger.debug('No match for eHub class name %r', ehub)
+        results[ehub] = (None, None)
+
+    return results
