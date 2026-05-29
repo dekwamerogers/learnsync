@@ -54,6 +54,9 @@
   <div class="h-toc sp-card" style="padding:12px;">
     <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.06em;padding:4px 12px 8px;">Contents</div>
     <ul class="h-toc-list">
+      <li class="h-toc-group">New users</li>
+      <li><a href="#quick-start">Quick start guide</a></li>
+
       <li class="h-toc-group">Getting started</li>
       <li><a href="#setup-order">Recommended setup order</a></li>
       <li><a href="#workflow">Activity CSV workflow</a></li>
@@ -86,6 +89,8 @@
 
       <li class="h-toc-group">Workflows</li>
       <li><a href="#learner-lookup">Finding a learner</a></li>
+      <li><a href="#filtering">Filter bar reference</a></li>
+      <li><a href="#filter-advanced">Advanced filter techniques</a></li>
       <li><a href="#interventions">Logging interventions</a></li>
       <li><a href="#pods">Managing pods</a></li>
       <li><a href="#manager-report">Manager report</a></li>
@@ -99,6 +104,44 @@
 
   <!-- ── Main content ─────────────────────────────────────── -->
   <div>
+
+    <!-- ══════════════════════════════════════════════════════
+         QUICK START
+    ══════════════════════════════════════════════════════ -->
+    <div class="h-section" id="quick-start" style="scroll-margin-top:72px;margin-bottom:28px;">
+      <div id="qs-banner" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:18px 20px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+          <div style="display:flex;align-items:flex-start;gap:14px;">
+            <div style="width:36px;height:36px;border-radius:8px;background:#0452F0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="ti ti-rocket" style="font-size:18px;color:#fff;"></i>
+            </div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#1e3a8a;margin-bottom:8px;">New to LearnSync? Follow these 5 steps.</div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <a href="#setup-order"    style="font-size:12px;background:#fff;border:1px solid #bfdbfe;border-radius:6px;padding:5px 12px;color:#1d4ed8;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:5px;"><span style="background:#0452F0;color:#fff;border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;">1</span> Setup order</a>
+                <a href="#workflow"       style="font-size:12px;background:#fff;border:1px solid #bfdbfe;border-radius:6px;padding:5px 12px;color:#1d4ed8;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:5px;"><span style="background:#0452F0;color:#fff;border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;">2</span> Upload your first CSV</a>
+                <a href="#health-status"  style="font-size:12px;background:#fff;border:1px solid #bfdbfe;border-radius:6px;padding:5px 12px;color:#1d4ed8;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:5px;"><span style="background:#0452F0;color:#fff;border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;">3</span> Understand health statuses</a>
+                <a href="#filtering"      style="font-size:12px;background:#fff;border:1px solid #bfdbfe;border-radius:6px;padding:5px 12px;color:#1d4ed8;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:5px;"><span style="background:#0452F0;color:#fff;border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;">4</span> Filter learners</a>
+                <a href="#interventions"  style="font-size:12px;background:#fff;border:1px solid #bfdbfe;border-radius:6px;padding:5px 12px;color:#1d4ed8;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:5px;"><span style="background:#0452F0;color:#fff;border-radius:3px;padding:0 5px;font-size:10px;font-weight:700;">5</span> Log interventions</a>
+              </div>
+              <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:6px;max-width:560px;">
+                <div style="font-size:11px;color:#3b82f6;background:#dbeafe;border-radius:6px;padding:6px 10px;line-height:1.5;">
+                  <strong style="color:#1e40af;">Daily routine:</strong> Upload a fresh Activity CSV each morning, check the At Risk &amp; Dormant tiles, work through Follow-ups Due.
+                </div>
+                <div style="font-size:11px;color:#3b82f6;background:#dbeafe;border-radius:6px;padding:6px 10px;line-height:1.5;">
+                  <strong style="color:#1e40af;">Key shortcut:</strong> Click any coloured number on the dashboard to jump straight to that filtered learner list.
+                </div>
+              </div>
+            </div>
+          </div>
+          <button onclick="document.getElementById('qs-banner').style.display='none';localStorage.setItem('qs_help_dismissed','1');"
+                  style="background:none;border:none;cursor:pointer;color:#93c5fd;font-size:18px;flex-shrink:0;padding:0;line-height:1;" title="Dismiss">
+            <i class="ti ti-x"></i>
+          </button>
+        </div>
+      </div>
+      <script>if(localStorage.getItem('qs_help_dismissed')==='1'){var _qsb=document.getElementById('qs-banner');if(_qsb)_qsb.style.display='none';}</script>
+    </div>
 
     <!-- ══════════════════════════════════════════════════════
          SETUP ORDER
@@ -890,6 +933,203 @@ courses_behind    = min(raw_behind, courses_not_started)</div>
           <li><strong>Snapshot trend:</strong> health history across uploads — see if the learner is improving or declining over time</li>
           <li><strong>Intervention history:</strong> every contact ever logged for this learner, most recent first</li>
         </ul>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         FILTERING
+    ══════════════════════════════════════════════════════ -->
+    <div class="h-section" id="filtering">
+      <h2><i class="ti ti-filter"></i> Filter Bar Reference</h2>
+      <p class="h-lead">The Learner List filter bar lets you combine multiple filters to drill into exactly the group you need. All filters use AND logic — a learner must match every active filter to appear in the results. The URL updates with your filter state so you can copy and share it.</p>
+
+      <div class="h-card">
+        <h3>How filtering works</h3>
+        <ul>
+          <li><strong>AND logic:</strong> selecting Programme = AICE AND Health = Dormant shows only learners enrolled in AICE <em>and</em> currently Dormant.</li>
+          <li><strong>Multi-select within one filter:</strong> selecting Programme = AICE and Programme = CC shows learners in AICE <em>or</em> CC (OR within a single filter, AND between different filters).</li>
+          <li><strong>URL sharing:</strong> the URL updates as you filter. Copy and paste it to hand off the exact same view to a colleague.</li>
+          <li><strong>Clearing:</strong> click the active (blue-highlighted) button again to deselect, or use the "Clear" link that appears when any filter is active.</li>
+          <li><strong>Combining Course + Course Status:</strong> these two always work as a pair — selecting a course without a status shows all learners who have touched that course (any status). Adding a status narrows to learners at that stage specifically.</li>
+        </ul>
+
+        <div class="h-callout tip">
+          <strong>Tip:</strong> Filters set from other pages (e.g. clicking a health count on the Programme Detail page, or a cohort bar on the Analytics page) arrive as pre-filled filter state — you'll land on the learner list already filtered. You can then add more filters on top.
+        </div>
+      </div>
+
+      <div class="h-card">
+        <h3>Search bar (top of filter row)</h3>
+        <p>Full-text search on <strong>name</strong> (first or last) and <strong>email</strong>. Minimum 2 characters. Combines with all other filters — search for "John" within AICE learners who are Dormant.</p>
+      </div>
+
+      <div class="h-two-col">
+        <div class="h-card">
+          <h3><i class="ti ti-list" style="color:#0452F0;"></i> Programme</h3>
+          <p>Shows learners enrolled in the selected programme(s). Multi-select — select more than one to see learners from any of those programmes combined.</p>
+          <p><strong>Note:</strong> prerequisite programmes (e.g. WALX) are not listed here — they are tracked separately via the Onboarded/Onboarding badges.</p>
+        </div>
+        <div class="h-card">
+          <h3><i class="ti ti-heartbeat" style="color:#0452F0;"></i> Health</h3>
+          <p>Filters by the learner's <strong>overall health status</strong> — the rollup across all their enrolments using active-wins logic. A learner Active in AICE and Dormant in CC shows as <strong>Active</strong> overall.</p>
+          <p>The <strong>Onboarded</strong> option is a pseudo-status — it shows learners who have graduated from a prerequisite programme (completed onboarding).</p>
+          <div class="h-callout tip">
+            <strong>Programme-specific health:</strong> To find learners who are Dormant <em>in a specific programme</em> (not just overall), click the health count numbers on the Programme Detail page. Those links use the <strong>Enrolment Health</strong> filter rather than the overall health rollup — so a learner who is Dormant in AICE but Active in CC will correctly appear. See the <a href="#filter-advanced" style="color:#14532d;font-weight:600;">Advanced filter techniques</a> section for details.
+          </div>
+        </div>
+        <div class="h-card">
+          <h3><i class="ti ti-credit-card" style="color:#0452F0;"></i> Payment</h3>
+          <p>Filters by the learner's payment status: Compliant, Due Soon, Grace Period, Overdue, or Unknown.</p>
+          <p><strong>Unknown (Unpaid)</strong> learners are hidden from all views by default. Use this filter to explicitly include or view them.</p>
+        </div>
+        <div class="h-card">
+          <h3><i class="ti ti-map-pin" style="color:#0452F0;"></i> Country</h3>
+          <p>Filters by country of residence. Only countries actually in the data appear in this list. Use the search box inside the dropdown to find a specific country quickly.</p>
+        </div>
+        <div class="h-card">
+          <h3><i class="ti ti-book" style="color:#0452F0;"></i> Course / Module</h3>
+          <p>Shows learners who have any Course Enrolment record for the selected course(s). By default this includes learners at any stage (Not Started, In Progress, Completed).</p>
+          <p><strong>Always pair with Course Status</strong> if you want a specific stage — for example, "learners who <em>completed</em> VA-6" requires both Course = VA-6 and Course Status = Completed.</p>
+          <div class="h-example"><strong>Example:</strong> Course = AICE-3 + Course Status = In Progress → learners currently working on AICE Course 3.</div>
+        </div>
+        <div class="h-card">
+          <h3><i class="ti ti-list-check" style="color:#0452F0;"></i> Course Status</h3>
+          <p>Used <em>with</em> Course to narrow by stage: In Progress, Completed, Not Started, or Withdrawn.</p>
+          <p>If used without a Course filter, it shows learners who have any course enrolment at that status — regardless of which course or programme.</p>
+          <div class="h-example"><strong>Example:</strong> Course Status = Completed (no course selected) → all learners who have completed at least one course anywhere.</div>
+        </div>
+        <div class="h-card">
+          <h3><i class="ti ti-clipboard-list" style="color:#0452F0;"></i> Assignment</h3>
+          <p>Shows learners who have an Assignment Progress record for the selected assignment(s). Useful for "who has/hasn't submitted Assignment 3 in Course 2 of AICE?"</p>
+        </div>
+        <div class="h-card">
+          <h3><i class="ti ti-award" style="color:#0452F0;"></i> Graduation</h3>
+          <p>Two options:</p>
+          <ul>
+            <li><strong>Has a badge</strong> — completed at least one course in a credential programme.</li>
+            <li><strong>Has a certificate</strong> — fully graduated from a credential programme (is_graduated = True).</li>
+          </ul>
+        </div>
+        <div class="h-card">
+          <h3><i class="ti ti-flag" style="color:#0452F0;"></i> At-risk Flag</h3>
+          <p>Shows learners who currently have at least one of the selected flags active on <em>any</em> enrolment. Multi-select — selecting two flags shows learners with flag A OR flag B.</p>
+          <p>Combine with Programme to see flag carriers in a specific programme only.</p>
+          <div class="h-example"><strong>Example:</strong> Flag = Inactive + Programme = AICE → AICE learners currently flagged as Inactive.</div>
+        </div>
+        <div class="h-card">
+          <h3><i class="ti ti-calendar" style="color:#0452F0;"></i> Enrolled Since</h3>
+          <p>Quick-select for recency: Last 7 days, 30 days, 90 days, or 12 months. Filters by <strong>enrolment date</strong> (not FSOL or effective date).</p>
+          <p>For a precise date range, use the analytics page date range picker and click the cohort bars to drill into a specific week.</p>
+        </div>
+        <div class="h-card">
+          <h3><i class="ti ti-users" style="color:#0452F0;"></i> Multi-programme</h3>
+          <p>Shows only learners enrolled in <strong>2 or more</strong> non-prerequisite programmes simultaneously. Useful for identifying learners who are "juggling" multiple programmes and may need extra support.</p>
+        </div>
+        <div class="h-card">
+          <h3><i class="ti ti-bell" style="color:#0452F0;"></i> Follow-up Due</h3>
+          <p>Shows learners where you previously logged an intervention with "Follow-up required" checked and the follow-up date is today or earlier (and not yet actioned). This mirrors the Follow-ups Due tile on the home dashboard.</p>
+        </div>
+        <div class="h-card">
+          <h3><i class="ti ti-calendar-event" style="color:#0452F0;"></i> Enrolment Date Range</h3>
+          <p>A precise date range picker (From / To) with an optional date basis selector. More targeted than "Enrolled Since" — lets you filter to any exact date window.</p>
+          <h4>Date basis options</h4>
+          <ul>
+            <li><strong>Effective start</strong> (default) — MAX(enrolment_date, programme.start_date). Best for cohort analysis since it excludes days before the programme launched. This is the same date used in the Analytics cohort charts.</li>
+            <li><strong>Enrolment date</strong> — the raw date from the Enrolment CSV. Use when you want to match dates the learner sees in the source system.</li>
+            <li><strong>First activity (FSOL)</strong> — when the learner first accessed or submitted any content. Use this to filter learners by actual engagement start, regardless of when they enrolled.</li>
+          </ul>
+          <div class="h-example"><strong>Example:</strong> Learners who first became active during March: Date basis = First activity · From = 1 Mar · To = 31 Mar</div>
+        </div>
+      </div>
+
+      <div class="h-card">
+        <h3>Filtering recipes for common tasks</h3>
+        <div class="h-metric-row">
+          <span class="h-metric-name">Who completed VA-6?</span>
+          <span class="h-metric-def">Programme = VA · Course = VA-6 · Course Status = Completed</span>
+        </div>
+        <div class="h-metric-row">
+          <span class="h-metric-name">Dormant AICE learners in Nigeria</span>
+          <span class="h-metric-def">Programme = AICE · Health = Dormant · Country = Nigeria</span>
+        </div>
+        <div class="h-metric-row">
+          <span class="h-metric-name">Learners stuck on a specific assignment</span>
+          <span class="h-metric-def">Flag = Stuck on Assignment · Assignment = [assignment name]</span>
+        </div>
+        <div class="h-metric-row">
+          <span class="h-metric-name">New learners this month who haven't activated</span>
+          <span class="h-metric-def">Health = Not Started · Enrolled Since = Last 30 days</span>
+        </div>
+        <div class="h-metric-row">
+          <span class="h-metric-name">All learners with payment problems</span>
+          <span class="h-metric-def">Payment = Due Soon + Grace Period + Overdue</span>
+        </div>
+        <div class="h-metric-row">
+          <span class="h-metric-name">Multi-programme learners who are at risk</span>
+          <span class="h-metric-def">Multi-programme ✓ · Health = At Risk</span>
+        </div>
+        <div class="h-metric-row">
+          <span class="h-metric-name">Who started AICE-3 but hasn't finished it?</span>
+          <span class="h-metric-def">Programme = AICE · Course = AICE-3 · Course Status = In Progress</span>
+        </div>
+        <div class="h-metric-row">
+          <span class="h-metric-name">Learners enrolled in the last 6 months with no follow-up</span>
+          <span class="h-metric-def">Enrolled Since = Last 6 months (or date range) — then review the intervention history on their profiles</span>
+        </div>
+        <div class="h-metric-row">
+          <span class="h-metric-name">Learners who first engaged during a specific month</span>
+          <span class="h-metric-def">Date Range = [month start]–[month end] · Date basis = First activity</span>
+        </div>
+        <div class="h-metric-row">
+          <span class="h-metric-name">At-risk learners with a low pass rate</span>
+          <span class="h-metric-def">Flag = Low Pass Rate · Health = At Risk</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         ADVANCED FILTERING
+    ══════════════════════════════════════════════════════ -->
+    <div class="h-section" id="filter-advanced">
+      <h2><i class="ti ti-filter-cog"></i> Advanced Filter Techniques</h2>
+      <p class="h-lead">Tips for power users: combining filters precisely, using the URL to share exact views, and understanding when to use Enrolment Health instead of overall Health.</p>
+
+      <div class="h-card">
+        <h3>Overall Health vs Enrolment Health — when to use which</h3>
+        <p>There are two ways to filter by health status, and the difference matters when a learner is in multiple programmes:</p>
+        <div class="h-formula">Overall Health (Health filter in the bar):
+  Uses the learner-level rollup. Active wins.
+  A learner Active in AICE + Dormant in CC → shows as ACTIVE.
+
+Enrolment Health (triggered from Programme Detail page links):
+  Checks the health of one specific programme enrolment.
+  That same learner → shows as DORMANT when filtering CC's dormant list.</div>
+        <p><strong>Use overall Health when:</strong> you want to find learners who need attention across your full portfolio, regardless of which programme they're struggling in.</p>
+        <p><strong>Use Enrolment Health when:</strong> you're managing a specific programme and want to see exactly who is Dormant (or At Risk) <em>in that programme</em>, even if they're doing fine elsewhere.</p>
+        <div class="h-callout tip">
+          <strong>Easiest way to use Enrolment Health:</strong> go to a Programme Detail page and click any health count (e.g. "12 Dormant"). The link pre-applies Programme + Enrolment Health so you land on exactly those 12 people. You can then add more filters (Country, Flag, etc.) on top.
+        </div>
+        <div class="h-example"><strong>URL form:</strong> <code>?programme=3&amp;enrolment_health=dormant</code> — learners who are Dormant in programme #3, even if they're Active in another programme.</div>
+      </div>
+
+      <div class="h-card">
+        <h3>Using the URL to share and bookmark views</h3>
+        <p>Every filter you apply updates the URL. This makes it easy to:</p>
+        <ul>
+          <li><strong>Share a filtered view</strong> with a colleague — copy the URL and paste it in Slack/email. They'll land on the exact same view.</li>
+          <li><strong>Bookmark a daily view</strong> — e.g. bookmark <code>?health=at_risk&amp;flag=inactive</code> to open it each morning.</li>
+          <li><strong>Create links in reports</strong> — paste a filtered URL in a Notion doc, spreadsheet, or email to make it one-click to the right list.</li>
+        </ul>
+        <div class="h-callout">The URL encodes all active filters as query parameters. Multi-select filters appear as repeated params: <code>?health=dormant&amp;health=at_risk</code></div>
+      </div>
+
+      <div class="h-card">
+        <h3>Filter logic cheat sheet</h3>
+        <div class="h-metric-row"><span class="h-metric-name">Between two different filters</span><span class="h-metric-def"><strong>AND</strong> — learner must match both. Programme = AICE AND Health = Dormant → only AICE dormant learners.</span></div>
+        <div class="h-metric-row"><span class="h-metric-name">Within one filter (multiple choices)</span><span class="h-metric-def"><strong>OR</strong> — learner matches any. Health = Dormant + At Risk → dormant <em>or</em> at-risk learners.</span></div>
+        <div class="h-metric-row"><span class="h-metric-name">Course + Course Status together</span><span class="h-metric-def">Always pair them — selecting a course without a status shows all learners who ever touched it (any stage). Adding status narrows to that specific stage.</span></div>
+        <div class="h-metric-row"><span class="h-metric-name">Enrolment Date Range + Date Basis</span><span class="h-metric-def">The basis determines which date the range is applied to. Same date window, different basis = different learners.</span></div>
+        <div class="h-metric-row"><span class="h-metric-name">Clearing a single filter</span><span class="h-metric-def">Click the active (blue) filter chip below the bar to remove just that one. Or use "Clear" to reset everything.</span></div>
       </div>
     </div>
 

@@ -18,7 +18,10 @@
 
   <!-- Date basis -->
   <div style="display:flex;flex-direction:column;gap:3px;">
-    <label style="font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;">Date basis</label>
+    <label style="font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:3px;">
+      Date basis
+      <span class="sp-tip tip-down" data-tip="Controls which date assigns a learner to a cohort. Effective: MAX(enrolment, programme start). Enrolment: raw CSV date. First activity: when they first accessed content.">?</span>
+    </label>
     <select name="cohort_type" onchange="document.getElementById('analytics-filter-form').submit()"
             style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;font-family:inherit;background:#fff;color:#374151;cursor:pointer;">
       <option value="effective" {% if cohort_type == 'effective' %}selected{% endif %}>Effective start</option>
@@ -89,7 +92,10 @@
 
   <!-- Health multi-select -->
   <div style="display:flex;flex-direction:column;gap:3px;">
-    <label style="font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;">Health</label>
+    <label style="font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:3px;">
+      Health
+      <span class="sp-tip tip-down" data-tip="Filters to learners currently in these health states. Uses the learner-level rollup — a learner Active in one programme and Dormant in another shows as Active.">?</span>
+    </label>
     <div style="position:relative;">
       <button type="button" onclick="msDrop(this)"
               class="ms-trigger {% if health_filter %}has-selection{% endif %}"

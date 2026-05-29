@@ -86,7 +86,10 @@
       </div>
       <div>
         <div style="font-size:30px;font-weight:700;color:{% if follow_up_count %}#d97706{% else %}#9ca3af{% endif %};line-height:1;">{{ follow_up_count }}</div>
-        <div style="font-size:13px;font-weight:600;color:#374151;margin-top:3px;">Follow-ups Due</div>
+        <div style="font-size:13px;font-weight:600;color:#374151;margin-top:3px;">
+          Follow-ups Due
+          <span class="sp-tip tip-down" data-tip="Interventions where you set a follow-up date of today or earlier and haven't acted yet. Log a new intervention to mark it as actioned.">?</span>
+        </div>
         <div style="font-size:11px;color:#9ca3af;">Interventions requiring action today</div>
       </div>
     </div>
@@ -99,7 +102,10 @@
       </div>
       <div>
         <div style="font-size:30px;font-weight:700;color:#0452F0;line-height:1;">{{ new_this_week_count }}</div>
-        <div style="font-size:13px;font-weight:600;color:#374151;margin-top:3px;">New This Week</div>
+        <div style="font-size:13px;font-weight:600;color:#374151;margin-top:3px;">
+          New This Week
+          <span class="sp-tip tip-down" data-tip="Learners whose enrolment date falls within the last 7 days. Click to see them in the Learner List and send a welcome outreach.">?</span>
+        </div>
         <div style="font-size:11px;color:#9ca3af;">Learners enrolled in the last 7 days</div>
       </div>
     </div>
@@ -113,35 +119,50 @@
   <a href="{% url 'sp_learner_list' %}?health=dormant" style="text-decoration:none;">
     <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #4338ca;">
       <div style="font-size:26px;font-weight:700;color:#4338ca;line-height:1;">{{ health_counts.dormant }}</div>
-      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Dormant</div>
+      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;display:flex;align-items:center;justify-content:center;gap:3px;">
+        Dormant
+        <span class="sp-tip tip-down" data-tip="No activity for 14+ days. These learners have effectively disengaged and need re-engagement outreach. Click to see the full list.">?</span>
+      </div>
     </div>
   </a>
 
   <a href="{% url 'sp_learner_list' %}?health=at_risk" style="text-decoration:none;">
     <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #b45309;">
       <div style="font-size:26px;font-weight:700;color:#b45309;line-height:1;">{{ health_counts.at_risk }}</div>
-      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">At Risk</div>
+      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;display:flex;align-items:center;justify-content:center;gap:3px;">
+        At Risk
+        <span class="sp-tip tip-down" data-tip="One or more flags active (e.g. Inactive, Stuck on Assignment, Low Pass Rate). Still engaged but needs attention. Click to see who and why.">?</span>
+      </div>
     </div>
   </a>
 
   <a href="{% url 'sp_learner_list' %}?health=active" style="text-decoration:none;">
     <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #15803d;">
       <div style="font-size:26px;font-weight:700;color:#15803d;line-height:1;">{{ health_counts.active }}</div>
-      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Active</div>
+      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;display:flex;align-items:center;justify-content:center;gap:3px;">
+        Active
+        <span class="sp-tip tip-down" data-tip="Recently active learners with no concerning flags. Target state — no immediate action needed. Click to browse the list.">?</span>
+      </div>
     </div>
   </a>
 
   <a href="{% url 'sp_learner_list' %}?graduated=certificate" style="text-decoration:none;">
     <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #1d4ed8;">
       <div style="font-size:26px;font-weight:700;color:#1d4ed8;line-height:1;">{{ certified_learner_count }}</div>
-      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Graduated</div>
+      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;display:flex;align-items:center;justify-content:center;gap:3px;">
+        Graduated
+        <span class="sp-tip tip-down" data-tip="Learners who completed all required courses in a programme that awards certificates. Counts unique learners (one person = 1, even if they graduated from two programmes).">?</span>
+      </div>
     </div>
   </a>
 
   <a href="{% url 'sp_learner_list' %}?health=not_yet_started" style="text-decoration:none;">
     <div class="sp-card" style="padding:14px;text-align:center;border-top:3px solid #d1d5db;">
       <div style="font-size:26px;font-weight:700;color:#9ca3af;line-height:1;">{{ health_counts.not_yet_started }}</div>
-      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;">Not Started</div>
+      <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-top:5px;display:flex;align-items:center;justify-content:center;gap:3px;">
+        Not Started
+        <span class="sp-tip tip-down" data-tip="Enrolled but never accessed any content. First-touch outreach is recommended — they've not yet seen what the programme offers.">?</span>
+      </div>
     </div>
   </a>
 
