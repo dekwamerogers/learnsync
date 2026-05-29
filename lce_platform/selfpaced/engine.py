@@ -23,7 +23,7 @@ from django.db.models import Count
 from selfpaced.detector import detect_programme_and_course
 from selfpaced.health import compute_enrolment_health
 from selfpaced.parsing import (
-    load_csv, parse_other_programme_names, row_to_dict, validate_columns,
+    iter_csv, load_csv, parse_other_programme_names, row_to_dict, validate_columns,
 )
 
 logger = logging.getLogger(__name__)
@@ -179,6 +179,118 @@ def _upsert_learners_mariadb(learner_objs, upload_date, batch_size: int = 1000) 
 
 
 # ---------------------------------------------------------------------------
+# Fast Enrolment upsert — MariaDB-native INSERT … ON DUPLICATE KEY UPDATE
+# ---------------------------------------------------------------------------
+
+def _upsert_enrolments_mariadb(rows: list, job_pk: int, batch_size: int = 500):
+    """
+    Upsert Enrolments using a single INSERT … ON DUPLICATE KEY UPDATE per batch.
+
+    Each row is a dict with keys:
+        learner_id, programme_id, first_sign_of_life_date, activation_date,
+        is_graduated, graduation_date, is_graduated_on_savanna
+
+    Guard semantics expressed in SQL:
+        • fsol / activation_date: keep EARLIEST (LEAST with NULL-safety)
+        • is_graduated: once True, stays True (GREATEST)
+        • graduation_date: keep most recent seen
+    """
+    if not rows:
+        return
+    sql = """
+        INSERT INTO selfpaced_enrolment
+            (learner_id, programme_id,
+             first_sign_of_life_date, activation_date,
+             is_graduated, graduation_date, is_graduated_on_savanna,
+             created_by_job_id, has_activity_data,
+             health_status, active_flags, flag_detail)
+        VALUES ({placeholders})
+        ON DUPLICATE KEY UPDATE
+            first_sign_of_life_date = CASE
+                WHEN first_sign_of_life_date IS NULL THEN VALUES(first_sign_of_life_date)
+                WHEN VALUES(first_sign_of_life_date) IS NULL THEN first_sign_of_life_date
+                ELSE LEAST(first_sign_of_life_date, VALUES(first_sign_of_life_date)) END,
+            activation_date = CASE
+                WHEN activation_date IS NULL THEN VALUES(activation_date)
+                WHEN VALUES(activation_date) IS NULL THEN activation_date
+                ELSE LEAST(activation_date, VALUES(activation_date)) END,
+            is_graduated     = GREATEST(is_graduated, VALUES(is_graduated)),
+            graduation_date  = COALESCE(VALUES(graduation_date), graduation_date),
+            is_graduated_on_savanna = GREATEST(is_graduated_on_savanna, VALUES(is_graduated_on_savanna)),
+            has_activity_data = 1
+    """
+    per_row = ', '.join(['%s'] * 12)
+    for chunk in _chunked(rows, batch_size):
+        values_clause = ', '.join(f'({per_row})' for _ in chunk)
+        params = []
+        for r in chunk:
+            params += [
+                r['learner_id'], r['programme_id'],
+                r.get('first_sign_of_life_date'), r.get('activation_date'),
+                int(r.get('is_graduated', False)), r.get('graduation_date'),
+                int(r.get('is_graduated_on_savanna', False)),
+                job_pk, True,
+                'not_yet_started', '[]', '{}',
+            ]
+        with connection.cursor() as cur:
+            cur.execute(sql.format(placeholders=values_clause), params)
+
+
+# ---------------------------------------------------------------------------
+# Fast CourseEnrolment upsert — MariaDB-native INSERT … ON DUPLICATE KEY UPDATE
+# ---------------------------------------------------------------------------
+
+def _upsert_ces_mariadb(rows: list, batch_size: int = 500):
+    """
+    Upsert CourseEnrolments using a single INSERT … ON DUPLICATE KEY UPDATE per batch.
+
+    Each row is a dict with keys:
+        enrolment_id, course_id, status, is_passed, completion_date,
+        last_activity_date, pass_percentage, opt_in_date
+
+    Guard semantics:
+        • status: 'completed' never regresses to 'in_progress'
+        • completion_date: keep first non-null
+        • last_activity_date: keep GREATEST (most recent)
+        • opt_in_date: keep LEAST (earliest)
+    """
+    if not rows:
+        return
+    sql = """
+        INSERT INTO selfpaced_courseenrolment
+            (enrolment_id, course_id, status, is_passed,
+             completion_date, last_activity_date, pass_percentage, opt_in_date)
+        VALUES ({placeholders})
+        ON DUPLICATE KEY UPDATE
+            status = IF(status = 'completed', 'completed', VALUES(status)),
+            is_passed = GREATEST(is_passed, VALUES(is_passed)),
+            completion_date = COALESCE(completion_date, VALUES(completion_date)),
+            last_activity_date = CASE
+                WHEN last_activity_date IS NULL THEN VALUES(last_activity_date)
+                WHEN VALUES(last_activity_date) IS NULL THEN last_activity_date
+                ELSE GREATEST(last_activity_date, VALUES(last_activity_date)) END,
+            pass_percentage = VALUES(pass_percentage),
+            opt_in_date = CASE
+                WHEN opt_in_date IS NULL THEN VALUES(opt_in_date)
+                WHEN VALUES(opt_in_date) IS NULL THEN opt_in_date
+                ELSE LEAST(opt_in_date, VALUES(opt_in_date)) END
+    """
+    per_row = ', '.join(['%s'] * 8)
+    for chunk in _chunked(rows, batch_size):
+        values_clause = ', '.join(f'({per_row})' for _ in chunk)
+        params = []
+        for r in chunk:
+            params += [
+                r['enrolment_id'], r['course_id'],
+                r['status'], int(r['is_passed']),
+                r.get('completion_date'), r.get('last_activity_date'),
+                r.get('pass_percentage'), r.get('opt_in_date'),
+            ]
+        with connection.cursor() as cur:
+            cur.execute(sql.format(placeholders=values_clause), params)
+
+
+# ---------------------------------------------------------------------------
 # Cancel-check helper — re-reads from DB so any thread can stop cleanly
 # ---------------------------------------------------------------------------
 
@@ -236,8 +348,14 @@ def run_ingestion(job_id: int) -> None:
     job.progress_log = []
     job.save(update_fields=['status', 'progress_log'])
     try:
-        content = bytes(job.file_content)
-        _execute(job, content)
+        import io as _io
+        if job.file:
+            # Pass the open file handle — _execute streams it without reading all bytes.
+            job.file.open('rb')
+            _execute(job, job.file)
+        else:
+            # Legacy: file stored as DB blob — wrap in BytesIO for the same interface.
+            _execute(job, _io.BytesIO(bytes(job.file_content)))
     except Exception as exc:
         logger.exception('IngestionJob %d failed: %s', job_id, exc)
         job.status = 'failed'
@@ -250,7 +368,7 @@ def run_ingestion(job_id: int) -> None:
 # Main pipeline
 # ---------------------------------------------------------------------------
 
-def _execute(job, content: bytes) -> None:
+def _execute(job, source) -> None:
     from selfpaced.models import (
         Assignment, AssignmentProgress, Course, CourseEnrolment,
         Enrolment, FlagCode, FlaggedRow, HealthStatus, IngestionJob, Learner, PaymentStatus,
@@ -265,7 +383,10 @@ def _execute(job, content: bytes) -> None:
     # ------------------------------------------------------------------
     # Phase 1 — Parse
     # ------------------------------------------------------------------
-    headers, raw_rows = load_csv(content)
+    # iter_csv streams rows lazily from the source (file handle or bytes),
+    # eliminating the intermediate all_rows and data_rows lists that previously
+    # held the entire CSV in memory twice before any rows were processed.
+    headers, row_iter = iter_csv(source)
     col_errors = validate_columns(headers)
     if col_errors:
         job.status = 'failed'
@@ -275,7 +396,7 @@ def _execute(job, content: bytes) -> None:
 
     all_parsed = []   # all valid-email rows, unfiltered — used for catalogue discovery
     skip_count = 0
-    for raw in raw_rows:
+    for raw in row_iter:
         r = row_to_dict(raw)
         if not r['email'] or '@' not in r['email']:
             skip_count += 1
@@ -658,77 +779,77 @@ def _execute(job, content: bytes) -> None:
         if last['is_graduated_on_savanna']:
             agg['is_graduated_on_savanna'] = True
 
-    # Existing enrolments — chunked to avoid SQLite 999-variable limit
-    existing_enrolments: dict[tuple, Enrolment] = {}
-    for _chunk in _chunked(list(all_emails)):
-        for e in Enrolment.objects.filter(
-            learner__email__in=_chunk,
-            programme_id__in=all_prog_pks,
-        ):
-            existing_enrolments[(e.learner_id, e.programme_id)] = e
+    enrolment_rows = [
+        {
+            'learner_id':             email,
+            'programme_id':           prog_pk,
+            'first_sign_of_life_date': min(agg['fsol']) if agg['fsol'] else None,
+            'activation_date':         min(agg['act']) if agg['act'] else None,
+            'is_graduated':            agg['is_graduated'],
+            'graduation_date':         agg['graduation_date'],
+            'is_graduated_on_savanna': agg['is_graduated_on_savanna'],
+        }
+        for (email, prog_pk), agg in enrolment_agg.items()
+    ]
 
-    new_enrolment_objs = []
-    for (email, prog_pk), agg in enrolment_agg.items():
-        if (email, prog_pk) in existing_enrolments:
-            continue
-        new_enrolment_objs.append(Enrolment(
-            learner_id=email,
-            programme_id=prog_pk,
-            first_sign_of_life_date=min(agg['fsol']) if agg['fsol'] else None,
-            activation_date=min(agg['act']) if agg['act'] else None,
-            is_graduated=agg['is_graduated'],
-            graduation_date=agg['graduation_date'],
-            is_graduated_on_savanna=agg['is_graduated_on_savanna'],
-            created_by_job=job,
-            has_activity_data=True,  # created directly from the activity CSV
-        ))
-
-    if new_enrolment_objs:
-        Enrolment.objects.bulk_create(new_enrolment_objs, batch_size=500)
-
-    # Update existing enrolments.
-    # Guards: never overwrite a later/better value with an older CSV's data.
-    #   • FSOL / activation: keep the EARLIEST known date (min of existing + CSV).
-    #   • Graduation: once graduated, always graduated — never regress.
-    update_enrolment_objs = []
-    for (email, prog_pk), agg in enrolment_agg.items():
-        e = existing_enrolments.get((email, prog_pk))
-        if e is None:
-            continue
-        if agg['fsol']:
-            csv_fsol = min(agg['fsol'])
-            e.first_sign_of_life_date = (
-                min(e.first_sign_of_life_date, csv_fsol)
-                if e.first_sign_of_life_date else csv_fsol
+    if connection.vendor == 'mysql':
+        # Single INSERT … ON DUPLICATE KEY UPDATE — no separate SELECT/create/update.
+        _upsert_enrolments_mariadb(enrolment_rows, job_pk=job.pk)
+    else:
+        # SQLite fallback: fetch existing, split, bulk_create + bulk_update.
+        existing_enrolments_sqlite: dict[tuple, Enrolment] = {}
+        for _chunk in _chunked(list(all_emails)):
+            for e in Enrolment.objects.filter(
+                learner__email__in=_chunk, programme_id__in=all_prog_pks,
+            ):
+                existing_enrolments_sqlite[(e.learner_id, e.programme_id)] = e
+        new_objs = [
+            Enrolment(
+                learner_id=r['learner_id'], programme_id=r['programme_id'],
+                first_sign_of_life_date=r['first_sign_of_life_date'],
+                activation_date=r['activation_date'],
+                is_graduated=r['is_graduated'], graduation_date=r['graduation_date'],
+                is_graduated_on_savanna=r['is_graduated_on_savanna'],
+                created_by_job=job, has_activity_data=True,
             )
-        if agg['act']:
-            csv_act = min(agg['act'])
-            e.activation_date = (
-                min(e.activation_date, csv_act)
-                if e.activation_date else csv_act
-            )
-        # Don't regress from graduated — once True it stays True.
-        if agg['is_graduated']:
-            e.is_graduated = True
-        if agg['graduation_date']:
-            e.graduation_date = agg['graduation_date']
-        if agg['is_graduated_on_savanna']:
-            e.is_graduated_on_savanna = True
-        # Mark as having activity data — never regress to False once seen in activity CSV.
-        if not e.has_activity_data:
+            for r in enrolment_rows
+            if (r['learner_id'], r['programme_id']) not in existing_enrolments_sqlite
+        ]
+        if new_objs:
+            Enrolment.objects.bulk_create(new_objs, batch_size=500)
+        upd_objs = []
+        for r in enrolment_rows:
+            e = existing_enrolments_sqlite.get((r['learner_id'], r['programme_id']))
+            if e is None:
+                continue
+            if r['first_sign_of_life_date']:
+                e.first_sign_of_life_date = (
+                    min(e.first_sign_of_life_date, r['first_sign_of_life_date'])
+                    if e.first_sign_of_life_date else r['first_sign_of_life_date']
+                )
+            if r['activation_date']:
+                e.activation_date = (
+                    min(e.activation_date, r['activation_date'])
+                    if e.activation_date else r['activation_date']
+                )
+            if r['is_graduated']:
+                e.is_graduated = True
+            if r['graduation_date']:
+                e.graduation_date = r['graduation_date']
+            if r['is_graduated_on_savanna']:
+                e.is_graduated_on_savanna = True
             e.has_activity_data = True
-        update_enrolment_objs.append(e)
+            upd_objs.append(e)
+        if upd_objs:
+            Enrolment.objects.bulk_update(
+                upd_objs,
+                ['first_sign_of_life_date', 'activation_date', 'is_graduated',
+                 'graduation_date', 'is_graduated_on_savanna', 'has_activity_data'],
+                batch_size=500,
+            )
 
-    if update_enrolment_objs:
-        Enrolment.objects.bulk_update(
-            update_enrolment_objs,
-            ['first_sign_of_life_date', 'activation_date',
-             'is_graduated', 'graduation_date', 'is_graduated_on_savanna',
-             'has_activity_data'],
-            batch_size=500,
-        )
-
-    # Re-fetch all enrolments to get PKs (including newly created) — chunked.
+    # Fetch all enrolments with select_related for downstream health computation.
+    # For MariaDB the upsert above wrote everything; this single fetch reads it back.
     all_enrolments: dict[tuple, Enrolment] = {}
     for _chunk in _chunked(list(all_emails)):
         for e in Enrolment.objects.filter(
@@ -740,25 +861,13 @@ def _execute(job, content: bytes) -> None:
     # --- 4b. CourseEnrolments ---
 
     all_course_pks: set[int] = {course_pk for (_, _, course_pk) in row_groups}
-
     all_enrolment_pks = {e.pk for e in all_enrolments.values()}
-    existing_ces: dict[tuple, CourseEnrolment] = {}
-    for e_chunk in _chunked(all_enrolment_pks):
-        for c_chunk in _chunked(all_course_pks):
-            for ce in CourseEnrolment.objects.filter(
-                enrolment_id__in=e_chunk,
-                course_id__in=c_chunk,
-            ):
-                existing_ces[(ce.enrolment_id, ce.course_id)] = ce
 
-    new_ce_objs = []
-    update_ce_objs = []
-
+    ce_rows = []
     for (email, prog_pk, course_pk), rows in row_groups.items():
         enrolment = all_enrolments.get((email, prog_pk))
         if enrolment is None:
             continue
-
         last_r = rows[-1]
         activity_dates = [
             d for r in rows
@@ -766,11 +875,9 @@ def _execute(job, content: bytes) -> None:
             if d
         ]
         last_activity = max(activity_dates) if activity_dates else None
-
         submitted = [r for r in rows if r['is_assignment_submitted']]
         passed = [r for r in submitted if r['is_assignment_passed']]
         pass_pct = round(len(passed) / len(submitted) * 100) if submitted else None
-
         if last_r['is_course_graduated']:
             status = 'completed'
             is_passed = True
@@ -779,51 +886,68 @@ def _execute(job, content: bytes) -> None:
             status = 'in_progress'
             is_passed = False
             completion_date = None
-
         opt_in = min(
             (d for d in [last_r['activation_date'], last_r['first_sign_of_life_date']] if d),
             default=None,
         )
+        ce_rows.append({
+            'enrolment_id':    enrolment.pk,
+            'course_id':       course_pk,
+            'status':          status,
+            'is_passed':       is_passed,
+            'completion_date': completion_date,
+            'last_activity_date': last_activity,
+            'pass_percentage': pass_pct,
+            'opt_in_date':     opt_in,
+        })
 
-        ce_key = (enrolment.pk, course_pk)
-        if ce_key in existing_ces:
-            ce = existing_ces[ce_key]
-            # Don't regress from completed — an old CSV won't show the completion.
-            if status == 'completed' or ce.status != 'completed':
-                ce.status = status
-                ce.is_passed = is_passed
-                # Don't clear a completion date that's already recorded.
-                if completion_date or ce.completion_date is None:
-                    ce.completion_date = completion_date
-            # Only advance last_activity — never move it backwards with old data.
-            if last_activity and (ce.last_activity_date is None or last_activity > ce.last_activity_date):
-                ce.last_activity_date = last_activity
-            ce.pass_percentage = pass_pct
-            # Don't clear an existing opt-in date with a later upload's None.
-            if opt_in and (ce.opt_in_date is None or opt_in < ce.opt_in_date):
-                ce.opt_in_date = opt_in
-            update_ce_objs.append(ce)
-        else:
-            new_ce_objs.append(CourseEnrolment(
-                enrolment=enrolment,
-                course_id=course_pk,
-                status=status,
-                is_passed=is_passed,
-                completion_date=completion_date,
-                last_activity_date=last_activity,
-                pass_percentage=pass_pct,
-                opt_in_date=opt_in,
-            ))
-
-    if new_ce_objs:
-        CourseEnrolment.objects.bulk_create(new_ce_objs, batch_size=500)
-    if update_ce_objs:
-        CourseEnrolment.objects.bulk_update(
-            update_ce_objs,
-            ['status', 'is_passed', 'completion_date',
-             'last_activity_date', 'pass_percentage', 'opt_in_date'],
-            batch_size=500,
-        )
+    if connection.vendor == 'mysql':
+        _upsert_ces_mariadb(ce_rows)
+    else:
+        # SQLite fallback: fetch existing CEs, split, bulk_create + bulk_update.
+        existing_ces: dict[tuple, CourseEnrolment] = {}
+        for e_chunk in _chunked(all_enrolment_pks):
+            for c_chunk in _chunked(all_course_pks):
+                for ce in CourseEnrolment.objects.filter(
+                    enrolment_id__in=e_chunk, course_id__in=c_chunk,
+                ):
+                    existing_ces[(ce.enrolment_id, ce.course_id)] = ce
+        new_ce_objs = []
+        update_ce_objs = []
+        for r in ce_rows:
+            ce_key = (r['enrolment_id'], r['course_id'])
+            if ce_key in existing_ces:
+                ce = existing_ces[ce_key]
+                if r['status'] == 'completed' or ce.status != 'completed':
+                    ce.status = r['status']
+                    ce.is_passed = r['is_passed']
+                    if r['completion_date'] or ce.completion_date is None:
+                        ce.completion_date = r['completion_date']
+                if r['last_activity_date'] and (
+                    ce.last_activity_date is None or r['last_activity_date'] > ce.last_activity_date
+                ):
+                    ce.last_activity_date = r['last_activity_date']
+                ce.pass_percentage = r['pass_percentage']
+                if r['opt_in_date'] and (ce.opt_in_date is None or r['opt_in_date'] < ce.opt_in_date):
+                    ce.opt_in_date = r['opt_in_date']
+                update_ce_objs.append(ce)
+            else:
+                new_ce_objs.append(CourseEnrolment(
+                    enrolment_id=r['enrolment_id'], course_id=r['course_id'],
+                    status=r['status'], is_passed=r['is_passed'],
+                    completion_date=r['completion_date'],
+                    last_activity_date=r['last_activity_date'],
+                    pass_percentage=r['pass_percentage'], opt_in_date=r['opt_in_date'],
+                ))
+        if new_ce_objs:
+            CourseEnrolment.objects.bulk_create(new_ce_objs, batch_size=500)
+        if update_ce_objs:
+            CourseEnrolment.objects.bulk_update(
+                update_ce_objs,
+                ['status', 'is_passed', 'completion_date',
+                 'last_activity_date', 'pass_percentage', 'opt_in_date'],
+                batch_size=500,
+            )
 
     # Re-fetch all CEs with course info for current_course and health phases.
     all_ces = []
@@ -906,15 +1030,16 @@ def _execute(job, content: bytes) -> None:
             upload_ce_pks.add(ce_pk)
 
     # Preserve passed_on_first_attempt across re-uploads.
+    # Use larger chunks (2000) to reduce round-trips for large files.
     prev_pfa: dict[tuple, bool] = {}
-    for chunk in _chunked(upload_ce_pks):
+    for chunk in _chunked(upload_ce_pks, 2000):
         for row in AssignmentProgress.objects.filter(
             course_enrolment_id__in=chunk,
             passed_on_first_attempt=True,
         ).values('course_enrolment_id', 'assignment_id', 'passed_on_first_attempt'):
             prev_pfa[(row['course_enrolment_id'], row['assignment_id'])] = True
 
-    for chunk in _chunked(upload_ce_pks):
+    for chunk in _chunked(upload_ce_pks, 2000):
         AssignmentProgress.objects.filter(course_enrolment_id__in=chunk).delete()
 
     # Use a dict keyed by (ce_pk, assign_pk) so duplicate CSV rows
@@ -948,7 +1073,7 @@ def _execute(job, content: bytes) -> None:
             )
 
     if ap_map:
-        AssignmentProgress.objects.bulk_create(list(ap_map.values()), batch_size=500)
+        AssignmentProgress.objects.bulk_create(list(ap_map.values()), batch_size=2000)
 
     _emit_progress(
         job, 4,
@@ -1235,10 +1360,13 @@ def _execute(job, content: bytes) -> None:
     job.new_assignments = new_assignment_count
     job.flagged_row_count = flagged_count
     job.warnings = []
-    job.file_content = b''   # CSV no longer needed once data is normalised into the DB
+    # Delete the uploaded file from disk now that data is in the DB.
+    if job.file:
+        job.file.delete(save=False)
+    job.file_content = b''
     job.save(update_fields=[
         'status', 'rows_processed', 'new_learners', 'updated_learners',
-        'new_assignments', 'flagged_row_count', 'warnings', 'file_content',
+        'new_assignments', 'flagged_row_count', 'warnings', 'file_content', 'file',
     ])
 
 
@@ -1250,10 +1378,15 @@ def preview_ingestion(job_id: int) -> dict:
     from selfpaced.detector import _EHUB_PATTERN as _FA_RE
     from selfpaced.models import Assignment, Course, IngestionJob, Learner, Programme
 
+    import io as _io
     job = IngestionJob.objects.get(pk=job_id)
-    content = bytes(job.file_content)
+    if job.file:
+        job.file.open('rb')
+        source = job.file
+    else:
+        source = _io.BytesIO(bytes(job.file_content))
 
-    headers, raw_rows = load_csv(content)
+    headers, row_iter = iter_csv(source)
     col_errors = validate_columns(headers)
     if col_errors:
         job.status = 'failed'
@@ -1263,7 +1396,7 @@ def preview_ingestion(job_id: int) -> dict:
 
     parsed = []
     skip_count = 0
-    for raw in raw_rows:
+    for raw in row_iter:
         r = row_to_dict(raw)
         if not r['email'] or '@' not in r['email']:
             skip_count += 1

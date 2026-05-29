@@ -56,6 +56,7 @@ urlpatterns = [
     path('admin/pattern-registry/', admin_views.pattern_registry, name='sp_pattern_registry'),
     path('admin/recompute-health/', admin_views.recompute_health, name='sp_recompute_health'),
     path('admin/recompute-status/', admin_views.recompute_health_status, name='sp_recompute_status'),
+    path('admin/purge-job-blobs/', admin_views.purge_job_blobs, name='sp_purge_job_blobs'),
     path('help/', help.help_page, name='sp_help'),
     # Pod import
     path('admin/pod-import/', admin_views.pod_import_log, name='sp_pod_import_log'),

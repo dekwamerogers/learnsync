@@ -1,61 +1,91 @@
 """
-management command: purge_job_files
+Management command: purge legacy binary CSV content from IngestionJob rows.
 
-Clears the file_content blob from completed ingestion jobs so the database
-doesn't grow indefinitely with raw CSV bytes that are no longer needed.
+Before migration 0028, uploaded CSVs were stored as raw bytes in the
+`file_content` BinaryField.  After ingestion completed the engine cleared it,
+but failed/cancelled jobs were left with the full binary still in the column —
+bloating the database.
+
+This command zeroes out `file_content` for all jobs in terminal states
+(complete, failed, cancelled) and shows how much space is reclaimed.
 
 Usage:
-  python manage.py purge_job_files            # purge all complete jobs
-  python manage.py purge_job_files --days 14  # only jobs older than 14 days
-  python manage.py purge_job_files --dry-run  # preview without writing
+    python manage.py purge_job_files            # dry-run
+    python manage.py purge_job_files --apply    # actually clear
 """
 
-from datetime import timedelta
-
 from django.core.management.base import BaseCommand
-from django.utils import timezone
+
+# States where the CSV bytes are no longer needed and can be safely cleared.
+TERMINAL_STATUSES = ('complete', 'failed', 'cancelled')
 
 
 class Command(BaseCommand):
-    help = 'Remove stored CSV bytes from completed ingestion jobs.'
+    help = 'Clear legacy file_content blobs from completed/failed/cancelled IngestionJobs.'
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--days', type=int, default=0,
-            help='Only purge jobs completed more than N days ago (0 = all complete jobs).',
-        )
-        parser.add_argument(
-            '--dry-run', action='store_true',
-            help='Print how many rows would be affected without updating anything.',
+            '--apply',
+            action='store_true',
+            help='Actually clear the content. Default is dry-run (show only).',
         )
 
     def handle(self, *args, **options):
-        from selfpaced.models import EnrolmentUploadJob, IngestionJob, PodImportJob
+        from selfpaced.models import IngestionJob
 
-        days     = options['days']
-        dry_run  = options['dry_run']
-        cutoff   = timezone.now() - timedelta(days=days) if days else None
+        apply = options['apply']
 
-        total_cleared = 0
+        # BinaryField in MySQL stores as LONGBLOB; Django returns memoryview.
+        # The only reliable "non-empty" check across databases is SQL LENGTH().
+        from django.db.models import IntegerField
+        from django.db.models.functions import Length
+        from django.db.models import ExpressionWrapper
 
-        for Model, label in [
-            (IngestionJob,       'IngestionJob'),
-            (EnrolmentUploadJob, 'EnrolmentUploadJob'),
-            (PodImportJob,       'PodImportJob'),
-        ]:
-            qs = Model.objects.filter(status='complete').exclude(file_content=b'')
-            if cutoff:
-                qs = qs.filter(uploaded_at__lte=cutoff)
+        qs = (
+            IngestionJob.objects
+            .filter(status__in=TERMINAL_STATUSES)
+            .annotate(_fc_len=ExpressionWrapper(
+                Length('file_content'), output_field=IntegerField()
+            ))
+            .filter(_fc_len__gt=0)
+        )
 
-            count = qs.count()
-            if not dry_run and count:
-                qs.update(file_content=b'')
-            total_cleared += count
-            self.stdout.write(
-                f'  {label}: {"would clear" if dry_run else "cleared"} {count} job(s)'
-            )
+        jobs = list(qs)
+        if not jobs:
+            self.stdout.write(self.style.SUCCESS(
+                'No legacy file_content blobs found — database is already clean.'
+            ))
+            return
 
-        verb = 'Would clear' if dry_run else 'Cleared'
+        total_bytes = sum(len(bytes(j.file_content)) for j in jobs)
+        self.stdout.write(
+            f'Found {len(jobs)} job(s) with legacy file_content '
+            f'({total_bytes / 1024 / 1024:.1f} MB in the database).'
+        )
+
+        if not apply:
+            self.stdout.write(self.style.WARNING(
+                'Dry-run — pass --apply to actually clear the content.'
+            ))
+            for job in jobs[:20]:
+                mb = len(bytes(job.file_content)) / 1024 / 1024
+                self.stdout.write(
+                    f'  #{job.pk:<5} {job.status:<12} {mb:>5.1f} MB  {job.file_name}'
+                )
+            if len(jobs) > 20:
+                self.stdout.write(f'  … and {len(jobs) - 20} more')
+            return
+
+        # Clear in small batches so we don't hold a huge transaction open.
+        cleared = 0
+        for job in jobs:
+            job.file_content = b''
+            job.save(update_fields=['file_content'])
+            cleared += 1
+            if cleared % 25 == 0:
+                self.stdout.write(f'  Cleared {cleared}/{len(jobs)}…')
+
         self.stdout.write(self.style.SUCCESS(
-            f'{verb} file_content from {total_cleared} completed job(s).'
+            f'Done — freed ~{total_bytes / 1024 / 1024:.1f} MB by clearing '
+            f'file_content on {cleared} job(s).'
         ))

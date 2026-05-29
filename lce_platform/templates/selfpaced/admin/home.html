@@ -100,6 +100,16 @@
       </div>
     </div>
 
+    <form method="post" action="{% url 'sp_purge_job_blobs' %}"
+          onsubmit="return confirm('This will permanently delete stored CSV bytes from all completed, failed and cancelled jobs. Continue?');">
+      {% csrf_token %}
+      <button type="submit" class="sp-card" style="padding:18px;display:block;width:100%;text-align:left;background:#fff;border:1px solid #e5e7eb;border-radius:10px;cursor:pointer;">
+        <i class="ti ti-database-off" style="font-size:22px;color:#374151;"></i>
+        <div style="font-size:13px;font-weight:600;color:#111827;margin-top:8px;">Purge Legacy Blobs</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:2px;">Clear old CSV bytes stored in the database</div>
+      </button>
+    </form>
+
   </div>
 
   <!-- Right: recent uploads -->

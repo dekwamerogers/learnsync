@@ -1,5 +1,4 @@
 {% extends "selfpaced/base.html" %}
-{% load crispy_forms_tags %}
 
 {% block title %}Upload CSV — LearnSync{% endblock %}
 {% block page_title %}Upload CSV{% endblock %}
@@ -21,7 +20,7 @@
         Columns are validated immediately. Processing runs in the background.
       </p>
 
-      <form method="post" enctype="multipart/form-data">
+      <form id="upload-form" method="post" enctype="multipart/form-data">
         {% csrf_token %}
 
         <div style="margin-bottom:16px;">
@@ -62,16 +61,105 @@
           </div>
         {% endif %}
 
+        <!-- Progress UI — hidden until upload starts -->
+        <div id="upload-progress" style="display:none;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:600;color:#374151;margin-bottom:5px;">
+            <span id="progress-label">Uploading…</span>
+            <span id="progress-pct">0%</span>
+          </div>
+          <div style="background:#f3f4f6;border-radius:6px;height:8px;overflow:hidden;">
+            <div id="progress-fill"
+                 style="height:100%;width:0%;background:#0452F0;border-radius:6px;transition:width .15s ease;"></div>
+          </div>
+          <p id="progress-note" style="font-size:11px;color:#9ca3af;margin-top:5px;">
+            Large files can take a moment — please don't close this page.
+          </p>
+        </div>
+
+        <div id="upload-error" style="display:none;" class="sp-alert sp-alert-error" style="margin-bottom:12px;"></div>
+
         <div style="display:flex;gap:8px;">
-          <button type="submit" class="sp-btn sp-btn-primary">
+          <button id="submit-btn" type="submit" class="sp-btn sp-btn-primary">
             <i class="ti ti-upload" style="font-size:13px;"></i>
             Upload &amp; Queue
           </button>
-          <a href="{% url 'sp_admin_home' %}" class="sp-btn sp-btn-secondary">Cancel</a>
+          <a href="{% url 'sp_admin_home' %}" class="sp-btn sp-btn-secondary" id="cancel-btn">Cancel</a>
         </div>
       </form>
 
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  var form   = document.getElementById('upload-form');
+  var btn    = document.getElementById('submit-btn');
+  var cancel = document.getElementById('cancel-btn');
+  var prog   = document.getElementById('upload-progress');
+  var fill   = document.getElementById('progress-fill');
+  var pct    = document.getElementById('progress-pct');
+  var label  = document.getElementById('progress-label');
+  var note   = document.getElementById('progress-note');
+  var errBox = document.getElementById('upload-error');
+
+  form.addEventListener('submit', function (e) {
+    var fileInput = form.querySelector('input[type="file"]');
+    if (!fileInput || !fileInput.files.length) return; // let Django validate
+
+    e.preventDefault();
+
+    btn.disabled = true;
+    cancel.style.pointerEvents = 'none';
+    cancel.style.opacity = '0.5';
+    prog.style.display = 'block';
+    errBox.style.display = 'none';
+
+    var xhr = new XMLHttpRequest();
+
+    // ── Upload progress ─────────────────────────────────────────────────
+    xhr.upload.addEventListener('progress', function (ev) {
+      if (!ev.lengthComputable) return;
+      var p = Math.round(ev.loaded / ev.total * 100);
+      fill.style.width = p + '%';
+      pct.textContent  = p + '%';
+      if (p === 100) {
+        label.textContent = 'Upload complete — analysing CSV…';
+        note.textContent  = 'The server is now parsing and validating your file.';
+        pct.textContent   = '';
+      }
+    });
+
+    // ── Server finished (follows redirects automatically) ───────────────
+    xhr.addEventListener('load', function () {
+      if (xhr.status >= 200 && xhr.status < 500) {
+        // XHR followed the Django redirect; responseURL is the final page.
+        window.location.href = xhr.responseURL || '{% url "sp_ingestion_log" %}';
+      } else {
+        showError('Server error (' + xhr.status + '). Please try again.');
+      }
+    });
+
+    xhr.addEventListener('error', function () {
+      showError('Connection error — please check your network and try again.');
+    });
+
+    xhr.addEventListener('abort', function () {
+      showError('Upload was cancelled.');
+    });
+
+    xhr.open('POST', form.getAttribute('action') || window.location.pathname);
+    xhr.send(new FormData(form));
+  });
+
+  function showError(msg) {
+    errBox.textContent = msg;
+    errBox.style.display = 'block';
+    prog.style.display = 'none';
+    btn.disabled = false;
+    cancel.style.pointerEvents = '';
+    cancel.style.opacity = '';
+  }
+})();
+</script>
 {% endblock %}

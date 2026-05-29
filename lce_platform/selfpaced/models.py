@@ -555,6 +555,9 @@ class IngestionJob(models.Model):
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
     file_name = models.CharField(max_length=255)
+    # New uploads write to file (FileField on disk); file_content is kept for
+    # backward-compat with jobs created before this field was added.
+    file = models.FileField(upload_to='ingestion_csvs/', null=True, blank=True)
     file_content = models.BinaryField(blank=True)
     status = models.CharField(
         max_length=20, choices=IngestionStatus.choices,

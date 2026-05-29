@@ -129,6 +129,18 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'          # populated by collectstatic
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
+# Private media — ingestion CSV files are stored here (not served via URL).
+# On the server this resolves to a directory alongside the app; it is NOT
+# inside public_html so the files are not web-accessible.
+MEDIA_ROOT = BASE_DIR.parent / 'private_media'
+MEDIA_URL = ''   # intentionally empty — these files are never served via URL
+
+# Allow large CSV uploads (activity files are currently ~80 MB and growing).
+# Django writes files > FILE_UPLOAD_MAX_MEMORY_SIZE to a temp file automatically;
+# DATA_UPLOAD_MAX_MEMORY_SIZE guards non-file POST data (form fields only).
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024        # 5 MB → large files go to disk
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024       # 10 MB ceiling for form fields
+
 # Django 4.2+ requires STORAGES dict instead of the removed STATICFILES_STORAGE setting.
 # WhiteNoise's CompressedManifestStaticFilesStorage:
 #   • compresses files (.gz / .br) so the web server can serve pre-compressed assets

@@ -77,13 +77,13 @@ def upload_csv(request):
         form = CSVUploadForm(request.POST, request.FILES)
         if form.is_valid():
             f = form.cleaned_data['file']
-            content = f.read()
             data_as_of_date = form.cleaned_data.get('data_as_of_date')
             job = IngestionJob.objects.create(
                 uploaded_by=request.user,
                 file_name=f.name,
-                file_content=content,
-                status='previewing',   # preview runs in background
+                file=f,            # stored on disk via FileField — no DB blob
+                file_content=b'',  # kept for backward-compat; new jobs don't use it
+                status='previewing',
                 data_as_of_date=data_as_of_date,
             )
             t = threading.Thread(target=_run_preview_thread, args=(job.pk,), daemon=True)
@@ -611,6 +611,33 @@ def recompute_health(request):
         return render(request, 'selfpaced/admin/_recompute_status.html', {
             'rc': get_recompute_status(),
         })
+    return redirect('sp_admin_home')
+
+
+@login_required
+@require_POST
+def purge_job_blobs(request):
+    """Clear legacy file_content BinaryField blobs from terminal IngestionJobs."""
+    from django.db.models import IntegerField, ExpressionWrapper
+    from django.db.models.functions import Length
+    guard = _require_staff(request)
+    if guard:
+        return guard
+    qs = (
+        IngestionJob.objects
+        .filter(status__in=('complete', 'failed', 'cancelled'))
+        .annotate(_fc_len=ExpressionWrapper(Length('file_content'), output_field=IntegerField()))
+        .filter(_fc_len__gt=0)
+    )
+    jobs = list(qs)
+    total_mb = sum(len(bytes(j.file_content)) for j in jobs) / 1024 / 1024
+    for job in jobs:
+        job.file_content = b''
+        job.save(update_fields=['file_content'])
+    if jobs:
+        messages.success(request, f'Cleared legacy CSV blobs from {len(jobs)} job(s) — freed ~{total_mb:.1f} MB.')
+    else:
+        messages.info(request, 'No legacy blobs found — database is already clean.')
     return redirect('sp_admin_home')
 
 

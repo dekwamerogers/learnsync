@@ -228,16 +228,47 @@ def normalise_assignment_type(raw: str) -> str:
 # File loading
 # ---------------------------------------------------------------------------
 
+def iter_csv(source) -> tuple[list[str], 'Iterator[dict]']:
+    """
+    Stream CSV rows lazily from bytes or a binary file-like object.
+
+    Returns (headers, row_iterator) where row_iterator yields one raw row dict
+    at a time — never materialises the full file as a list.  This keeps peak
+    memory proportional to the largest single row rather than the whole file.
+
+    source can be:
+      - bytes               — decoded to StringIO
+      - a binary file-like  — wrapped with TextIOWrapper (must support seek)
+    """
+    import io as _io
+    if isinstance(source, (bytes, bytearray)):
+        text = source.decode('utf-8-sig')
+        reader = csv.reader(StringIO(text))
+    else:
+        source.seek(0)
+        wrapper = _io.TextIOWrapper(source, encoding='utf-8-sig', newline='')
+        reader = csv.reader(wrapper)
+
+    try:
+        raw_header = next(reader)
+    except StopIteration:
+        return [], iter([])
+
+    headers = [_str(h) for h in raw_header]
+
+    def _row_gen():
+        for raw in reader:
+            if any(raw):
+                padded = raw + [''] * max(0, len(headers) - len(raw))
+                yield dict(zip(headers, padded))
+
+    return headers, _row_gen()
+
+
 def load_csv(content: bytes) -> tuple[list[str], list[dict]]:
-    """Parse CSV bytes into (headers, list-of-dicts)."""
-    text = content.decode('utf-8-sig')
-    reader = csv.reader(StringIO(text))
-    all_rows = list(reader)
-    if len(all_rows) < 2:
-        return [], []
-    headers = [_str(h) for h in all_rows[0]]
-    data_rows = [dict(zip(headers, row)) for row in all_rows[1:] if any(row)]
-    return headers, data_rows
+    """Parse CSV bytes into (headers, list-of-dicts). Kept for callers that need a full list."""
+    headers, row_iter = iter_csv(content)
+    return headers, list(row_iter)
 
 
 # ---------------------------------------------------------------------------
