@@ -420,9 +420,15 @@ def preview_poll_fragment(request, pk):
     from selfpaced.engine import PREVIEW_STEPS
     job = get_object_or_404(IngestionJob, pk=pk)
     if job.status == 'previewing':
-        # Safety net: if still previewing after 90 seconds the background thread
-        # died without updating the status — fail it so the UI unsticks.
-        if timezone.now() - job.uploaded_at > timedelta(seconds=90):
+        elapsed = timezone.now() - job.uploaded_at
+        # If no progress at all after 20s the thread likely died (Passenger recycled
+        # the worker). Restart it — preview_ingestion is idempotent.
+        if not job.progress_log and elapsed > timedelta(seconds=20):
+            import threading as _threading
+            t = _threading.Thread(target=_run_preview_thread, args=(job.pk,), daemon=True)
+            t.start()
+        # Hard timeout: 5 minutes covers large CSVs on slow shared hosts.
+        if elapsed > timedelta(seconds=300):
             job.status = 'failed'
             job.errors = ['Preview timed out — the analysis took too long. Please try uploading again.']
             job.save(update_fields=['status', 'errors'])

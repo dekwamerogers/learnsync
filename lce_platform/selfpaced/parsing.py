@@ -130,6 +130,10 @@ def _sanitize_name(s: str) -> str:
     emoji, box-drawing characters, and other symbols.
     """
     s = _strip_4byte(s)
+    # Fast path: plain ASCII letters/spaces/hyphens/apostrophes are always safe
+    # and str.isalpha() is far cheaper than unicodedata.category() per char.
+    if all(c.isalpha() or c in " -'.’‘" for c in s):
+        return s
     return ''.join(
         c for c in s
         if unicodedata.category(c) in _NAME_SAFE_CATS or c in _NAME_SAFE_CHARS
@@ -164,6 +168,14 @@ def parse_date(val) -> date | None:
         raw = _str(val)
         if not raw:
             return None
+        # Fast path: YYYY-MM-DD is the standard eHub export format.
+        # date.fromisoformat() is ~10× faster than strptime.
+        if len(raw) == 10 and raw[4] == '-' and raw[7] == '-':
+            try:
+                d = date.fromisoformat(raw)
+                return None if d == NULL_DATE else d
+            except ValueError:
+                pass
         for fmt in (
             '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M',
             '%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y',

@@ -2,7 +2,7 @@
 {# ── Running — poll every second ─────────────────────────────── #}
 <div id="recompute-widget"
      hx-get="{% url 'sp_recompute_status' %}"
-     hx-trigger="every 1s"
+     hx-trigger="every 10s"
      hx-swap="outerHTML"
      class="sp-card"
      style="padding:18px;display:block;">

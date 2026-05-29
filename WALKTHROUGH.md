@@ -252,10 +252,15 @@ Point to a Behind or Significantly Behind learner.
 > 1. **Activity CSV** (from eHub staff portal) — records all learner activity: course completions, attempts, scores. This is the primary data source.*
 > 2. **Enrolment/Roster CSV** (from your own records) — adds learners who are enrolled but not yet in eHub.*"
 
-Click **Upload** (the button in the top-right or sidebar).
+*Click **Upload** (the button in the top-right or sidebar). The upload form has two fields: the CSV file and a 'Data as of date' (when the file was exported from the staff portal — fill this in, it prevents learners from appearing artificially dormant).*
 
-> *"Two separate upload fields: one for each CSV type. You can run both simultaneously — there's no conflict. Best practice: upload the enrolment CSV first, then the activity CSV.*
-> *The system processes them in the background. The ingestion log (Admin → Ingestion Log) shows progress and any errors."*
+*Once you click Upload & Queue, a real-time progress bar shows the file uploading to the server. When the upload finishes, the page automatically moves to an **Analysis** screen — you'll see three steps ticking off live: Reading & parsing CSV → Detecting programmes & courses → Counting new learners. This usually takes 10–30 seconds for large files.*
+
+*When analysis completes you land on a **Review** screen. This shows a breakdown by programme (rows found, new courses detected, any unrecognised rows flagged). Review it, then click Confirm to run the full ingestion — or Cancel to discard.*
+
+*After you confirm, a 7-step pipeline runs in the background with its own progress bar. The ingestion log (Admin → Ingestion Log) shows completed, in-progress, and failed jobs.*
+
+*Best practice: upload the enrolment CSV first, then the activity CSV. They can run simultaneously without conflict, but enrolment-only learners get their records created first this way.*
 
 ---
 

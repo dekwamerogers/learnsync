@@ -1,6 +1,6 @@
 # LearnSync — Technical Handoff Document
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Generated:** May 2026  
 **Status:** Current  
 **Classification:** Internal
@@ -49,7 +49,7 @@ LearnSync is a Django internal web application built for Learner Community Execu
 |---|---|
 | Language | Python 3.x |
 | Framework | Django 6.x |
-| Database | SQLite (dev) / PostgreSQL (production recommended) |
+| Database | MariaDB (production server) / SQLite (dev, set `DB_ENGINE=django.db.backends.sqlite3`) |
 | Frontend | Server-rendered HTML + Tailwind-adjacent CSS, Chart.js 4 for charts |
 | Partial updates | HTMX (filter bar swaps on analytics page) |
 | Excel export | openpyxl 3.1.5 |
@@ -69,8 +69,8 @@ LDP/
 │   │   ├── models.py          # All database models
 │   │   ├── health.py          # Health flag computation (pure functions)
 │   │   ├── engine.py          # Ingestion processing engine
-│   │   ├── parsing.py         # CSV parsing and validation
-│   │   ├── detector.py        # Programme/course detection from eHub class names
+│   │   ├── parsing.py         # CSV parsing and validation; `iter_csv()` streaming row iterator
+│   │   ├── detector.py        # Programme/course detection from eHub class names; `bulk_detect()` batch programme/course resolver
 │   │   ├── pace.py            # Pod pace calculation
 │   │   ├── tasks.py           # Background job runners
 │   │   ├── signals.py         # Django signals (post-save hooks)
@@ -92,13 +92,13 @@ LDP/
 │   │   │   ├── interventions.py # Intervention log + log form
 │   │   │   ├── pods.py        # Pod list + detail + assignment
 │   │   │   ├── portfolio.py   # Portfolio cross-programme view
-│   │   │   ├── admin_views.py # Upload, ingestion log, admin tools
+│   │   │   ├── admin_views.py # Upload, ingestion log, admin tools, user management
 │   │   │   ├── programme_admin.py # Programme/course CRUD
 │   │   │   ├── programme_structure.py # Programme structure upload
 │   │   │   └── help.py        # Help page
 │   │   ├── templatetags/
 │   │   │   └── sp_filters.py  # Custom template filters
-│   │   └── migrations/        # 26 migrations
+│   │   └── migrations/        # 28 migrations
 │   └── templates/
 │       ├── base.html          # Root base
 │       ├── selfpaced/base.html # App base (nav sidebar)
@@ -126,12 +126,14 @@ LDP/
 
 ```bash
 cd lce_platform
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
+DB_ENGINE=django.db.backends.sqlite3 python manage.py migrate
+DB_ENGINE=django.db.backends.sqlite3 python manage.py createsuperuser
+DB_ENGINE=django.db.backends.sqlite3 python manage.py runserver
 ```
 
 Open `http://127.0.0.1:8000/`. All routes are under the `selfpaced` app with prefix `/`.
+
+**Note:** On the production server, MariaDB is used. Set `DB_ENGINE=django.db.backends.mysql` and provide `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` environment variables.
 
 **Stalled job auto-reset:** On every server startup, `apps.py → SelfpacedConfig.ready()` resets any `IngestionJob`, `EnrolmentUploadJob`, or `PodImportJob` with `status='processing'` to `status='failed'` — these were mid-run when the server last restarted and would otherwise be stuck indefinitely.
 
@@ -169,6 +171,13 @@ Open `http://127.0.0.1:8000/`. All routes are under the `selfpaced` app with pre
 | `/admin/ingestion/<pk>/retry/` | `admin_views.retry_job` | Retry a failed job |
 | `/admin/ingestion/<pk>/review/` | `admin_views.review_job` | Review flagged rows |
 | `/admin/ingestion/<pk>/delete/` | `admin_views.delete_job` | Delete a job |
+| `/admin/ingestion/<pk>/preview-poll/` | `admin_views.preview_poll_fragment` | HTMX preview progress poll |
+| `/admin/recompute-status/` | `admin_views.recompute_health_status` | HTMX recompute progress |
+| `/admin/purge-job-blobs/` | `admin_views.purge_job_blobs` | Purge legacy CSV blobs from DB |
+| `/admin/users/` | `admin_views.user_list` | Staff user list |
+| `/admin/users/create/` | `admin_views.user_create` | Create staff user |
+| `/admin/users/<pk>/edit/` | `admin_views.user_edit` | Edit staff user |
+| `/admin/users/<pk>/toggle-active/` | `admin_views.user_toggle_active` | Activate/deactivate user |
 | `/admin/enrolment-csv/` | `admin_views.enrolment_upload_log` | Enrolment CSV job list |
 | `/admin/enrolment-csv/upload/` | `admin_views.upload_enrolment_csv` | Upload enrolment CSV |
 | `/admin/enrolment-csv/<pk>/review/` | `admin_views.review_enrolment_csv` | Review enrolment CSV |
@@ -383,13 +392,17 @@ base_qs = (
 **Purpose:** Upload staff portal CSV to ingest learner progress.
 
 **Flow:**
-1. File validation (synchronous — returns immediately if invalid)
-2. Programme/course detection via eHub class name pattern registry
-3. Background thread processes: structure extraction → learner matching → progress upsert → health flag recomputation → snapshot creation → ingestion log entry
-4. HTMX polling updates the progress bar in the UI without full page refresh
-5. Rows that can't be auto-matched are flagged for admin review in the flagged row queue
+1. User selects a CSV and an optional "Data as of date" — the upload page shows a real-time progress bar while the file is transferred (XHR, not a standard form submit)
+2. File is saved to disk (`MEDIA_ROOT/ingestion_csvs/`) as a `FileField` — not stored in the database as a blob
+3. Background thread runs `preview_ingestion()`, which streams through the CSV rows without loading all rows into memory at once (`iter_csv()` generator), and emits step progress to `progress_log` after each of its 3 phases
+4. HTMX polls `/admin/ingestion/<pk>/preview-poll/` every 2 seconds; the poll endpoint returns a step-list fragment showing "Reading & parsing CSV → Detecting programmes & courses → Counting new learners" with live check/pulse indicators; when preview finishes it returns `HX-Redirect`
+5. Admin reviews the preview screen (programme breakdown, flagged rows, new course warnings) then clicks Confirm or Cancel
+6. On Confirm: 7-phase ingestion pipeline runs in background with its own HTMX progress bar (Parsing CSV → Building course catalogue → Upserting learner records → Upserting enrolments & progress → Computing health flags → Creating snapshots → Finalising)
+7. Phases 3 and 4 use MariaDB `INSERT … ON DUPLICATE KEY UPDATE` for Learner, Enrolment, and CourseEnrolment tables — eliminates the SELECT + split + dual-write round-trips
+8. AssignmentProgress: old records for uploaded courses are deleted and recreated in batches of 2000 (not 500)
+9. On completion: CSV file deleted from disk; `file_content` BinaryField cleared
 
-**Job model:** `IngestionJob` — `status` ∈ `{pending, processing, complete, failed, cancelled}`
+**Job model:** `IngestionJob` — `status` ∈ `{pending, previewing, pending_review, processing, complete, failed, cancelled}`
 
 ---
 
@@ -493,12 +506,12 @@ else:                                   → "active"
 
 | Threshold | Default |
 |---|---|
-| activation_threshold_days | 3 |
-| inactivity_threshold_days | 7 |
-| dormancy_threshold_days | 14 |
-| stuck_assignment_threshold_days | 5 |
-| pass_rate_threshold_pct | 70 |
-| inter_course_threshold_days | 5 |
+| activation_threshold_days | 14 |
+| inactivity_threshold_days | 14 |
+| dormancy_threshold_days | 21 |
+| stuck_assignment_threshold_days | 14 |
+| pass_rate_threshold_pct | 50 |
+| inter_course_threshold_days | 14 |
 | upload_warning_threshold_days | 7 |
 
 ### Graduation detection
@@ -561,6 +574,12 @@ All three job models follow the same pattern — `status` ∈ `{pending, process
 | `IngestionJob` | Staff portal CSV upload job |
 | `EnrolmentUploadJob` | Simplified enrolment CSV upload job |
 | `PodImportJob` | Pod assignment CSV import job |
+
+#### `IngestionJob` — additional fields
+
+`file_name` — original filename of the uploaded CSV.
+
+`file` (FileField, nullable) — path to uploaded CSV on disk (`MEDIA_ROOT/ingestion_csvs/`). Cleared after ingestion completes. Takes priority over `file_content` in the engine. `file_content` (BinaryField) — legacy; kept for backward compat with jobs uploaded before migration 0028. New uploads write to `file` only.
 
 ### Pod Models
 
@@ -663,6 +682,8 @@ Can be triggered manually from `/admin/recompute-health/`. Runs `compute_enrolme
 | Configure monitored countries | `/admin/countries/` |
 | Purge learners from removed countries | `/admin/countries/purge/` |
 | Trigger full health recompute | `/admin/recompute-health/` |
+| Manage staff users (create/edit/deactivate) | `/admin/users/` |
+| Purge legacy CSV blobs from the database | `/admin/` → Purge Legacy Blobs button |
 
 ---
 
@@ -729,6 +750,12 @@ Programmes with `is_prerequisite=True` (e.g. WALX onboarding) are excluded from 
 - Delta comparisons on the home dashboard (current vs previous upload)
 - Historical trend charts on the learner profile
 They are NOT used for any current-state metrics (which always query live `Enrolment`/`CourseEnrolment` data).
+
+### CSV stored on disk, not in DB (since migration 0028).
+Uploaded CSVs are written to `MEDIA_ROOT/ingestion_csvs/` (configurable in `settings.py`) and deleted after ingestion. `MEDIA_ROOT` defaults to `BASE_DIR.parent / 'private_media'` — this directory must exist and be writable on the server. Pre-0028 jobs that have `file_content` set can be cleared via Admin → Purge Legacy Blobs or `python manage.py purge_job_files --apply`.
+
+### Streaming CSV parsing.
+`parsing.iter_csv()` is a lazy generator — it yields one row dict at a time rather than materialising `all_rows` and `data_rows` lists. This reduces peak memory during ingestion/preview from ~600 MB (for 80 MB files) to ~200 MB. `all_parsed` (the fully-typed list of valid rows) is still held in memory because Phase 2 iterates it 4+ times; future work could split this into two seekable file passes.
 
 ---
 

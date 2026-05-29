@@ -90,7 +90,7 @@ elif _db_engine == 'django.db.backends.mysql':
             'PASSWORD': os.environ.get('DB_PASSWORD', ''),
             'HOST':     os.environ.get('DB_HOST',     'localhost'),
             'PORT':     os.environ.get('DB_PORT',     '3306'),
-            'CONN_MAX_AGE': 60,  # keep connections alive 60s — reduces overhead per request
+            'CONN_MAX_AGE': 0 if DEBUG else 60,  # 0 in dev avoids connection pile-up from threaded server + polling
             'OPTIONS': {
                 'charset': 'utf8mb4',
                 # STRICT_TRANS_TABLES: required by Django — MySQL 5.7+ enables this by default

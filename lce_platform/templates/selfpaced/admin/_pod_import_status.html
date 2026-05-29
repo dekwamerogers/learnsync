@@ -1,7 +1,7 @@
 <div id="pod-import-status"
      {% if job.status == 'processing' %}
      hx-get="{% url 'sp_pod_import_status' job.pk %}"
-     hx-trigger="every 2s"
+     hx-trigger="every 10s"
      hx-swap="outerHTML"
      {% endif %}>
 

@@ -2,7 +2,7 @@
 <div id="enrolment-status"
      {% if job.status == 'processing' %}
      hx-get="{% url 'sp_enrolment_status' job.pk %}"
-     hx-trigger="every 2s"
+     hx-trigger="every 10s"
      hx-swap="outerHTML"
      {% endif %}>
 

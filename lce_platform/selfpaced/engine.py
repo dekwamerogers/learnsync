@@ -24,6 +24,7 @@ from selfpaced.detector import detect_programme_and_course
 from selfpaced.health import compute_enrolment_health
 from selfpaced.parsing import (
     iter_csv, load_csv, parse_other_programme_names, row_to_dict, validate_columns,
+    _str, _seq, _text, get,
 )
 
 logger = logging.getLogger(__name__)
@@ -210,8 +211,9 @@ def _upsert_enrolments_mariadb(rows: list, job_pk: int, batch_size: int = 500):
              first_sign_of_life_date, activation_date,
              is_graduated, graduation_date, is_graduated_on_savanna,
              created_by_job_id, has_activity_data,
-             health_status, active_flags, flag_detail)
-        VALUES ({placeholders})
+             health_status, active_flags, flag_detail,
+             last_updated_date)
+        VALUES {placeholders}
         ON DUPLICATE KEY UPDATE
             first_sign_of_life_date = CASE
                 WHEN first_sign_of_life_date IS NULL THEN VALUES(first_sign_of_life_date)
@@ -224,9 +226,10 @@ def _upsert_enrolments_mariadb(rows: list, job_pk: int, batch_size: int = 500):
             is_graduated     = GREATEST(is_graduated, VALUES(is_graduated)),
             graduation_date  = COALESCE(VALUES(graduation_date), graduation_date),
             is_graduated_on_savanna = GREATEST(is_graduated_on_savanna, VALUES(is_graduated_on_savanna)),
-            has_activity_data = 1
+            has_activity_data = 1,
+            last_updated_date = NOW(6)
     """
-    per_row = ', '.join(['%s'] * 12)
+    per_row = ', '.join(['%s'] * 12) + ', NOW(6)'
     for chunk in _chunked(rows, batch_size):
         values_clause = ', '.join(f'({per_row})' for _ in chunk)
         params = []
@@ -266,8 +269,9 @@ def _upsert_ces_mariadb(rows: list, batch_size: int = 500):
     sql = """
         INSERT INTO selfpaced_courseenrolment
             (enrolment_id, course_id, status, is_passed,
-             completion_date, last_activity_date, pass_percentage, opt_in_date)
-        VALUES ({placeholders})
+             completion_date, last_activity_date, pass_percentage, opt_in_date,
+             last_updated_date)
+        VALUES {placeholders}
         ON DUPLICATE KEY UPDATE
             status = IF(status = 'completed', 'completed', VALUES(status)),
             is_passed = GREATEST(is_passed, VALUES(is_passed)),
@@ -280,9 +284,10 @@ def _upsert_ces_mariadb(rows: list, batch_size: int = 500):
             opt_in_date = CASE
                 WHEN opt_in_date IS NULL THEN VALUES(opt_in_date)
                 WHEN VALUES(opt_in_date) IS NULL THEN opt_in_date
-                ELSE LEAST(opt_in_date, VALUES(opt_in_date)) END
+                ELSE LEAST(opt_in_date, VALUES(opt_in_date)) END,
+            last_updated_date = NOW(6)
     """
-    per_row = ', '.join(['%s'] * 8)
+    per_row = ', '.join(['%s'] * 8) + ', NOW(6)'
     for chunk in _chunked(rows, batch_size):
         values_clause = ', '.join(f'({per_row})' for _ in chunk)
         params = []
@@ -1400,63 +1405,66 @@ def preview_ingestion(job_id: int) -> dict:
         job.save(update_fields=['status', 'errors'])
         return {}
 
-    # Reset progress log for fresh preview progress display.
     job.progress_log = []
     job.save(update_fields=['progress_log'])
 
-    parsed = []
+    # ── Single streaming pass ────────────────────────────────────────────────
+    # Keep only the 6 fields needed for post-detect work as slim tuples.
+    # Avoids materialising ~30-field dicts for 100k+ rows (~200 MB → ~30 MB).
+    slim_rows: list[tuple] = []   # (email, ehub, seq, cname, assign_name)
+    ehub_course_hint: dict[str, str] = {}
+    cross_enrolled: dict[str, set] = {}
+    all_emails: set[str] = set()
     skip_count = 0
+
     for raw in row_iter:
-        r = row_to_dict(raw)
-        if not r['email'] or '@' not in r['email']:
+        email = _str(get(raw, 'email')).lower()
+        if not email or '@' not in email:
             skip_count += 1
             continue
-        parsed.append(r)
 
-    _emit_progress(job, 1, f'Parsed {len(parsed):,} rows — {skip_count} skipped')
+        ehub  = _str(get(raw, 'ehub_class_name'))
+        cname = _clean_course_name(_str(get(raw, 'course_name')))
+        seq   = _seq(get(raw, 'course_sequence_number'))
+        aname = _text(get(raw, 'assignment_name'))
 
-    # Cross-enrolment signals
-    cross_enrolled: dict[str, set] = {}
-    for r in parsed:
-        for name in parse_other_programme_names(r.get('other_programme_names') or ''):
-            cross_enrolled.setdefault(name, set()).add(r['email'])
-
-    # Detect once per unique eHub class name (may auto-create Programmes).
-    # bulk_detect resolves all class names with ~5 queries instead of N*5.
-    ehub_course_hint: dict[str, str] = {}
-    for r in parsed:
-        ehub = r['ehub_class_name']
         if ehub and ehub not in ehub_course_hint:
-            ehub_course_hint[ehub] = _clean_course_name(r['course_name'] or '')
+            ehub_course_hint[ehub] = cname
 
+        for pname in parse_other_programme_names(_str(get(raw, 'other_programme_names'))):
+            cross_enrolled.setdefault(pname, set()).add(email)
+
+        all_emails.add(email)
+        slim_rows.append((email, ehub, seq, cname, aname))
+
+    row_count = len(slim_rows)
+    _emit_progress(job, 1, f'Parsed {row_count:,} rows — {skip_count} skipped')
+
+    # ── Programme / course detection ─────────────────────────────────────────
     from selfpaced.detector import bulk_detect as _bulk_detect
     ehub_resolution: dict[str, tuple] = _bulk_detect(ehub_course_hint)
 
     prog_count = sum(1 for p, _ in ehub_resolution.values() if p is not None)
     _emit_progress(job, 2, f'Matched {len(ehub_course_hint):,} class names across {prog_count} programme(s)')
 
-    # Collect needed (prog, seq) → name and count rows per programme.
-    needed: dict[tuple, str] = {}     # (prog_pk, seq) -> name
-    prog_row_counts: dict[str, int] = {}   # prog_code -> row count
+    existing_prog_codes = set(Programme.objects.values_list('code', flat=True))
+
+    needed: dict[tuple, str] = {}
+    prog_row_counts: dict[str, int] = {}
     flagged_preview = []
     flagged_emails: set[str] = set()
     new_prog_codes: set[str] = set()
+    needed_assign_keys: set[tuple] = set()
 
-    # Which programme codes are already in the DB?
-    existing_prog_codes = set(
-        Programme.objects.values_list('code', flat=True)
-    )
-
-    for r in parsed:
-        ehub = r['ehub_class_name']
+    for email, ehub, seq, cname, aname in slim_rows:
         prog, course = ehub_resolution.get(ehub, (None, None))
 
         if prog is None:
             flagged_preview.append({
                 'flag_reason': 'unrecognised_pattern',
-                'raw_data': {'email': r['email'], 'ehub_class_name': ehub},
+                'raw_data': {'email': email, 'ehub_class_name': ehub},
             })
-            flagged_emails.add(r['email'])
+            flagged_emails.add(email)
             continue
 
         prog_row_counts[prog.code] = prog_row_counts.get(prog.code, 0) + 1
@@ -1464,45 +1472,24 @@ def preview_ingestion(job_id: int) -> dict:
         if prog.code not in existing_prog_codes:
             new_prog_codes.add(prog.code)
 
-        if course is None:
-            seq = _resolve_course_seq(ehub, r['course_sequence_number'], _FA_RE)
-            if seq:
-                cname = _clean_course_name(r['course_name'] or '') or f'{prog.code} — Course {seq}'
-                key = (prog.pk, seq)
-                if key not in needed or _is_placeholder(needed[key]):
-                    needed[key] = cname
+        if course is None and seq:
+            key = (prog.pk, seq)
+            label = cname or f'{prog.code} — Course {seq}'
+            if key not in needed or _is_placeholder(needed[key]):
+                needed[key] = label
 
-    # Bulk-query existing courses.
+        if aname and seq:
+            needed_assign_keys.add((prog.pk, seq, aname))
+
+    # ── Bulk DB lookups ──────────────────────────────────────────────────────
     if needed:
         _course_rows = Course.objects.filter(
             programme_id__in={k[0] for k in needed}
         ).values('id', 'code', 'programme_id', 'sequence_number')
         existing_course_map: dict[tuple, dict] = {
-            (row['programme_id'], row['sequence_number']): row
-            for row in _course_rows
+            (r['programme_id'], r['sequence_number']): r for r in _course_rows
         }
         existing_course_pairs: set[tuple] = set(existing_course_map.keys())
-    else:
-        existing_course_map = {}
-        existing_course_pairs = set()
-
-    truly_new_courses = [
-        {'programme_id': prog_pk, 'sequence_number': seq, 'full_name': name}
-        for (prog_pk, seq), name in needed.items()
-        if (prog_pk, seq) not in existing_course_pairs
-    ]
-
-    # Bulk-query existing assignments for a new-count estimate.
-    if needed:
-        needed_assign_keys: set[tuple] = set()
-        prog_id_to_code = dict(Programme.objects.values_list('id', 'code'))
-        for r in parsed:
-            ehub = r['ehub_class_name']
-            prog, course = ehub_resolution.get(ehub, (None, None))
-            if prog and r['assignment_name']:
-                seq = _resolve_course_seq(ehub, r['course_sequence_number'], _FA_RE)
-                if seq:
-                    needed_assign_keys.add((prog.pk, seq, r['assignment_name']))
 
         existing_assign_keys: set[tuple] = set(
             Assignment.objects.filter(
@@ -1511,30 +1498,32 @@ def preview_ingestion(job_id: int) -> dict:
         )
         new_assign_count = len(needed_assign_keys - existing_assign_keys)
     else:
+        existing_course_map = {}
+        existing_course_pairs = set()
         new_assign_count = 0
 
-    # Programme breakdown for the review card.
-    prog_names = dict(Programme.objects.values_list('code', 'name'))
-    new_course_by_prog: dict[str, int] = {}
-    for (prog_pk, seq) in needed:
-        if (prog_pk, seq) not in existing_course_pairs:
-            prog_code = prog_id_to_code.get(prog_pk, '')
-            new_course_by_prog[prog_code] = new_course_by_prog.get(prog_code, 0) + 1
+    truly_new_courses = [
+        {'programme_id': pk, 'sequence_number': seq, 'full_name': name}
+        for (pk, seq), name in needed.items()
+        if (pk, seq) not in existing_course_pairs
+    ]
 
+    prog_id_to_code = dict(Programme.objects.values_list('id', 'code'))
+    prog_names      = dict(Programme.objects.values_list('code', 'name'))
+    prog_id_map     = {p.pk: p.code for p, _ in ehub_resolution.values() if p}
+
+    new_course_by_prog: dict[str, int] = {}
     prog_courses: dict[str, list] = defaultdict(list)
-    prog_id_map = {p.pk: p.code for p, _ in ehub_resolution.values() if p}
     for (prog_pk, seq), name in needed.items():
         prog_code = prog_id_map.get(prog_pk, '')
         is_new = (prog_pk, seq) not in existing_course_pairs
+        if is_new:
+            new_course_by_prog[prog_code] = new_course_by_prog.get(prog_code, 0) + 1
         existing_row = existing_course_map.get((prog_pk, seq)) or {}
-        # Course tag shown on the review screen — prefer the stored code, fall back to derived form.
         course_tag = existing_row.get('code') or f'{prog_code}-{seq}'
         prog_courses[prog_code].append({
-            'seq': seq,
-            'name': name,
-            'tag': course_tag,
-            'is_new': is_new,
-            'course_pk': existing_row.get('id'),
+            'seq': seq, 'name': name, 'tag': course_tag,
+            'is_new': is_new, 'course_pk': existing_row.get('id'),
         })
 
     programme_breakdown = [
@@ -1549,8 +1538,8 @@ def preview_ingestion(job_id: int) -> dict:
         for code in sorted(prog_row_counts)
     ]
 
-    # New vs existing learner count (exclude emails only seen in unresolvable rows).
-    processable_emails = {r['email'] for r in parsed} - flagged_emails
+    # ── New vs existing learners ─────────────────────────────────────────────
+    processable_emails = all_emails - flagged_emails
     existing_emails: set[str] = set()
     for _chunk in _chunked(list(processable_emails)):
         existing_emails.update(
@@ -1561,8 +1550,8 @@ def preview_ingestion(job_id: int) -> dict:
     _emit_progress(job, 3, f'{new_count:,} new learner{"s" if new_count != 1 else ""}, {len(existing_emails):,} existing')
 
     preview = {
-        'rows_processed':     len(parsed) + skip_count,
-        'new_learners':       len(processable_emails - existing_emails),
+        'rows_processed':     row_count + skip_count,
+        'new_learners':       new_count,
         'updated_learners':   len(processable_emails & existing_emails),
         'flagged_count':      len(flagged_preview),
         'warnings':           [],

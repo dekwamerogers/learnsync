@@ -29,9 +29,11 @@
 
   <div class="sp-card" style="padding:24px;">
     <div style="font-size:13px;font-weight:600;color:#111827;margin-bottom:16px;">Analysing your CSV</div>
-    {# _preview_status.html owns the #preview-loader div and its HTMX poll loop.
-       Each swap re-inserts it with the same hx-trigger="load, every 2s",
-       so polling is self-perpetuating until HX-Redirect fires. #}
+    {% comment %}
+    _preview_status.html owns the #preview-loader div and its HTMX poll loop.
+    Each swap re-inserts it with the same hx-trigger, so polling is
+    self-perpetuating until HX-Redirect fires.
+    {% endcomment %}
     {% include "selfpaced/admin/_preview_status.html" %}
     <div style="font-size:11px;color:#9ca3af;margin-top:16px;">
       Large files can take 10–30 seconds — please keep this page open.

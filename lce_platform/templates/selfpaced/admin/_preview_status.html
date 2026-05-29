@@ -7,7 +7,7 @@ the next 2-second poll.  When the poll endpoint returns HX-Redirect
 {% endcomment %}
 <div id="preview-loader"
      hx-get="{% url 'sp_preview_poll' job.pk %}"
-     hx-trigger="load, every 2s"
+     hx-trigger="load, every 10s"
      hx-target="this"
      hx-swap="outerHTML">
 

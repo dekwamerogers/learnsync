@@ -5,6 +5,13 @@
 **Date:** May 2026
 **Classification:** Confidential
 
+> **Changelog — v1.2 → v1.3 (May 2026)**
+> **Section 4 (Upload Process):** Full preview step added — file is now stored on disk (FileField) rather than as a database blob. Upload page shows XHR progress bar during file transfer. Preview runs asynchronously with a 3-step progress display (Reading & parsing, Detecting programmes, Counting learners). Admin reviews a programme breakdown before confirming ingestion. 7-step ingestion pipeline progress bar visible during processing.
+> **Section 4 (Ingestion performance):** Learner, Enrolment, and CourseEnrolment upserts now use MariaDB `INSERT … ON DUPLICATE KEY UPDATE` — eliminates the read-before-write pattern that caused lock wait timeouts at scale. AssignmentProgress batch size increased to 2000.
+> **Section 6 (Health thresholds):** Default thresholds updated to reflect realistic engagement patterns: activation 14 days, inactivity 14 days, dormancy 21 days, stuck assignment 14 days, pass rate 50%, inter-course 14 days.
+> **Section 8 (Admin capabilities):** User management added — admins can create, edit, and deactivate staff accounts from within the app (Admin → Users), no Django admin required.
+> **Section 18 (File upload security):** CSV files are stored in a non-web-accessible directory (`private_media/`) outside the web root and deleted from disk after ingestion completes, ensuring sensitive learner data is not retained as files.
+
 > **Changelog — v1.1 → v1.2 (May 2026)**
 > **Section 5 (Enrolment model):** Added `has_activity_data` boolean field — distinguishes eHub activity-CSV enrolments (True) from roster-only enrolment-CSV records (False). Used to split "In eHub" vs "Roster Only" counts on the home dashboard.
 > **Section 11 (Home dashboard):** Added Programme Health Breakdown table — per-programme row showing Roster Only vs In eHub split, Activated/Active/At Risk/Dormant/Graduated rates, all status counts as clickable links to filtered learner list.
@@ -175,7 +182,7 @@ Where the values decoded from the eHub class name conflict with the course name 
 
 ### Upload Process
 
-An LCE or admin downloads the CSV from the staff portal and uploads it through the ingestion interface. Large files are processed asynchronously in the background. The upload is received and queued immediately — the LCE does not wait at a loading screen. An in-app notification is delivered when processing is complete. If processing produces errors, the notification describes them and links to the ingestion log entry with full detail.
+An LCE or admin downloads the CSV from the staff portal and uploads it through the ingestion interface. A real-time progress bar in the browser shows the file being transferred to the server. Once transferred, the file is stored temporarily on disk (not in the database) and the server immediately begins an asynchronous preview analysis. The upload interface transitions automatically to an analysis screen showing three live progress steps — reading and parsing the CSV, detecting programmes and courses, counting new and existing learners. When analysis completes, the admin reviews a programme breakdown showing which programmes and courses were found, how many rows matched, and any rows that could not be resolved. The admin then confirms or cancels. On confirmation, the full 7-phase ingestion pipeline runs in the background. The file is deleted from disk once ingestion completes.
 
 On upload, the system performs the following steps in order:
 
@@ -402,13 +409,13 @@ Thresholds are configured per programme by an admin and stored in a threshold co
 
 | Threshold | Description | Default |
 |---|---|---|
-| Activation threshold | Days after first sign of life before never activated flag fires | 3 days |
-| Inactivity threshold | Days without activity before inactive flag fires | 7 days |
-| Dormancy threshold | Days without activity before status escalates to dormant | 14 days |
-| Stuck assignment threshold | Days after assignment access before stuck flag fires | 5 days |
-| Pass rate threshold | Minimum pass ratio before low pass rate flag fires | 70% |
-| Inter-course threshold | Days after course completion before stalled flag fires | 5 days |
-| Upload warning threshold | Days since last upload before staleness warning fires | 7 days |
+| Activation threshold | Days after first sign of life before never activated flag fires | **14 days** |
+| Inactivity threshold | Days without activity before inactive flag fires | **14 days** |
+| Dormancy threshold | Days without activity before status escalates to dormant | **21 days** |
+| Stuck assignment threshold | Days after assignment access before stuck flag fires | **14 days** |
+| Pass rate threshold | Minimum pass ratio before low pass rate flag fires | **50%** |
+| Inter-course threshold | Days after course completion before stalled flag fires | **14 days** |
+| Upload warning threshold | Days since last upload before staleness warning fires | 7 days (unchanged) |
 
 All thresholds have system-wide defaults. Admins can override per programme at any time. Changes take effect on the next ingestion and do not retroactively alter historical snapshots. Every threshold change is logged with the admin's name and timestamp.
 
@@ -514,9 +521,15 @@ Admins can trigger a re-ingestion of any previously uploaded file. Re-ingestion 
 
 ### User Management
 
-Admins can create, edit, and deactivate staff user accounts. Deactivating a user does not alter records attributed to them — their name remains on all historical interventions and uploads. A deactivated user cannot log in but their history is preserved.
+Admins can create, edit, and deactivate staff user accounts directly from the LearnSync interface at `/admin/users/`. No access to the Django admin panel is required for routine account management.
 
-In the initial release there is no role-based access control. The role field on the staff user record — LCE, PM, admin — is used for display and attribution purposes but does not restrict access. It is designed to support access control in a future release without a schema change.
+**Creating a user** — name, email, password (minimum 8 characters), staff/superuser permissions. Usernames must be unique.
+
+**Editing a user** — all fields except username are editable. Password field left blank = keep existing password.
+
+**Deactivating a user** — toggles the active flag. The user cannot log in while inactive but all records attributed to them (uploads, interventions, admin actions) are retained and continue to be attributed to their account. Admins cannot deactivate their own account.
+
+Only staff members can access user management. Superuser checkbox can only be set by a superuser.
 
 ---
 
@@ -1238,7 +1251,7 @@ Every input surface in the platform is validated and sanitised before processing
 
 **Cross-site request forgery (CSRF)** — all state-changing requests require a valid CSRF token. The token is tied to the authenticated session and validated server-side on every request.
 
-**File upload security** — uploaded files are validated for type, size, and structure before processing. The ingestion pipeline does not execute any code contained in uploaded files. Files are stored in an isolated location inaccessible from the web server's public directory.
+**File upload security** — uploaded CSV files are stored in a non-web-accessible directory (`private_media/`) outside the web root and deleted from disk after ingestion completes, ensuring sensitive learner data is not retained as files. Uploaded files are validated for type, size, and structure before processing. The ingestion pipeline does not execute any code contained in uploaded files.
 
 ### API & Endpoint Security
 
