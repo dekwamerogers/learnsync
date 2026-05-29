@@ -1610,7 +1610,10 @@ def _update_learner_health_rollups(enrolments):
         updates.append(Learner(email=learner_id, overall_health_status=overall))
 
     if updates:
-        Learner.objects.bulk_update(updates, ['overall_health_status'], batch_size=500)
+        from django.db import transaction
+        for _i in range(0, len(updates), 100):
+            with transaction.atomic():
+                Learner.objects.bulk_update(updates[_i:_i + 100], ['overall_health_status'])
 
     # Learners whose only enrolments are prerequisite programmes (e.g. WALX-only)
     # were never added to learner_enrolments; reset any stale 'graduated' status.
@@ -1819,13 +1822,16 @@ def recompute_health(
             errors.append(f'{enrolment.learner_id} ({enrolment.programme.code}): {exc}')
             _recompute_state['errors'] = len(errors)
 
-    # Single bulk_update instead of one UPDATE per enrolment
+    # Write in small batches inside separate transactions so MariaDB releases
+    # row locks between batches.  One giant bulk_update holds locks on every
+    # Enrolment row for the entire duration, causing lock-wait timeouts when
+    # other requests access the same table concurrently.
     if updated_enrolments:
-        Enrolment.objects.bulk_update(
-            updated_enrolments,
-            ['health_status', 'active_flags', 'flag_detail'],
-            batch_size=500,
-        )
+        from django.db import transaction
+        fields = ['health_status', 'active_flags', 'flag_detail']
+        for _i in range(0, len(updated_enrolments), 100):
+            with transaction.atomic():
+                Enrolment.objects.bulk_update(updated_enrolments[_i:_i + 100], fields)
 
     _update_learner_health_rollups(enrolments)
 

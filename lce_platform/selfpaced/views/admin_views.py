@@ -31,9 +31,9 @@ def _run_ingestion_thread(job_pk: int) -> None:
 def _run_preview_thread(job_pk: int) -> None:
     """Run preview_ingestion in a background thread so the upload response is instant."""
     from django.db import close_old_connections
-    from selfpaced.engine import preview_ingestion
     close_old_connections()
     try:
+        from selfpaced.engine import preview_ingestion  # inside try so import errors are caught
         preview_ingestion(job_pk)
         # preview_ingestion sets status → 'pending_review' or 'failed' itself.
     except Exception as exc:
@@ -415,8 +415,17 @@ def preview_poll_fragment(request, pk):
     - Failed/other      → HX-Redirect to the job detail page.
     """
     from django.urls import reverse
+    from django.utils import timezone
+    from datetime import timedelta
     job = get_object_or_404(IngestionJob, pk=pk)
     if job.status == 'previewing':
+        # Safety net: if still previewing after 3 minutes the background thread
+        # died without updating the status — fail it so the UI unsticks.
+        if timezone.now() - job.uploaded_at > timedelta(minutes=3):
+            job.status = 'failed'
+            job.errors = ['Preview timed out — the analysis took too long. Please try uploading again.']
+            job.save(update_fields=['status', 'errors'])
+            return HttpResponse('', headers={'HX-Redirect': reverse('sp_job_detail', args=[pk])})
         return render(request, 'selfpaced/admin/_preview_status.html', {'job': job})
     if job.status == 'pending_review':
         return HttpResponse('', headers={'HX-Redirect': reverse('sp_job_review', args=[pk])})
