@@ -1,11 +1,18 @@
 {% comment %}
-HTMX polling fragment — swapped every 2 s while preview is running.
-The outer #preview-loader div has hx-get / hx-trigger="every 2s" set on it.
+HTMX polling fragment for the preview-in-progress state.
+
+The div carries its own hx-* attributes so that each swap re-registers
+the next 2-second poll.  When the poll endpoint returns HX-Redirect
+(preview done or failed) the redirect fires before any swap occurs.
 {% endcomment %}
-<div style="padding:0;">
+<div id="preview-loader"
+     hx-get="{% url 'sp_preview_poll' job.pk %}"
+     hx-trigger="load, every 2s"
+     hx-target="this"
+     hx-swap="outerHTML">
 
   {% if preview_pipeline %}
-  {# ── Step progress bar ───────────────────────────────────────────────────── #}
+  {# ── Step progress bar ─────────────────────────────────────────────── #}
   <div style="margin-bottom:20px;">
     <div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;margin-bottom:6px;">
       <span>{{ preview_pct }}% complete</span>
@@ -19,7 +26,7 @@ The outer #preview-loader div has hx-get / hx-trigger="every 2s" set on it.
     </div>
   </div>
 
-  {# ── Step list ───────────────────────────────────────────────────────────── #}
+  {# ── Step list ──────────────────────────────────────────────────────── #}
   <div>
     {% for step in preview_pipeline %}
     <div style="display:flex;gap:12px;padding:9px 0;{% if not forloop.last %}border-bottom:1px solid #f9fafb;{% endif %}
@@ -61,9 +68,10 @@ The outer #preview-loader div has hx-get / hx-trigger="every 2s" set on it.
   </div>
 
   {% else %}
-  {# ── Fallback spinner before first step fires ────────────────────────────── #}
+  {# ── Fallback spinner before the first step fires ───────────────────── #}
   <div style="text-align:center;padding:16px 0;">
-    <div style="display:inline-block;width:18px;height:18px;border:2px solid #e5e7eb;border-top-color:#0452F0;border-radius:50%;animation:sp-spin .7s linear infinite;vertical-align:middle;margin-right:8px;"></div>
+    <div style="display:inline-block;width:18px;height:18px;border:2px solid #e5e7eb;border-top-color:#0452F0;
+                border-radius:50%;animation:sp-spin .7s linear infinite;vertical-align:middle;margin-right:8px;"></div>
     <span style="font-size:13px;color:#6b7280;">Starting analysis…</span>
   </div>
   {% endif %}
