@@ -278,26 +278,90 @@
 
 /* ── Tooltip system ─────────────────────────────────────────────────────── */
 /* Usage: <span class="sp-tip" data-tip="Your explanation here">?</span>    */
+/* Tooltip bubble is rendered via JS into a fixed-position div on <body>    */
+/* so it is never clipped by overflow:hidden parent containers.             */
 .sp-tip {
   display:inline-flex;align-items:center;justify-content:center;
   width:14px;height:14px;border-radius:50%;
   background:#e5e7eb;color:#6b7280;font-size:10px;font-weight:700;
-  cursor:help;position:relative;vertical-align:middle;margin-left:4px;
+  cursor:help;vertical-align:middle;margin-left:4px;
   flex-shrink:0;
 }
-.sp-tip::after {
-  content: attr(data-tip);
-  position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);
-  background:#1f2937;color:#f9fafb;font-size:11px;font-weight:400;
-  line-height:1.55;padding:7px 10px;border-radius:6px;
-  width:220px;white-space:normal;text-align:left;
-  pointer-events:none;opacity:0;transition:opacity .15s;z-index:9999;
-}
-.sp-tip:hover::after { opacity:1; }
-/* flip upward when near bottom of viewport */
-.sp-tip.tip-down::after { bottom:auto;top:calc(100% + 7px); }
 </style>
 <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+<script>
+// ── .sp-tip tooltip — fixed-position so it escapes overflow:hidden parents ──
+(function () {
+  var bubble = document.createElement('div');
+  bubble.style.cssText = [
+    'position:fixed',
+    'z-index:99999',
+    'background:#1f2937',
+    'color:#f9fafb',
+    'font-size:11px',
+    'font-weight:400',
+    'line-height:1.55',
+    'padding:7px 10px',
+    'border-radius:6px',
+    'width:220px',
+    'max-width:calc(100vw - 16px)',
+    'white-space:normal',
+    'text-align:left',
+    'pointer-events:none',
+    'display:none',
+    'box-sizing:border-box',
+  ].join(';');
+  document.body.appendChild(bubble);
+
+  var hideTimer;
+
+  function show(el) {
+    clearTimeout(hideTimer);
+    var text = el.getAttribute('data-tip');
+    if (!text) return;
+    bubble.textContent = text;
+    bubble.style.display = 'block';
+
+    var tipW = Math.min(220, window.innerWidth - 16);
+    bubble.style.width = tipW + 'px';
+
+    var r   = el.getBoundingClientRect();
+    var bH  = bubble.offsetHeight;
+    var cx  = r.left + r.width / 2;
+    var spaceAbove = r.top;
+    var spaceBelow = window.innerHeight - r.bottom;
+
+    // Place above unless there isn't enough room and more space is below
+    var top;
+    if (spaceAbove >= bH + 10 || spaceAbove >= spaceBelow) {
+      top = r.top - bH - 7;
+    } else {
+      top = r.bottom + 7;
+    }
+
+    var left = cx - tipW / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
+    top  = Math.max(8, Math.min(top,  window.innerHeight - bH  - 8));
+
+    bubble.style.left = left + 'px';
+    bubble.style.top  = top  + 'px';
+  }
+
+  function hide() {
+    hideTimer = setTimeout(function () { bubble.style.display = 'none'; }, 60);
+  }
+
+  document.addEventListener('mouseover', function (e) {
+    var el = e.target.closest && e.target.closest('.sp-tip');
+    if (el) show(el);
+  });
+  document.addEventListener('mouseout', function (e) {
+    if (e.target.closest && e.target.closest('.sp-tip')) hide();
+  });
+  // Hide on scroll so the bubble doesn't drift
+  window.addEventListener('scroll', function () { bubble.style.display = 'none'; }, true);
+})();
+</script>
 <script>
   // Wire Django's CSRF cookie into every non-GET HTMX request
   document.addEventListener('htmx:configRequest', function(e) {
