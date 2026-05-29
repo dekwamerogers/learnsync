@@ -148,13 +148,21 @@
 
   </aside>
 
+  <!-- Overlay dims content when sidebar drawer is open on mobile -->
+  <div id="sp-sidebar-overlay" onclick="spCloseSidebar()"></div>
+
   <!-- =========================================================
        MAIN AREA (right of sidebar)
   ========================================================= -->
-  <div class="sp-main" style="margin-left:220px;">
+  <div class="sp-main">
 
     <!-- Top bar -->
     <div id="sp-topbar">
+      <!-- Hamburger: hidden on desktop, visible on mobile -->
+      <button id="sp-menu-btn" onclick="spToggleSidebar()" aria-label="Open navigation">
+        <i class="ti ti-menu-2"></i>
+      </button>
+
       <span class="sp-page-title">{% block page_title %}{% endblock %}</span>
 
       <!-- Global search -->
@@ -167,7 +175,7 @@
       <!-- Upload CSV -->
       <button class="sp-btn-upload" onclick="spOpenUpload()">
         <i class="ti ti-upload" style="font-size:14px;"></i>
-        Upload CSV
+        <span class="sp-upload-label">Upload CSV</span>
       </button>
 
       <!-- Notification bell -->
@@ -399,6 +407,16 @@ function spBack(fallback) {
   } else {
     window.location.href = fallback || '/';
   }
+}
+
+// Mobile sidebar toggle
+function spToggleSidebar() {
+  var open = document.getElementById('sp-sidebar').classList.toggle('sp-open');
+  document.getElementById('sp-sidebar-overlay').classList.toggle('sp-open', open);
+}
+function spCloseSidebar() {
+  document.getElementById('sp-sidebar').classList.remove('sp-open');
+  document.getElementById('sp-sidebar-overlay').classList.remove('sp-open');
 }
 
 // Upload modal

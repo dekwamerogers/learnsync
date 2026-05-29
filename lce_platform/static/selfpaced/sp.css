@@ -494,4 +494,89 @@ body {
   display: flex;
   flex-direction: column;
   background: #f9fafb;
+  margin-left: 220px;           /* offset for fixed sidebar — overridden on mobile */
+}
+
+/* ══════════════════════════════════════════════════════════
+   Mobile — hamburger, overlay, off-canvas sidebar
+══════════════════════════════════════════════════════════ */
+
+/* Hamburger button: hidden on desktop, shown on mobile */
+#sp-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: none;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+  cursor: pointer;
+  font-size: 18px;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+#sp-menu-btn:hover { background: #f3f4f6; }
+
+/* Overlay that dims the content when the sidebar is open */
+#sp-sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 55;
+}
+#sp-sidebar-overlay.sp-open { display: block; }
+
+/* Smooth slide transition on the sidebar */
+#sp-sidebar { transition: transform 0.22s ease; }
+
+@media (max-width: 768px) {
+  /* ── Sidebar becomes an off-canvas drawer ─────────────── */
+  #sp-sidebar {
+    transform: translateX(-100%);
+    z-index: 60;
+  }
+  #sp-sidebar.sp-open {
+    transform: translateX(0);
+    box-shadow: 6px 0 32px rgba(0, 0, 0, 0.2);
+  }
+
+  /* ── Main content fills full width ────────────────────── */
+  .sp-main { margin-left: 0; }
+
+  /* ── Top bar: hamburger visible, search hidden ─────────── */
+  #sp-menu-btn  { display: flex; }
+  #sp-topbar    { padding: 0 14px; gap: 8px; }
+  #sp-topbar .sp-search { display: none; }
+  .sp-upload-label { display: none; }   /* icon only for Upload CSV button */
+
+  /* ── Content / structural padding ─────────────────────── */
+  #sp-content   { padding: 14px; }
+  #sp-freshness { padding: 6px 14px; }
+  .sp-messages  { padding: 0 14px; }
+
+  /* ── Card grids: force single column ──────────────────── */
+  .sp-action-row,
+  .sp-health-row,
+  .sp-kpi-row,
+  .sp-charts-2col { grid-template-columns: 1fr !important; }
+
+  /* ── Tables: horizontal scroll ────────────────────────── */
+  .sp-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Help page two/three column grids ─────────────────── */
+  .h-two-col,
+  .h-three-col { grid-template-columns: 1fr !important; }
+
+  /* ── Help page sidebar TOC hidden on mobile ────────────── */
+  .h-toc { display: none !important; }
+  .h-shell { grid-template-columns: 1fr !important; }
 }
