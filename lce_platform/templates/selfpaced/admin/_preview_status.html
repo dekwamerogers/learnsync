@@ -2,7 +2,70 @@
 HTMX polling fragment — swapped every 2 s while preview is running.
 The outer #preview-loader div has hx-get / hx-trigger="every 2s" set on it.
 {% endcomment %}
-<div style="text-align:center;padding:16px 0;">
-  <div style="display:inline-block;width:18px;height:18px;border:2px solid #e5e7eb;border-top-color:#0452F0;border-radius:50%;animation:sp-spin .7s linear infinite;vertical-align:middle;margin-right:8px;"></div>
-  <span style="font-size:13px;color:#6b7280;">Analysing CSV — this usually takes 10–30 seconds…</span>
+<div style="padding:0;">
+
+  {% if preview_pipeline %}
+  {# ── Step progress bar ───────────────────────────────────────────────────── #}
+  <div style="margin-bottom:20px;">
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;margin-bottom:6px;">
+      <span>{{ preview_pct }}% complete</span>
+      <span style="display:flex;align-items:center;gap:5px;color:#d97706;font-weight:500;">
+        <span style="width:6px;height:6px;border-radius:50%;background:#d97706;display:inline-block;animation:sp-pulse 1.2s infinite;"></span>
+        Analysing&hellip;
+      </span>
+    </div>
+    <div style="height:7px;background:#f3f4f6;border-radius:9999px;overflow:hidden;">
+      <div style="height:100%;border-radius:9999px;width:{{ preview_pct }}%;background:#0452F0;transition:width .4s ease;"></div>
+    </div>
+  </div>
+
+  {# ── Step list ───────────────────────────────────────────────────────────── #}
+  <div>
+    {% for step in preview_pipeline %}
+    <div style="display:flex;gap:12px;padding:9px 0;{% if not forloop.last %}border-bottom:1px solid #f9fafb;{% endif %}
+      {% if not step.is_done and not step.is_current %}opacity:.38;{% endif %}">
+
+      <div style="flex-shrink:0;padding-top:1px;">
+        {% if step.is_done %}
+        <div style="width:22px;height:22px;border-radius:50%;background:#f0fdf4;border:2px solid #86efac;
+                    display:flex;align-items:center;justify-content:center;">
+          <i class="ti ti-check" style="font-size:11px;color:#16a34a;"></i>
+        </div>
+        {% elif step.is_current %}
+        <div style="width:22px;height:22px;border-radius:50%;background:#eff6ff;border:2px solid #93c5fd;
+                    display:flex;align-items:center;justify-content:center;">
+          <div style="width:7px;height:7px;border-radius:50%;background:#0452F0;animation:sp-pulse 1.2s infinite;"></div>
+        </div>
+        {% else %}
+        <div style="width:22px;height:22px;border-radius:50%;background:#f9fafb;border:2px solid #e5e7eb;"></div>
+        {% endif %}
+      </div>
+
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:600;color:{% if step.is_done or step.is_current %}#111827{% else %}#9ca3af{% endif %};">
+          {{ step.label }}
+        </div>
+        {% if step.entry %}
+        <div style="font-size:11px;color:#6b7280;margin-top:1px;">{{ step.entry.msg }}</div>
+        {% elif step.is_current %}
+        <div style="font-size:11px;color:#d97706;margin-top:1px;">Working&hellip;</div>
+        {% endif %}
+      </div>
+
+      {% if step.entry %}
+      <div style="font-size:11px;color:#9ca3af;white-space:nowrap;padding-top:2px;">{{ step.entry.at }}</div>
+      {% endif %}
+
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  {# ── Fallback spinner before first step fires ────────────────────────────── #}
+  <div style="text-align:center;padding:16px 0;">
+    <div style="display:inline-block;width:18px;height:18px;border:2px solid #e5e7eb;border-top-color:#0452F0;border-radius:50%;animation:sp-spin .7s linear infinite;vertical-align:middle;margin-right:8px;"></div>
+    <span style="font-size:13px;color:#6b7280;">Starting analysis…</span>
+  </div>
+  {% endif %}
+
 </div>

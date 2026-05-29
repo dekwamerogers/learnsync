@@ -417,16 +417,33 @@ def preview_poll_fragment(request, pk):
     from django.urls import reverse
     from django.utils import timezone
     from datetime import timedelta
+    from selfpaced.engine import PREVIEW_STEPS
     job = get_object_or_404(IngestionJob, pk=pk)
     if job.status == 'previewing':
-        # Safety net: if still previewing after 3 minutes the background thread
+        # Safety net: if still previewing after 90 seconds the background thread
         # died without updating the status — fail it so the UI unsticks.
-        if timezone.now() - job.uploaded_at > timedelta(minutes=3):
+        if timezone.now() - job.uploaded_at > timedelta(seconds=90):
             job.status = 'failed'
             job.errors = ['Preview timed out — the analysis took too long. Please try uploading again.']
             job.save(update_fields=['status', 'errors'])
             return HttpResponse('', headers={'HX-Redirect': reverse('sp_job_detail', args=[pk])})
-        return render(request, 'selfpaced/admin/_preview_status.html', {'job': job})
+        log_by_step = {entry['step']: entry for entry in (job.progress_log or [])}
+        steps_done = len(log_by_step)
+        preview_pipeline = []
+        for i, label in enumerate(PREVIEW_STEPS, start=1):
+            entry = log_by_step.get(i)
+            preview_pipeline.append({
+                'label':      label,
+                'entry':      entry,
+                'is_done':    entry is not None,
+                'is_current': not entry and i == steps_done + 1,
+            })
+        pct = int(steps_done / len(PREVIEW_STEPS) * 100)
+        return render(request, 'selfpaced/admin/_preview_status.html', {
+            'job': job,
+            'preview_pipeline': preview_pipeline,
+            'preview_pct': pct,
+        })
     if job.status == 'pending_review':
         return HttpResponse('', headers={'HX-Redirect': reverse('sp_job_review', args=[pk])})
     # Failed, cancelled, or anything else — go to job detail

@@ -71,6 +71,13 @@ PIPELINE_STEPS = [
     'Upserting enrolments & progress',
     'Computing health flags',
     'Creating snapshots',
+    'Finalising',
+]
+
+PREVIEW_STEPS = [
+    'Reading & parsing CSV',
+    'Detecting programmes & courses',
+    'Counting new learners',
 ]
 
 # Placeholder names written when no real name was available.
@@ -350,11 +357,9 @@ def run_ingestion(job_id: int) -> None:
     try:
         import io as _io
         if job.file:
-            # Pass the open file handle — _execute streams it without reading all bytes.
             job.file.open('rb')
-            _execute(job, job.file)
+            _execute(job, _io.BytesIO(job.file.read()))
         else:
-            # Legacy: file stored as DB blob — wrap in BytesIO for the same interface.
             _execute(job, _io.BytesIO(bytes(job.file_content)))
     except Exception as exc:
         logger.exception('IngestionJob %d failed: %s', job_id, exc)
@@ -1353,6 +1358,7 @@ def _execute(job, source) -> None:
     # ------------------------------------------------------------------
     # Phase 7 — Finalise
     # ------------------------------------------------------------------
+    _emit_progress(job, 7, 'Data committed — cleaning up')
     job.status = 'complete'
     job.rows_processed = len(parsed) + skip_count
     job.new_learners = new_learners
@@ -1382,7 +1388,7 @@ def preview_ingestion(job_id: int) -> dict:
     job = IngestionJob.objects.get(pk=job_id)
     if job.file:
         job.file.open('rb')
-        source = job.file
+        source = _io.BytesIO(job.file.read())
     else:
         source = _io.BytesIO(bytes(job.file_content))
 
@@ -1394,6 +1400,10 @@ def preview_ingestion(job_id: int) -> dict:
         job.save(update_fields=['status', 'errors'])
         return {}
 
+    # Reset progress log for fresh preview progress display.
+    job.progress_log = []
+    job.save(update_fields=['progress_log'])
+
     parsed = []
     skip_count = 0
     for raw in row_iter:
@@ -1402,6 +1412,8 @@ def preview_ingestion(job_id: int) -> dict:
             skip_count += 1
             continue
         parsed.append(r)
+
+    _emit_progress(job, 1, f'Parsed {len(parsed):,} rows — {skip_count} skipped')
 
     # Cross-enrolment signals
     cross_enrolled: dict[str, set] = {}
@@ -1419,6 +1431,9 @@ def preview_ingestion(job_id: int) -> dict:
 
     from selfpaced.detector import bulk_detect as _bulk_detect
     ehub_resolution: dict[str, tuple] = _bulk_detect(ehub_course_hint)
+
+    prog_count = sum(1 for p, _ in ehub_resolution.values() if p is not None)
+    _emit_progress(job, 2, f'Matched {len(ehub_course_hint):,} class names across {prog_count} programme(s)')
 
     # Collect needed (prog, seq) → name and count rows per programme.
     needed: dict[tuple, str] = {}     # (prog_pk, seq) -> name
@@ -1541,6 +1556,9 @@ def preview_ingestion(job_id: int) -> dict:
         existing_emails.update(
             Learner.objects.filter(email__in=_chunk).values_list('email', flat=True)
         )
+
+    new_count = len(processable_emails - existing_emails)
+    _emit_progress(job, 3, f'{new_count:,} new learner{"s" if new_count != 1 else ""}, {len(existing_emails):,} existing')
 
     preview = {
         'rows_processed':     len(parsed) + skip_count,

@@ -27,12 +27,8 @@
     </span>
   </div>
 
-  <div class="sp-card" style="padding:48px 24px;text-align:center;">
-    <div style="display:inline-block;width:36px;height:36px;border:3px solid #e5e7eb;border-top-color:#0452F0;border-radius:50%;animation:sp-spin .8s linear infinite;margin-bottom:16px;"></div>
-    <div style="font-size:15px;font-weight:600;color:#111827;margin-bottom:6px;">Analysing your CSV</div>
-    <div style="font-size:13px;color:#9ca3af;margin-bottom:24px;">
-      Matching rows to learners and programmes — usually takes 10–30 seconds for large files.
-    </div>
+  <div class="sp-card" style="padding:24px;">
+    <div style="font-size:13px;font-weight:600;color:#111827;margin-bottom:16px;">Analysing your CSV</div>
     {# HTMX polls every 2s; HX-Redirect fires when preview finishes #}
     <div id="preview-loader"
          hx-get="{% url 'sp_preview_poll' job.pk %}"
@@ -40,6 +36,9 @@
          hx-target="#preview-loader"
          hx-swap="outerHTML">
       {% include "selfpaced/admin/_preview_status.html" %}
+    </div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:16px;">
+      Large files can take 10–30 seconds — please keep this page open.
     </div>
   </div>
 
