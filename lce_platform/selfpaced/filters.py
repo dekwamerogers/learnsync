@@ -102,6 +102,11 @@ class LearnerFilter(django_filters.FilterSet):
         label='Enrolled since',
         empty_label='All time',
     )
+    enrolment_health = django_filters.MultipleChoiceFilter(
+        choices=HealthStatus.choices,
+        method='filter_enrolment_health',
+        label='Enrolment Health',
+    )
     flag = django_filters.MultipleChoiceFilter(
         choices=[
             ('inactive',                'Inactive'),
@@ -205,6 +210,23 @@ class LearnerFilter(django_filters.FilterSet):
                 enrolments__is_graduated=True,
             )
         return queryset.filter(q).distinct()
+
+    def filter_enrolment_health(self, queryset, name, value):
+        """
+        Filter on the per-programme Enrolment.health_status rather than the
+        learner-level overall_health_status rollup.  When a programme filter is
+        also active both conditions are applied in a single .filter() span so
+        they must match the *same* Enrolment row (avoids cross-join false positives).
+        """
+        if not value:
+            return queryset
+        prog_pks = [p for p in self.data.getlist('programme') if p]
+        if prog_pks:
+            return queryset.filter(
+                enrolments__programme_id__in=prog_pks,
+                enrolments__health_status__in=value,
+            ).distinct()
+        return queryset.filter(enrolments__health_status__in=value).distinct()
 
     def filter_since(self, queryset, name, value):
         try:

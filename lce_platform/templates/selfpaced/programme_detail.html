@@ -35,15 +35,15 @@
         </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:16px;text-align:center;min-width:480px;">
-        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&health=dormant" style="text-decoration:none;">
+        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&enrolment_health=dormant" style="text-decoration:none;">
           <div style="font-size:22px;font-weight:700;color:#7c3aed;">{{ health_counts.dormant }}</div>
           <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">Dormant</div>
         </a>
-        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&health=at_risk" style="text-decoration:none;">
+        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&enrolment_health=at_risk" style="text-decoration:none;">
           <div style="font-size:22px;font-weight:700;color:#d97706;">{{ health_counts.at_risk }}</div>
           <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">At Risk</div>
         </a>
-        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&health=active" style="text-decoration:none;">
+        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&enrolment_health=active" style="text-decoration:none;">
           <div style="font-size:22px;font-weight:700;color:#16a34a;">{{ health_counts.active }}</div>
           <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">Active</div>
         </a>
@@ -51,7 +51,7 @@
           <div style="font-size:22px;font-weight:700;color:#2563eb;">{{ health_counts.graduated }}</div>
           <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">Graduated</div>
         </a>
-        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&health=not_yet_started" style="text-decoration:none;">
+        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&enrolment_health=not_yet_started" style="text-decoration:none;">
           <div style="font-size:22px;font-weight:700;color:#9ca3af;">{{ health_counts.not_yet_started }}</div>
           <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">Not Started</div>
         </a>
@@ -122,7 +122,7 @@
   <div class="sp-card">
     <div class="sp-card-header">
       <span>At-Risk &amp; Dormant Flags</span>
-      <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&health=at_risk&health=dormant"
+      <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&enrolment_health=at_risk&enrolment_health=dormant"
          style="font-size:11px;color:#0452F0;text-decoration:none;">View all →</a>
     </div>
     <div class="sp-card-body" style="display:flex;flex-direction:column;gap:8px;">
@@ -164,7 +164,7 @@
           <span style="font-size:11px;color:#9ca3af;flex-shrink:0;">{{ course.expected_duration_days }}d</span>
         {% endif %}
         {% if course.enrolled_count %}
-        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&course={{ course.full_name|urlencode_val }}"
+        <a href="{% url 'sp_learner_list' %}?programme={{ programme.pk }}&course={{ course.pk }}&course_status=completed"
            style="font-size:11px;color:#0452F0;text-decoration:none;flex-shrink:0;">→</a>
         {% endif %}
       </div>

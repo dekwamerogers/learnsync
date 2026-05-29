@@ -1229,16 +1229,45 @@ def _execute(job, source) -> None:
     # ------------------------------------------------------------------
     touched_enrolments = list(all_enrolments.values())
 
+    # Graduated enrolments need no flag computation — set directly and skip.
+    # This avoids loading their APs and running the full flag pipeline.
+    non_grad_enrolments = []
+    for e in touched_enrolments:
+        if e.is_graduated:
+            e.health_status = HealthStatus.GRADUATED
+            e.active_flags  = []
+            e.flag_detail   = {}
+        else:
+            non_grad_enrolments.append(e)
+
+    # Collect CE pks only for non-graduated enrolments.
+    non_grad_ce_pks = {
+        ce.pk
+        for e in non_grad_enrolments
+        for ce in ces_by_enrolment.get(e.pk, [])
+    }
+
+    # Load APs with only the columns the flag functions actually read:
+    #   is_accessed / is_submitted / is_passed / accessed_date / submitted_date
+    #   assignment.name  (flag_stuck_on_assignment detail only)
     aps_by_ce: dict[int, list] = defaultdict(list)
-    for chunk in _chunked(touched_ce_pks):
-        for ap in AssignmentProgress.objects.filter(
-            course_enrolment_id__in=chunk
-        ).select_related('assignment'):
+    for chunk in _chunked(non_grad_ce_pks):
+        for ap in (
+            AssignmentProgress.objects
+            .filter(course_enrolment_id__in=chunk)
+            .select_related('assignment')
+            .only(
+                'id', 'course_enrolment_id',
+                'is_accessed', 'is_submitted', 'is_passed',
+                'accessed_date', 'submitted_date',
+                'assignment_id', 'assignment__id', 'assignment__name',
+            )
+        ):
             aps_by_ce[ap.course_enrolment_id].append(ap)
 
-    # Pre-fetch learner → set of enrolment PKs that have any in_progress/completed CE.
-    # Eliminates the N+1 DB query inside flag_stalled_progression.
-    all_learner_pks = {e.learner_id for e in touched_enrolments}
+    # Pre-fetch learner → active enrolment PKs (for flag_stalled_progression).
+    # Scoped to non-graduated learners only.
+    all_learner_pks = {e.learner_id for e in non_grad_enrolments}
     learner_active_enrolment_pks: dict[int, set[int]] = defaultdict(set)
     for chunk in _chunked(all_learner_pks):
         for row in (
@@ -1251,18 +1280,13 @@ def _execute(job, source) -> None:
         ):
             learner_active_enrolment_pks[row['enrolment__learner_id']].add(row['enrolment_id'])
 
-    # Pre-fetch payment status so payment-forced at_risk is reflected in Enrolment.health_status.
+    # Payment status — learner is already select_related on all_enrolments; no extra query.
     _payment_issue_statuses = {PaymentStatus.DUE_SOON, PaymentStatus.GRACE_PERIOD, PaymentStatus.OVERDUE}
-    learner_payment: dict = {}
-    for chunk in _chunked(all_learner_pks):
-        learner_payment.update(
-            Learner.objects.filter(email__in=chunk).values_list('email', 'payment_status')
-        )
 
     threshold_cache: dict = {}
     health_errors = []
 
-    for enrolment in touched_enrolments:
+    for enrolment in non_grad_enrolments:
         try:
             ces = ces_by_enrolment.get(enrolment.pk, [])
             aps: list = []
@@ -1279,9 +1303,7 @@ def _execute(job, source) -> None:
                 programme_course_count=prog_course_counts.get(enrolment.programme_id),
                 learner_active_enrolment_pks=learner_active_enrolment_pks,
             )
-            # Payment issue is tracked as a flag but does not override health status —
-            # engagement status (active, dormant, etc.) is kept independent of payment.
-            if (learner_payment.get(enrolment.learner_id) in _payment_issue_statuses
+            if (enrolment.learner.payment_status in _payment_issue_statuses
                     and FlagCode.PAYMENT_ISSUE not in active_flags):
                 active_flags = list(active_flags) + [FlagCode.PAYMENT_ISSUE]
             enrolment.health_status = health_status

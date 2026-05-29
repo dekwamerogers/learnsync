@@ -151,8 +151,11 @@ def compute_pod_pace(pod_assignment, as_of=None):
         pace_status = PaceStatus.SIGNIFICANTLY_BEHIND
     elif current_pace == 0:
         # No courses completed yet.
-        # Grace period: don't penalise new learners who haven't finished a course yet.
-        if days_active <= GRACE_DAYS:
+        # Grace period: only applies if the required pace doesn't yet expect a completion.
+        # e.g. a tight deadline (17.5/week) means the learner should already have courses
+        # done — the grace period should not mask that.
+        expected_by_now = (required_pace or 0) * weeks_active
+        if days_active <= GRACE_DAYS and expected_by_now < 1.0:
             pace_status = PaceStatus.ON_TRACK
         else:
             pace_status = PaceStatus.SIGNIFICANTLY_BEHIND
