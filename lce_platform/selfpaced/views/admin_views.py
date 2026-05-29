@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def _run_ingestion_thread(job_pk: int) -> None:
-    """Run ingestion in a background thread, isolated from the request connection."""
+    """Run ingestion in a background thread (Windows/dev only)."""
     from django.db import close_old_connections
     from selfpaced.engine import run_ingestion
     close_old_connections()
@@ -26,6 +26,43 @@ def _run_ingestion_thread(job_pk: int) -> None:
         pass  # engine writes the failure to the job record
     finally:
         close_old_connections()
+
+
+def _launch_ingestion(job_pk: int) -> None:
+    """
+    Start ingestion in a way that survives Passenger worker recycling.
+
+    On POSIX (Linux/cPanel): spawn `python manage.py sp_ingest <pk>` as a
+    detached subprocess — it lives independently of the Passenger worker that
+    started it, so Passenger recycling cannot kill it mid-run.  The subprocess
+    PID is stored on the job so the cancel view can kill it if needed.
+
+    On Windows (dev): fall back to a background thread (no Passenger there).
+    """
+    import os
+    if os.name == 'posix':
+        import subprocess, sys
+        from pathlib import Path
+        from selfpaced.models import IngestionJob
+        manage_py = str(Path(__file__).resolve().parent.parent.parent / 'manage.py')
+        log_dir = Path(__file__).resolve().parent.parent.parent / 'logs'
+        log_dir.mkdir(exist_ok=True)
+        log_fh = open(log_dir / f'ingest_{job_pk}.log', 'a')
+        proc = subprocess.Popen(
+            [sys.executable, manage_py, 'sp_ingest', str(job_pk)],
+            env=os.environ.copy(),
+            close_fds=True,
+            start_new_session=True,
+            stdout=log_fh,
+            stderr=log_fh,
+        )
+        # Store PID so cancel_ingestion_job can SIGTERM it if needed.
+        rd = dict(IngestionJob.objects.values_list('review_data', flat=True).get(pk=job_pk) or {})
+        rd['subprocess_pid'] = proc.pid
+        IngestionJob.objects.filter(pk=job_pk).update(review_data=rd)
+    else:
+        t = threading.Thread(target=_run_ingestion_thread, args=(job_pk,), daemon=True)
+        t.start()
 
 
 def _run_preview_thread(job_pk: int) -> None:
@@ -113,10 +150,7 @@ def review_job(request, pk):
         if action == 'confirm':
             job.status = 'processing'
             job.save(update_fields=['status'])
-            t = threading.Thread(
-                target=_run_ingestion_thread, args=(job.pk,), daemon=True
-            )
-            t.start()
+            _launch_ingestion(job.pk)
             messages.info(request, f'Ingestion started for job #{pk} — the page will update automatically.')
             return redirect('sp_job_detail', pk=pk)
         elif action == 'cancel':
@@ -175,8 +209,7 @@ def retry_job(request, pk):
     job.progress_log = []
     job.save(update_fields=['status', 'errors', 'warnings', 'rows_processed',
                             'new_learners', 'flagged_row_count', 'progress_log'])
-    t = threading.Thread(target=_run_ingestion_thread, args=(job.pk,), daemon=True)
-    t.start()
+    _launch_ingestion(job.pk)
     messages.info(request, f'Job #{pk} re-queued — the page will update automatically.')
     return redirect('sp_job_detail', pk=pk)
 
@@ -184,14 +217,28 @@ def retry_job(request, pk):
 @login_required
 @require_POST
 def cancel_ingestion_job(request, pk):
-    """Request cancellation of an in-progress ingestion job.
-    Sets the cancel_requested flag; the background thread picks it up between phases."""
+    """Cancel an in-progress ingestion job.
+
+    Sets the DB cancel flag (checked between phases) and, on POSIX, also sends
+    SIGTERM to the subprocess PID stored at launch so it stops immediately even
+    if it is mid-parse rather than waiting for the next checkpoint.
+    """
     job = get_object_or_404(IngestionJob, pk=pk)
     if job.status != 'processing':
         messages.warning(request, f'Job #{pk} is not currently processing (status: {job.status}).')
         return redirect('sp_job_detail', pk=pk)
     IngestionJob.objects.filter(pk=pk).update(cancel_requested=True)
-    messages.info(request, f'Cancellation requested for job #{pk} — it will stop at the next checkpoint.')
+    # If the ingestion is running as a subprocess, kill it directly.
+    import os
+    if os.name == 'posix':
+        pid = (job.review_data or {}).get('subprocess_pid')
+        if pid:
+            import signal
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass  # already finished
+    messages.info(request, f'Cancellation requested for job #{pk}.')
     return redirect('sp_job_detail', pk=pk)
 
 

@@ -14,6 +14,7 @@ Phases:
 
 import logging
 import re
+import time
 from collections import defaultdict
 from datetime import date, datetime
 
@@ -362,8 +363,10 @@ def run_ingestion(job_id: int) -> None:
     try:
         import io as _io
         if job.file:
+            # Stream directly — avoids loading the full file into RAM twice
+            # (once as bytes, once as BytesIO) which can OOM on shared hosts.
             job.file.open('rb')
-            _execute(job, _io.BytesIO(job.file.read()))
+            _execute(job, job.file)
         else:
             _execute(job, _io.BytesIO(bytes(job.file_content)))
     except Exception as exc:
@@ -389,6 +392,15 @@ def _execute(job, source) -> None:
     # work, but uploading with the correct export date is strongly preferred so
     # that "days since activity" flags are anchored to reality.
     upload_date: date = job.data_as_of_date or date.today()
+    _started_at = time.monotonic()
+    _MAX_RUNTIME_SECS = 3600  # 1 hour hard limit — marks job failed rather than hanging forever
+
+    def _check_timeout():
+        if time.monotonic() - _started_at > _MAX_RUNTIME_SECS:
+            job.status = 'failed'
+            job.errors = ['Ingestion timed out — exceeded 1-hour limit. Contact support if this recurs.']
+            job.save(update_fields=['status', 'errors'])
+            raise RuntimeError('ingestion_timeout')
 
     # ------------------------------------------------------------------
     # Phase 1 — Parse
@@ -433,6 +445,7 @@ def _execute(job, source) -> None:
     _emit_progress(job, 1, f'Parsed {len(parsed):,} rows — {skip_count} skipped'
                    + (f' ({country_skip} unmonitored country)' if country_skip else ''))
 
+    _check_timeout()
     # Cancel check after Phase 1
     if _is_cancel_requested(job.pk, IngestionJob):
         _mark_cancelled(job, 'Cancelled after Phase 1 (parsing)')
@@ -680,6 +693,7 @@ def _execute(job, source) -> None:
         + (f' — {flagged_count} flagged' if flagged_count else ''),
     )
 
+    _check_timeout()
     # Cancel check after Phase 2
     if _is_cancel_requested(job.pk, IngestionJob):
         _mark_cancelled(job, 'Cancelled after Phase 2 (catalogue)')
@@ -751,6 +765,7 @@ def _execute(job, source) -> None:
         f'{updated_learners:,} updated',
     )
 
+    _check_timeout()
     # Cancel check after Phase 3
     if _is_cancel_requested(job.pk, IngestionJob):
         _mark_cancelled(job, 'Cancelled after Phase 3 (learner upsert)')
@@ -1176,6 +1191,7 @@ def _execute(job, source) -> None:
                         to_create, batch_size=500, ignore_conflicts=True,
                     )
 
+    _check_timeout()
     # Cancel check after Phase 4 (enrolments written — safe stopping point)
     if _is_cancel_requested(job.pk, IngestionJob):
         _mark_cancelled(job, 'Cancelled after Phase 4 (enrolments & progress)')

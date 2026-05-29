@@ -107,6 +107,8 @@ _NULL_STRINGS = frozenset(['n/a', '#n/a', 'na', 'n.a.', 'none', 'null', 'nil', '
 #                 Legitimate accented letters (é, ñ, ọ, etc.) are preserved.
 
 _4BYTE_RE = re.compile(r'[\U00010000-\U0010FFFF]', re.UNICODE)
+# Removes unsafe characters from ASCII-only name strings in one C-level pass.
+_NAME_UNSAFE_ASCII_RE = re.compile(r"[^a-zA-Z \-'.]")
 
 # Unicode categories kept in name fields:
 #   L* = letters (Latin, Arabic, CJK, Cyrillic, …)
@@ -130,10 +132,12 @@ def _sanitize_name(s: str) -> str:
     emoji, box-drawing characters, and other symbols.
     """
     s = _strip_4byte(s)
-    # Fast path: plain ASCII letters/spaces/hyphens/apostrophes are always safe
-    # and str.isalpha() is far cheaper than unicodedata.category() per char.
-    if all(c.isalpha() or c in " -'.’‘" for c in s):
+    if not s:
         return s
+    # ASCII fast path: single C-level regex pass, no per-char Python overhead.
+    if s.isascii():
+        return _NAME_UNSAFE_ASCII_RE.sub('', s)
+    # Unicode slow path: per-char category check for accented/non-Latin names.
     return ''.join(
         c for c in s
         if unicodedata.category(c) in _NAME_SAFE_CATS or c in _NAME_SAFE_CHARS
