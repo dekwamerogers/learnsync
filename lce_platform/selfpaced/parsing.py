@@ -168,11 +168,11 @@ def parse_date(val) -> date | None:
         raw = _str(val)
         if not raw:
             return None
-        # Fast path: YYYY-MM-DD is the standard eHub export format.
-        # date.fromisoformat() is ~10× faster than strptime.
-        if len(raw) == 10 and raw[4] == '-' and raw[7] == '-':
+        # Fast path: covers YYYY-MM-DD and YYYY-MM-DD HH:MM:SS (eHub export format).
+        # Slicing raw[:10] handles both; date.fromisoformat() is ~10× faster than strptime.
+        if len(raw) >= 10 and raw[4] == '-' and raw[7] == '-':
             try:
-                d = date.fromisoformat(raw)
+                d = date.fromisoformat(raw[:10])
                 return None if d == NULL_DATE else d
             except ValueError:
                 pass
