@@ -114,3 +114,12 @@ def ap_pass_pct(assignment_progress_qs):
         return None
     passed = sum(1 for ap in submitted if ap.is_passed)
     return round(passed / len(submitted) * 100)
+
+
+@register.filter
+def abs_val(value):
+    """Return the absolute value of a number."""
+    try:
+        return abs(value)
+    except (TypeError, ValueError):
+        return value

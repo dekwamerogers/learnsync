@@ -1446,13 +1446,13 @@ def preview_ingestion(job_id: int) -> dict:
     job.progress_log = []
     job.save(update_fields=['progress_log'])
 
-    # ── Single streaming pass ────────────────────────────────────────────────
-    # Keep only the 6 fields needed for post-detect work as slim tuples.
-    # Avoids materialising ~30-field dicts for 100k+ rows (~200 MB → ~30 MB).
-    slim_rows: list[tuple] = []   # (email, ehub, seq, cname, assign_name)
+    # ── Pass 1: collect detection inputs (streaming, no materialisation) ────
+    # Two-pass approach keeps only the tiny per-run aggregates in memory rather
+    # than a full 150 k-row tuple list alongside the BytesIO (~45 MB saved).
     ehub_course_hint: dict[str, str] = {}
     cross_enrolled: dict[str, set] = {}
     all_emails: set[str] = set()
+    row_count = 0
     skip_count = 0
 
     for raw in row_iter:
@@ -1463,8 +1463,6 @@ def preview_ingestion(job_id: int) -> dict:
 
         ehub  = _str(get(raw, 'ehub_class_name'))
         cname = _clean_course_name(_str(get(raw, 'course_name')))
-        seq   = _seq(get(raw, 'course_sequence_number'))
-        aname = _text(get(raw, 'assignment_name'))
 
         if ehub and ehub not in ehub_course_hint:
             ehub_course_hint[ehub] = cname
@@ -1473,9 +1471,8 @@ def preview_ingestion(job_id: int) -> dict:
             cross_enrolled.setdefault(pname, set()).add(email)
 
         all_emails.add(email)
-        slim_rows.append((email, ehub, seq, cname, aname))
+        row_count += 1
 
-    row_count = len(slim_rows)
     _emit_progress(job, 1, f'Parsed {row_count:,} rows — {skip_count} skipped')
 
     # ── Programme / course detection ─────────────────────────────────────────
@@ -1490,18 +1487,32 @@ def preview_ingestion(job_id: int) -> dict:
     needed: dict[tuple, str] = {}
     prog_row_counts: dict[str, int] = {}
     flagged_preview = []
+    flagged_count = 0
     flagged_emails: set[str] = set()
     new_prog_codes: set[str] = set()
     needed_assign_keys: set[tuple] = set()
 
-    for email, ehub, seq, cname, aname in slim_rows:
+    # ── Pass 2: categorise rows (iter_csv seeks source back to 0) ───────────
+    _, row_iter2 = iter_csv(source)
+    for raw in row_iter2:
+        email = _str(get(raw, 'email')).lower()
+        if not email or '@' not in email:
+            continue
+
+        ehub  = _str(get(raw, 'ehub_class_name'))
+        seq   = _seq(get(raw, 'course_sequence_number'))
+        cname = _clean_course_name(_str(get(raw, 'course_name')))
+        aname = _text(get(raw, 'assignment_name'))
+
         prog, course = ehub_resolution.get(ehub, (None, None))
 
         if prog is None:
-            flagged_preview.append({
-                'flag_reason': 'unrecognised_pattern',
-                'raw_data': {'email': email, 'ehub_class_name': ehub},
-            })
+            flagged_count += 1
+            if len(flagged_preview) < 50:
+                flagged_preview.append({
+                    'flag_reason': 'unrecognised_pattern',
+                    'raw_data': {'email': email, 'ehub_class_name': ehub},
+                })
             flagged_emails.add(email)
             continue
 
@@ -1578,11 +1589,7 @@ def preview_ingestion(job_id: int) -> dict:
 
     # ── New vs existing learners ─────────────────────────────────────────────
     processable_emails = all_emails - flagged_emails
-    existing_emails: set[str] = set()
-    for _chunk in _chunked(list(processable_emails)):
-        existing_emails.update(
-            Learner.objects.filter(email__in=_chunk).values_list('email', flat=True)
-        )
+    existing_emails = processable_emails & set(Learner.objects.values_list('email', flat=True))
 
     new_count = len(processable_emails - existing_emails)
     _emit_progress(job, 3, f'{new_count:,} new learner{"s" if new_count != 1 else ""}, {len(existing_emails):,} existing')
@@ -1590,14 +1597,14 @@ def preview_ingestion(job_id: int) -> dict:
     preview = {
         'rows_processed':     row_count + skip_count,
         'new_learners':       new_count,
-        'updated_learners':   len(processable_emails & existing_emails),
-        'flagged_count':      len(flagged_preview),
+        'updated_learners':   len(existing_emails),
+        'flagged_count':      flagged_count,
         'warnings':           [],
         'new_programmes':     [{'code': c} for c in sorted(new_prog_codes)],
         'new_courses':        truly_new_courses,
         'new_assignments':    new_assign_count,
         'programme_breakdown': programme_breakdown,
-        'flagged_rows':       flagged_preview[:50],
+        'flagged_rows':       flagged_preview,
         'cross_enrolled_programmes': sorted(
             [{'name': n, 'learner_count': len(emails)} for n, emails in cross_enrolled.items()],
             key=lambda x: -x['learner_count'],

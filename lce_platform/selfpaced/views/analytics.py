@@ -6,7 +6,7 @@ from django.db.models import Count, F, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce, Greatest, TruncWeek
 from django.shortcuts import render
 
-from selfpaced.models import AssignmentProgress, Course, CourseEnrolment, Enrolment, Learner, Programme
+from selfpaced.models import AssignmentProgress, Course, CourseEnrolment, Enrolment, Learner, PaymentStatus, Programme
 from selfpaced.utils import safe_json
 
 _PROG_PALETTE = [
@@ -42,12 +42,14 @@ def analytics(request):
     # Build a clean (JOIN-free) email subquery first — using a JOIN-based
     # learner_qs directly with .values().annotate() can inflate COUNT results
     # because each learner appears once per matching enrolment row.
+    # Paid learners only — exclude unknown/unpaid status to match the manager report definition.
     _activity_emails = (
         Learner.objects
         .filter(
             enrolments__has_activity_data=True,
             enrolments__programme__is_prerequisite=False,
         )
+        .exclude(payment_status=PaymentStatus.UNKNOWN)
         .values_list('email', flat=True)
         .distinct()
     )
@@ -63,6 +65,7 @@ def analytics(request):
             has_activity_data=True,
         )
         .filter(Q(programme__start_date__isnull=True) | Q(programme__start_date__lte=date.today()))
+        .exclude(learner__payment_status=PaymentStatus.UNKNOWN)
     )
     if country_filter:
         enrolment_qs = enrolment_qs.filter(learner__country__in=country_filter)
@@ -327,6 +330,73 @@ def analytics(request):
     def _as_date(v):
         return v.date() if hasattr(v, 'hour') else v
 
+    # ── Per-programme weekly cohort breakdown ─────────────────────────────
+    # For each programme, for each enrolment cohort week, the current health
+    # distribution — mirrors cohort_data but broken down per programme.
+    _prog_cohort_raw = list(
+        Enrolment.objects
+        .filter(pk__in=enrolment_qs.values('pk'))
+        .annotate(_eff=_date_expr)
+        .exclude(_eff__isnull=True)
+        .annotate(week=TruncWeek('_eff'))
+        .values('week', 'programme__code', 'programme__name', 'health_status')
+        .annotate(n=Count('id'))
+        .order_by('programme__code', 'week')
+    )
+    _prog_cohort_act_raw = list(
+        Enrolment.objects
+        .filter(pk__in=list(_activated_ids))
+        .annotate(_eff=_date_expr)
+        .exclude(_eff__isnull=True)
+        .annotate(week=TruncWeek('_eff'))
+        .values('week', 'programme__code')
+        .annotate(n=Count('id'))
+        .order_by('programme__code', 'week')
+    )
+
+    _pc: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+    _pc_names: dict = {}
+    for r in _prog_cohort_raw:
+        w = _as_date(r['week'])
+        code = r['programme__code']
+        _pc_names[code] = r['programme__name']
+        _pc[code][w][r['health_status']] = r['n']
+
+    _pc_activated: dict = defaultdict(lambda: defaultdict(int))
+    for r in _prog_cohort_act_raw:
+        w = _as_date(r['week'])
+        _pc_activated[r['programme__code']][w] = r['n']
+
+    prog_cohort_chart = []
+    for code in sorted(_pc.keys()):
+        all_weeks = sorted(set(_pc[code].keys()) | set(_pc_activated.get(code, {}).keys()))
+        weeks_data = []
+        for week_start in all_weeks:
+            h = _pc[code][week_start]
+            week_end = week_start + timedelta(days=6)
+            total = sum(h.values())
+            activated = _pc_activated.get(code, {}).get(week_start, 0)
+            not_started = h.get('not_yet_started', 0)
+            weeks_data.append({
+                'label':       f'{week_start.strftime("%d %b")} – {week_end.strftime("%d %b")}',
+                'week_start':  week_start.isoformat(),
+                'total':       total,
+                'activated':   activated,
+                'active':      h.get('active', 0),
+                'at_risk':     h.get('at_risk', 0),
+                'dormant':     h.get('dormant', 0),
+                'graduated':   h.get('graduated', 0),
+                'not_started': not_started,
+                'activation_rate': round(activated / total * 100, 1) if total else 0,
+                'active_rate':     round(h.get('active', 0) / total * 100, 1) if total else 0,
+                'at_risk_rate':    round(h.get('at_risk', 0) / total * 100, 1) if total else 0,
+            })
+        prog_cohort_chart.append({
+            'code':  code,
+            'name':  _pc_names.get(code, code),
+            'weeks': weeks_data,
+        })
+
     # Series 1: daily unique active learners per programme
     # "Active" = accessed or submitted at least one assignment on that day.
     # Two queries merged in Python so each (date, programme, learner) triple
@@ -505,9 +575,10 @@ def analytics(request):
         'course_chart_data':      safe_json(course_chart_data),
         'active_progs':           active_progs,
         # cohort
-        'cohort_type':  cohort_type,
-        'cohort_data':  safe_json(cohort_data),
-        'cohort_rows':  cohort_data,
+        'cohort_type':       cohort_type,
+        'cohort_data':       safe_json(cohort_data),
+        'cohort_rows':       cohort_data,
+        'prog_cohort_data':  safe_json(prog_cohort_chart),
         # progression over time
         'prog_week_labels':              prog_week_labels,
         'activation_datasets':                activation_datasets,

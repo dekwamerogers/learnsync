@@ -295,7 +295,6 @@ def home(request):
         IngestionJob.objects.filter(status='complete').order_by('-uploaded_at')[:2]
     )
     last_job = recent_jobs[0] if recent_jobs else None
-    prev_job = recent_jobs[1] if len(recent_jobs) >= 2 else None
 
     data_stale = False
     if last_job:
@@ -304,9 +303,22 @@ def home(request):
     else:
         data_stale = True
 
-    # ── Deltas vs previous upload ─────────────────────────────────────────
+    # Week-on-week comparison: most recent upload from at least 6 days ago
+    week_ago_job = (
+        IngestionJob.objects
+        .filter(status='complete', uploaded_at__date__lte=today - timedelta(days=6))
+        .order_by('-uploaded_at')
+        .first()
+    )
+    delta_label = (
+        f"vs {week_ago_job.uploaded_at.strftime('%d %b')}"
+        if week_ago_job else None
+    )
+
+    # ── Deltas vs previous week ───────────────────────────────────────────
     deltas = None
-    if prev_job:
+    if week_ago_job:
+        prev_job = week_ago_job
         prev_snaps = (
             EnrolmentSnapshot.objects
             .filter(ingestion_job=prev_job)
@@ -476,6 +488,7 @@ def home(request):
         'data_stale':          data_stale,
         'today':               today,
         'deltas':              deltas,
+        'delta_label':         delta_label,
         'chart_programme_labels': chart_programme_labels,
         'chart_graduated':    chart_graduated,
         'chart_active':       chart_active,

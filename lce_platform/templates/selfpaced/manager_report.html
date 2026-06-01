@@ -1,4 +1,5 @@
 {% extends "selfpaced/base.html" %}
+{% load sp_filters %}
 {% block title %}Manager Report — LearnSync{% endblock %}
 {% block nav_manager_report %}sp-nav-active{% endblock %}
 {% block page_title %}Manager Report{% endblock %}
@@ -35,6 +36,13 @@
   .glossary-row:last-child { border-bottom:none; }
   .glossary-term { flex:0 0 160px; font-size:12px; font-weight:600; color:#374151; }
   .glossary-def  { flex:1; font-size:12px; color:#6b7280; line-height:1.55; }
+  /* Week-on-week delta indicators */
+  .wk-delta { font-size:9px; display:block; margin-top:1px; font-weight:600; line-height:1.2; white-space:nowrap; }
+  .wk-delta-up  { color:#16a34a; }
+  .wk-delta-dn  { color:#dc2626; }
+  .wk-delta-nc  { color:#9ca3af; }
+  .wk-delta-inv-up { color:#dc2626; }
+  .wk-delta-inv-dn { color:#16a34a; }
 </style>
 {% endblock %}
 
@@ -184,23 +192,40 @@
               <a href="{% url 'sp_learner_list' %}?enrol_from={{ r.week_start|date:'Y-m-d' }}&enrol_to={{ r.week_end|date:'Y-m-d' }}&cohort_basis=effective"
                  style="color:inherit;text-decoration:none;" title="View all learners in this cohort">{{ r.label }}</a>
             </td>
-            <td>{{ r.enrolled }}</td>
-            <td>{{ r.activated }}</td>
+            <td>
+              {{ r.enrolled }}
+              {% if r.delta_enrolled is not None %}<span class="wk-delta {% if r.delta_enrolled > 0 %}wk-delta-up{% elif r.delta_enrolled < 0 %}wk-delta-dn{% else %}wk-delta-nc{% endif %}">{% if r.delta_enrolled > 0 %}+{% endif %}{{ r.delta_enrolled }}</span>{% endif %}
+            </td>
+            <td>
+              {{ r.activated }}
+              {% if r.delta_activated is not None %}<span class="wk-delta {% if r.delta_activated > 0 %}wk-delta-up{% elif r.delta_activated < 0 %}wk-delta-dn{% else %}wk-delta-nc{% endif %}">{% if r.delta_activated > 0 %}+{% endif %}{{ r.delta_activated }}</span>{% endif %}
+            </td>
             <td style="color:#0d9488;font-weight:600;">
               {% if r.active %}
               <a href="{% url 'sp_learner_list' %}?enrol_from={{ r.week_start|date:'Y-m-d' }}&enrol_to={{ r.week_end|date:'Y-m-d' }}&cohort_basis=effective&health=active"
                  style="color:inherit;text-decoration:none;" title="View active learners in this cohort">{{ r.active }}</a>
               {% else %}{{ r.active }}{% endif %}
+              {% if r.delta_active is not None %}<span class="wk-delta {% if r.delta_active > 0 %}wk-delta-up{% elif r.delta_active < 0 %}wk-delta-dn{% else %}wk-delta-nc{% endif %}">{% if r.delta_active > 0 %}+{% endif %}{{ r.delta_active }}</span>{% endif %}
             </td>
             <td style="color:#dc2626;font-weight:600;">
               {% if r.at_risk %}
               <a href="{% url 'sp_learner_list' %}?enrol_from={{ r.week_start|date:'Y-m-d' }}&enrol_to={{ r.week_end|date:'Y-m-d' }}&cohort_basis=effective&health=at_risk"
                  style="color:inherit;text-decoration:none;" title="View at-risk learners in this cohort">{{ r.at_risk }}</a>
               {% else %}{{ r.at_risk }}{% endif %}
+              {% if r.delta_at_risk is not None %}<span class="wk-delta {% if r.delta_at_risk > 0 %}wk-delta-inv-up{% elif r.delta_at_risk < 0 %}wk-delta-inv-dn{% else %}wk-delta-nc{% endif %}">{% if r.delta_at_risk > 0 %}+{% endif %}{{ r.delta_at_risk }}</span>{% endif %}
             </td>
-            <td>{{ r.graduated }}</td>
-            <td style="color:#7c3aed;font-weight:600;">{{ r.badges }}</td>
-            <td>{{ r.interventions }}</td>
+            <td>
+              {{ r.graduated }}
+              {% if r.delta_graduated is not None %}<span class="wk-delta {% if r.delta_graduated > 0 %}wk-delta-up{% elif r.delta_graduated < 0 %}wk-delta-dn{% else %}wk-delta-nc{% endif %}">{% if r.delta_graduated > 0 %}+{% endif %}{{ r.delta_graduated }}</span>{% endif %}
+            </td>
+            <td style="color:#7c3aed;font-weight:600;">
+              {{ r.badges }}
+              {% if r.delta_badges is not None %}<span class="wk-delta {% if r.delta_badges > 0 %}wk-delta-up{% elif r.delta_badges < 0 %}wk-delta-dn{% else %}wk-delta-nc{% endif %}">{% if r.delta_badges > 0 %}+{% endif %}{{ r.delta_badges }}</span>{% endif %}
+            </td>
+            <td>
+              {{ r.interventions }}
+              {% if r.delta_interventions is not None %}<span class="wk-delta {% if r.delta_interventions > 0 %}wk-delta-up{% elif r.delta_interventions < 0 %}wk-delta-dn{% else %}wk-delta-nc{% endif %}">{% if r.delta_interventions > 0 %}+{% endif %}{{ r.delta_interventions }}</span>{% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -242,23 +267,40 @@
                   <a href="{% url 'sp_learner_list' %}?enrol_from={{ w.week_start|date:'Y-m-d' }}&enrol_to={{ w.week_end|date:'Y-m-d' }}&cohort_basis=effective&programme={{ p.code }}"
                      style="color:inherit;text-decoration:none;" title="View learners in this cohort">{{ w.label }}</a>
                 </td>
-                <td>{{ w.enrolled }}</td>
-                <td>{{ w.activated }}</td>
+                <td>
+                  {{ w.enrolled }}
+                  {% if w.delta_enrolled is not None %}<span class="wk-delta {% if w.delta_enrolled > 0 %}wk-delta-up{% elif w.delta_enrolled < 0 %}wk-delta-dn{% else %}wk-delta-nc{% endif %}">{% if w.delta_enrolled > 0 %}+{% endif %}{{ w.delta_enrolled }}</span>{% endif %}
+                </td>
+                <td>
+                  {{ w.activated }}
+                  {% if w.delta_activated is not None %}<span class="wk-delta {% if w.delta_activated > 0 %}wk-delta-up{% elif w.delta_activated < 0 %}wk-delta-dn{% else %}wk-delta-nc{% endif %}">{% if w.delta_activated > 0 %}+{% endif %}{{ w.delta_activated }}</span>{% endif %}
+                </td>
                 <td style="color:#0d9488;font-weight:600;">
                   {% if w.active %}
                   <a href="{% url 'sp_learner_list' %}?enrol_from={{ w.week_start|date:'Y-m-d' }}&enrol_to={{ w.week_end|date:'Y-m-d' }}&cohort_basis=effective&programme={{ p.code }}&health=active"
                      style="color:inherit;text-decoration:none;">{{ w.active }}</a>
                   {% else %}{{ w.active }}{% endif %}
+                  {% if w.delta_active is not None %}<span class="wk-delta {% if w.delta_active > 0 %}wk-delta-up{% elif w.delta_active < 0 %}wk-delta-dn{% else %}wk-delta-nc{% endif %}">{% if w.delta_active > 0 %}+{% endif %}{{ w.delta_active }}</span>{% endif %}
                 </td>
                 <td style="color:#dc2626;font-weight:600;">
                   {% if w.at_risk %}
                   <a href="{% url 'sp_learner_list' %}?enrol_from={{ w.week_start|date:'Y-m-d' }}&enrol_to={{ w.week_end|date:'Y-m-d' }}&cohort_basis=effective&programme={{ p.code }}&health=at_risk"
                      style="color:inherit;text-decoration:none;">{{ w.at_risk }}</a>
                   {% else %}{{ w.at_risk }}{% endif %}
+                  {% if w.delta_at_risk is not None %}<span class="wk-delta {% if w.delta_at_risk > 0 %}wk-delta-inv-up{% elif w.delta_at_risk < 0 %}wk-delta-inv-dn{% else %}wk-delta-nc{% endif %}">{% if w.delta_at_risk > 0 %}+{% endif %}{{ w.delta_at_risk }}</span>{% endif %}
                 </td>
-                <td>{{ w.graduated }}</td>
-                <td style="color:#7c3aed;font-weight:600;">{{ w.badges }}</td>
-                <td>{{ w.interventions }}</td>
+                <td>
+                  {{ w.graduated }}
+                  {% if w.delta_graduated is not None %}<span class="wk-delta {% if w.delta_graduated > 0 %}wk-delta-up{% elif w.delta_graduated < 0 %}wk-delta-dn{% else %}wk-delta-nc{% endif %}">{% if w.delta_graduated > 0 %}+{% endif %}{{ w.delta_graduated }}</span>{% endif %}
+                </td>
+                <td style="color:#7c3aed;font-weight:600;">
+                  {{ w.badges }}
+                  {% if w.delta_badges is not None %}<span class="wk-delta {% if w.delta_badges > 0 %}wk-delta-up{% elif w.delta_badges < 0 %}wk-delta-dn{% else %}wk-delta-nc{% endif %}">{% if w.delta_badges > 0 %}+{% endif %}{{ w.delta_badges }}</span>{% endif %}
+                </td>
+                <td>
+                  {{ w.interventions }}
+                  {% if w.delta_interventions is not None %}<span class="wk-delta {% if w.delta_interventions > 0 %}wk-delta-up{% elif w.delta_interventions < 0 %}wk-delta-dn{% else %}wk-delta-nc{% endif %}">{% if w.delta_interventions > 0 %}+{% endif %}{{ w.delta_interventions }}</span>{% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>

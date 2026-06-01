@@ -286,6 +286,11 @@ def _build_report_data():
         )
         if any(row[c] for c in _WEEK_COLS)
     ]
+    # Week-over-week deltas — each row compared to the previous row in the list
+    for i, row in enumerate(weekly_rows):
+        prev = weekly_rows[i - 1] if i > 0 else None
+        for col in _WEEK_COLS:
+            row[f'delta_{col}'] = (row[col] - prev[col]) if prev is not None else None
 
     # ── Per-programme per-week breakdown ──────────────────────────────────────
     _prog_name_map = {p['programme__code']: p['programme__name'] for p in prog_rows}
@@ -377,6 +382,13 @@ def _build_report_data():
         }
         for code in _all_pw_codes
     ]
+    # Week-over-week deltas per programme
+    for prog in weekly_by_prog:
+        pw = prog['weeks']
+        for i, w in enumerate(pw):
+            pw_prev = pw[i - 1] if i > 0 else None
+            for col in _WEEK_COLS:
+                w[f'delta_{col}'] = (w[col] - pw_prev[col]) if pw_prev is not None else None
 
     # Learner detail for Excel — paid learners only
     learner_rows = list(

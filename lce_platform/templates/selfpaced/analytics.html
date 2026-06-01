@@ -363,6 +363,35 @@
 
 </div>
 
+<!-- ══ COHORT TREND ═══════════════════════════════════════════════════ -->
+{% if cohort_rows %}
+<div class="an-section-header"><span>Week-on-Week Trends</span><small>Health metric trends across cohort enrolment weeks</small></div>
+<div class="sp-card" style="padding:20px;margin-bottom:14px;">
+  <div style="margin-bottom:16px;">
+    <div style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;">Overall Cohort Trend</div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:2px;">How has each health metric moved across successive enrolment weeks? Rising At Risk or Dormant lines need attention.</div>
+  </div>
+  <div style="position:relative;height:320px;"><canvas id="cohortTrendLine"></canvas></div>
+</div>
+
+<!-- ══ PROGRAMME COHORT TRENDS ════════════════════════════════════════ -->
+<div class="an-section-header"><span>Programme Week-on-Week Trends</span><small>Per-programme cohort health over enrolment weeks — select a programme</small></div>
+<div class="sp-card" style="padding:20px;margin-bottom:14px;">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+    <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-right:4px;">Programme</div>
+    {% for p in active_progs %}
+    <button class="pc-prog-pill" data-code="{{ p.code }}"
+            style="font-size:11px;font-weight:600;border-radius:20px;padding:3px 11px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-family:inherit;line-height:1.4;">
+      {{ p.code }}
+    </button>
+    {% endfor %}
+  </div>
+  <div id="pc-no-data-msg" style="display:none;height:100px;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;">No weekly data for this programme</div>
+  <div style="position:relative;height:320px;"><canvas id="progCohortLine"></canvas></div>
+  <div id="pc-prog-table" style="overflow-x:auto;margin-top:20px;"></div>
+</div>
+{% endif %}
+
 <!-- ══ DISTRIBUTION ═══════════════════════════════════════════════════ -->
 <div class="an-section-header"><span>Distribution</span><small>Where are learners coming from, and how are they spread across programmes?</small></div>
 <div style="display:grid;grid-template-columns:1fr 220px;gap:14px;margin-bottom:14px;">
@@ -509,6 +538,7 @@
   "dowData":       {{ dow_activity|safe }},
   "courseData":    {{ course_chart_data|safe }},
   "cohortData":    {{ cohort_data|safe }},
+  "progCohortData": {{ prog_cohort_data|safe }},
   "progWeekLabels":                    {{ prog_week_labels|safe }},
   "activationDatasets":                {{ activation_datasets|safe }},
   "activationCumulativeDatasets":      {{ activation_cumulative_datasets|safe }},
@@ -594,6 +624,7 @@
   function destroyCharts() {
     ['analyticsHealthDonut','analyticsProgBar','analyticsFlagBar','analyticsCountryBar',
      'analyticsPortfolioDonut','analyticsDowBar','analyticsCourseBar','cohortBar','cohortBarStarted',
+     'cohortTrendLine','progCohortLine',
      'activationLine','activationCumLine','completionLine','completionCumLine',
      'firstModuleLine','firstModuleCumLine'].forEach(function(id) {
       var c = document.getElementById(id);
@@ -987,6 +1018,163 @@
         },
       });
       cohortStartedCanvas.style.cursor = 'pointer';
+    }
+
+    // ── Cohort trend line chart ───────────────────────────────────
+    var trendCanvas = document.getElementById('cohortTrendLine');
+    if (trendCanvas && D.cohortData && D.cohortData.length) {
+      new Chart(trendCanvas, {
+        type: 'line',
+        data: {
+          labels: D.cohortData.map(function(r) { return r.label; }),
+          datasets: [
+            { label: 'Active',     data: D.cohortData.map(function(r){return r.active;}),    borderColor: SP_COLORS.active,    backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, datalabels:{display:false} },
+            { label: 'At Risk',    data: D.cohortData.map(function(r){return r.at_risk;}),   borderColor: SP_COLORS.at_risk,   backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, datalabels:{display:false} },
+            { label: 'Dormant',    data: D.cohortData.map(function(r){return r.dormant;}),   borderColor: SP_COLORS.dormant,   backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, borderDash:[4,3], datalabels:{display:false} },
+            { label: 'Activated',  data: D.cohortData.map(function(r){return r.activated;}), borderColor: '#f97316',           backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, datalabels:{display:false} },
+            { label: 'Graduated',  data: D.cohortData.map(function(r){return r.graduated;}), borderColor: SP_COLORS.graduated, backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, borderDash:[3,3], datalabels:{display:false} },
+            { label: 'Not Started',data: D.cohortData.map(function(r){return r.not_started;}),borderColor:SP_COLORS.not_yet_started,backgroundColor:'transparent',borderWidth:1.5,pointRadius:2,tension:0.3,borderDash:[2,4],datalabels:{display:false} },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          layout: { padding: { top: 10 } },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 10, family: 'Poppins,sans-serif' } } },
+            datalabels: { display: false },
+            tooltip: {
+              callbacks: {
+                footer: function(items) {
+                  var total = D.cohortData[items[0].dataIndex].total;
+                  return 'Cohort total: ' + total;
+                },
+              },
+            },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+            y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 10 } } },
+          },
+          animation: { duration: 300 },
+        },
+      });
+    }
+
+    // ── Per-programme cohort line chart ───────────────────────────
+    var progCohortRaw  = D.progCohortData || [];
+    var progCohortChart = null;
+
+    function setPcPill(code) {
+      document.querySelectorAll('.pc-prog-pill').forEach(function(b) {
+        var on = b.dataset.code === code;
+        b.style.background  = on ? '#0452F0' : '#f9fafb';
+        b.style.color       = on ? '#fff'    : '#374151';
+        b.style.borderColor = on ? '#0452F0' : '#e5e7eb';
+      });
+    }
+
+    function renderProgCohortChart(code) {
+      var prog    = progCohortRaw.find(function(p) { return p.code === code; });
+      var noMsg   = document.getElementById('pc-no-data-msg');
+      var canvas  = document.getElementById('progCohortLine');
+      var tblEl   = document.getElementById('pc-prog-table');
+      if (!prog || !prog.weeks || !prog.weeks.length) {
+        if (noMsg)  noMsg.style.display  = 'flex';
+        if (canvas) canvas.style.display = 'none';
+        if (progCohortChart) { progCohortChart.destroy(); progCohortChart = null; }
+        if (tblEl) tblEl.innerHTML = '';
+        return;
+      }
+      if (noMsg)  noMsg.style.display  = 'none';
+      if (canvas) canvas.style.display = 'block';
+
+      var labels = prog.weeks.map(function(w) { return w.label; });
+      if (progCohortChart) progCohortChart.destroy();
+      progCohortChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            { label:'Active',     data:prog.weeks.map(function(w){return w.active;}),    borderColor:SP_COLORS.active,          backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, datalabels:{display:false} },
+            { label:'At Risk',    data:prog.weeks.map(function(w){return w.at_risk;}),   borderColor:SP_COLORS.at_risk,         backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, datalabels:{display:false} },
+            { label:'Dormant',    data:prog.weeks.map(function(w){return w.dormant;}),   borderColor:SP_COLORS.dormant,         backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, borderDash:[4,3], datalabels:{display:false} },
+            { label:'Activated',  data:prog.weeks.map(function(w){return w.activated;}), borderColor:'#f97316',                 backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, datalabels:{display:false} },
+            { label:'Graduated',  data:prog.weeks.map(function(w){return w.graduated;}), borderColor:SP_COLORS.graduated,       backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, borderDash:[3,3], datalabels:{display:false} },
+            { label:'Not Started',data:prog.weeks.map(function(w){return w.not_started;}),borderColor:SP_COLORS.not_yet_started,backgroundColor:'transparent', borderWidth:1.5,pointRadius:2, tension:0.3, borderDash:[2,4], datalabels:{display:false} },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          layout: { padding: { top: 10 } },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 10, family: 'Poppins,sans-serif' } } },
+            datalabels: { display: false },
+            tooltip: {
+              callbacks: {
+                footer: function(items) {
+                  var idx = items[0] && items[0].dataIndex;
+                  if (idx === undefined) return '';
+                  var w = prog.weeks[idx];
+                  return 'Total: ' + w.total + '  |  Act. rate: ' + w.activation_rate + '%  |  At-risk rate: ' + w.at_risk_rate + '%';
+                },
+              },
+            },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+            y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { precision: 0, font: { size: 10 } } },
+          },
+          animation: { duration: 300 },
+        },
+      });
+
+      // Summary table below the chart
+      if (tblEl && prog.weeks.length) {
+        var rows = prog.weeks.map(function(w, i) {
+          var prev = i > 0 ? prog.weeks[i-1] : null;
+          function delta(curr, p) { if (!p) return ''; var d = curr - p.active; /* placeholder */ return ''; }
+          function dCell(curr, prev_val, invert) {
+            if (prev_val === undefined || prev_val === null) return '<span style="color:#9ca3af">—</span>';
+            var d = curr - prev_val;
+            if (d === 0) return curr + ' <span style="font-size:9px;color:#9ca3af">=</span>';
+            var isGood = invert ? d < 0 : d > 0;
+            var col = isGood ? '#16a34a' : '#dc2626';
+            var sign = d > 0 ? '+' : '';
+            return curr + ' <span style="font-size:9px;font-weight:600;color:' + col + '">' + sign + d + '</span>';
+          }
+          return '<tr style="border-bottom:1px solid #f3f4f6;">'
+            + '<td style="padding:6px 8px;font-size:11px;color:#374151;white-space:nowrap;">' + w.label + '</td>'
+            + '<td style="padding:6px 8px;font-size:11px;text-align:right;font-weight:700;">' + w.total + '</td>'
+            + '<td style="padding:6px 8px;font-size:11px;text-align:right;color:#f97316;">' + dCell(w.activated, prev && prev.activated, false) + '</td>'
+            + '<td style="padding:6px 8px;font-size:11px;text-align:right;color:#15803d;">' + dCell(w.active, prev && prev.active, false) + '</td>'
+            + '<td style="padding:6px 8px;font-size:11px;text-align:right;color:#b45309;">' + dCell(w.at_risk, prev && prev.at_risk, true) + '</td>'
+            + '<td style="padding:6px 8px;font-size:11px;text-align:right;color:#6366f1;">' + dCell(w.dormant, prev && prev.dormant, true) + '</td>'
+            + '<td style="padding:6px 8px;font-size:11px;text-align:right;color:#1d4ed8;">' + dCell(w.graduated, prev && prev.graduated, false) + '</td>'
+            + '</tr>';
+        }).join('');
+        tblEl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:11px;">'
+          + '<thead><tr style="background:#f9fafb;">'
+          + '<th style="padding:6px 8px;text-align:left;color:#6b7280;font-weight:600;white-space:nowrap;">Week</th>'
+          + '<th style="padding:6px 8px;text-align:right;color:#6b7280;font-weight:600;">Total</th>'
+          + '<th style="padding:6px 8px;text-align:right;color:#f97316;font-weight:600;">Activated</th>'
+          + '<th style="padding:6px 8px;text-align:right;color:#15803d;font-weight:600;">Active</th>'
+          + '<th style="padding:6px 8px;text-align:right;color:#b45309;font-weight:600;">At Risk</th>'
+          + '<th style="padding:6px 8px;text-align:right;color:#6366f1;font-weight:600;">Dormant</th>'
+          + '<th style="padding:6px 8px;text-align:right;color:#1d4ed8;font-weight:600;">Graduated</th>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table>';
+      }
+    }
+
+    document.querySelectorAll('.pc-prog-pill').forEach(function(b) {
+      b.addEventListener('click', function() { setPcPill(b.dataset.code); renderProgCohortChart(b.dataset.code); });
+    });
+
+    var firstPcWithData = progCohortRaw.find(function(p) { return p.weeks && p.weeks.length; });
+    if (firstPcWithData) {
+      setPcPill(firstPcWithData.code);
+      renderProgCohortChart(firstPcWithData.code);
     }
 
     // ── Shared datalabels config for progression line charts ──────

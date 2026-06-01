@@ -1,4 +1,5 @@
 {% extends "selfpaced/base.html" %}
+{% load sp_filters %}
 
 {% block title %}Home — LearnSync{% endblock %}
 {% block page_title %}Daily Briefing{% endblock %}
@@ -123,6 +124,10 @@
         Dormant
         <span class="sp-tip tip-down" data-tip="No activity for 14+ days. These learners have effectively disengaged and need re-engagement outreach. Click to see the full list.">?</span>
       </div>
+      {% if deltas and deltas.dormant is not None %}{% with d=deltas.dormant %}
+      <div style="font-size:9px;font-weight:600;margin-top:4px;color:{% if d < 0 %}#16a34a{% elif d > 0 %}#dc2626{% else %}#9ca3af{% endif %};">
+        {% if d > 0 %}+{{ d }}{% elif d < 0 %}{{ d }}{% else %}={% endif %} {{ delta_label }}
+      </div>{% endwith %}{% endif %}
     </div>
   </a>
 
@@ -133,6 +138,10 @@
         At Risk
         <span class="sp-tip tip-down" data-tip="One or more flags active (e.g. Inactive, Stuck on Assignment, Low Pass Rate). Still engaged but needs attention. Click to see who and why.">?</span>
       </div>
+      {% if deltas and deltas.at_risk is not None %}{% with d=deltas.at_risk %}
+      <div style="font-size:9px;font-weight:600;margin-top:4px;color:{% if d < 0 %}#16a34a{% elif d > 0 %}#dc2626{% else %}#9ca3af{% endif %};">
+        {% if d > 0 %}+{{ d }}{% elif d < 0 %}{{ d }}{% else %}={% endif %} {{ delta_label }}
+      </div>{% endwith %}{% endif %}
     </div>
   </a>
 
@@ -143,6 +152,10 @@
         Active
         <span class="sp-tip tip-down" data-tip="Recently active learners with no concerning flags. Target state — no immediate action needed. Click to browse the list.">?</span>
       </div>
+      {% if deltas and deltas.active is not None %}{% with d=deltas.active %}
+      <div style="font-size:9px;font-weight:600;margin-top:4px;color:{% if d > 0 %}#16a34a{% elif d < 0 %}#dc2626{% else %}#9ca3af{% endif %};">
+        {% if d > 0 %}+{{ d }}{% elif d < 0 %}{{ d }}{% else %}={% endif %} {{ delta_label }}
+      </div>{% endwith %}{% endif %}
     </div>
   </a>
 
@@ -153,6 +166,10 @@
         Graduated
         <span class="sp-tip tip-down" data-tip="Learners who completed all required courses in a programme that awards certificates. Counts unique learners (one person = 1, even if they graduated from two programmes).">?</span>
       </div>
+      {% if deltas and deltas.graduated is not None %}{% with d=deltas.graduated %}
+      <div style="font-size:9px;font-weight:600;margin-top:4px;color:{% if d > 0 %}#16a34a{% elif d < 0 %}#dc2626{% else %}#9ca3af{% endif %};">
+        {% if d > 0 %}+{{ d }}{% elif d < 0 %}{{ d }}{% else %}={% endif %} {{ delta_label }}
+      </div>{% endwith %}{% endif %}
     </div>
   </a>
 
@@ -163,6 +180,10 @@
         Not Started
         <span class="sp-tip tip-down" data-tip="Enrolled but never accessed any content. First-touch outreach is recommended — they've not yet seen what the programme offers.">?</span>
       </div>
+      {% if deltas and deltas.not_yet_started is not None %}{% with d=deltas.not_yet_started %}
+      <div style="font-size:9px;font-weight:600;margin-top:4px;color:{% if d < 0 %}#16a34a{% elif d > 0 %}#f97316{% else %}#9ca3af{% endif %};">
+        {% if d > 0 %}+{{ d }}{% elif d < 0 %}{{ d }}{% else %}={% endif %} {{ delta_label }}
+      </div>{% endwith %}{% endif %}
     </div>
   </a>
 
@@ -185,6 +206,10 @@
         <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px;">
           <div style="font-size:28px;font-weight:700;color:#111827;line-height:1;">{{ total_learners }}</div>
         </div>
+        {% if deltas and deltas.total_learners is not None %}{% with d=deltas.total_learners %}
+        <div style="font-size:9px;font-weight:600;color:{% if d > 0 %}#16a34a{% elif d < 0 %}#dc2626{% else %}#9ca3af{% endif %};">
+          {% if d > 0 %}+{{ d }}{% elif d < 0 %}{{ d }}{% else %}={% endif %} {{ delta_label }}
+        </div>{% endwith %}{% endif %}
         <div style="font-size:10px;color:#9ca3af;margin-top:4px;">In eHub activity data</div>
         {% if enrolled_not_reached %}
         <div style="font-size:10px;color:#d97706;margin-top:2px;">
@@ -277,6 +302,10 @@
     <div style="display:flex;align-items:baseline;gap:10px;margin-top:4px;">
       <div style="font-size:32px;font-weight:700;color:#1d4ed8;line-height:1;">{% if grad_rate is not None %}{{ grad_rate }}%{% else %}—{% endif %}</div>
     </div>
+    {% if deltas and deltas.grad_rate is not None %}{% with d=deltas.grad_rate %}
+    <div style="font-size:9px;font-weight:600;margin-top:2px;color:{% if d > 0 %}#16a34a{% elif d < 0 %}#dc2626{% else %}#9ca3af{% endif %};">
+      {% if d > 0 %}+{% endif %}{{ d }}pp {{ delta_label }}
+    </div>{% endwith %}{% endif %}
     <div style="font-size:11px;color:#9ca3af;margin-top:8px;">Of activated learners who have graduated</div>
   </div>
 
@@ -288,10 +317,18 @@
     <div style="display:flex;align-items:baseline;gap:10px;margin-top:4px;">
       <div style="font-size:32px;font-weight:700;color:#1d4ed8;line-height:1;">{{ certificates_count }}</div>
     </div>
+    {% if deltas and deltas.certs is not None %}{% with d=deltas.certs %}
+    <div style="font-size:9px;font-weight:600;margin-top:2px;color:{% if d > 0 %}#16a34a{% elif d < 0 %}#dc2626{% else %}#9ca3af{% endif %};">
+      {% if d > 0 %}+{{ d }}{% elif d < 0 %}{{ d }}{% else %}={% endif %} {{ delta_label }}
+    </div>{% endwith %}{% endif %}
     <div style="font-size:11px;color:#9ca3af;margin-top:8px;">Programme graduations</div>
     <div style="margin-top:8px;padding-top:8px;border-top:1px solid #f3f4f6;display:flex;align-items:baseline;gap:8px;">
       <span style="font-size:18px;font-weight:700;color:#7c3aed;">{{ badges_count }}</span>
       <span style="font-size:10px;color:#9ca3af;">course badges</span>
+      {% if deltas and deltas.badges is not None %}{% with d=deltas.badges %}
+      <span style="font-size:9px;font-weight:600;color:{% if d > 0 %}#16a34a{% elif d < 0 %}#dc2626{% else %}#9ca3af{% endif %};">
+        {% if d > 0 %}+{{ d }}{% elif d < 0 %}{{ d }}{% else %}={% endif %} {{ delta_label }}
+      </span>{% endwith %}{% endif %}
     </div>
   </div>
 
