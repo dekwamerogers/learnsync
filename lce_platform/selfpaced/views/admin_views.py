@@ -120,12 +120,11 @@ def upload_csv(request):
                 file_name=f.name,
                 file=f,            # stored on disk via FileField — no DB blob
                 file_content=b'',  # kept for backward-compat; new jobs don't use it
-                status='previewing',
+                status='processing',
                 data_as_of_date=data_as_of_date,
             )
-            t = threading.Thread(target=_run_preview_thread, args=(job.pk,), daemon=True)
-            t.start()
-            return redirect('sp_job_review', pk=job.pk)
+            _launch_ingestion(job.pk)
+            return redirect('sp_job_detail', pk=job.pk)
     else:
         form = CSVUploadForm()
     return render(request, 'selfpaced/admin/upload.html', {'form': form})
