@@ -1415,7 +1415,7 @@ def _execute(job, source) -> None:
     job.file_content = b''
     job.save(update_fields=[
         'status', 'rows_processed', 'new_learners', 'updated_learners',
-        'new_assignments', 'flagged_row_count', 'warnings', 'file_content', 'file',
+        'new_assignments', 'flagged_row_count', 'warnings', 'errors', 'file_content', 'file',
     ])
 
 
